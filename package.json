@@ -2,12 +2,12 @@
   "name": "np-job-portal",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
+"scripts": {
+  "dev": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" next dev --webpack",
+  "build": "next build",
+  "start": "next start",
+  "lint": "next lint"
+},
   "dependencies": {
     "clsx": "^2.1.1",
     "firebase": "^12.19.0",
