@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, MessageCircle, Mail, MapPin, ShieldAlert, Award, ExternalLink } from 'lucide-react';
+import { Phone, MessageCircle, ShieldAlert, Award, ExternalLink } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 
 export const Footer: React.FC = () => {

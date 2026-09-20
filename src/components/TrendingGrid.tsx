@@ -1,6 +1,7 @@
 import React from 'react';
-import { Sparkles, ArrowRight, MessageCircle, Calendar, Users, Flame } from 'lucide-react';
-import { TRENDING_CARDS, OWNER_INFO } from '../data/portalData';
+import Link from 'next/link';
+import { Sparkles, ArrowRight, MessageCircle, Calendar, Flame } from 'lucide-react';
+import { TRENDING_CARDS } from '../data/portalData';
 import { TrendingCard } from '../types';
 
 interface TrendingGridProps {
@@ -94,6 +95,40 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard }) => {
                       फॉर्म भरें
                     </a>
                   </div>
+
+                  {/* Direct Poster & Sarkari Table Link */}
+                  {card.id === 'trend-1' && (
+                    <Link
+                      href="/jobs/mp-police-constable-2026"
+                      className="mt-2 text-center text-[10px] font-bold text-red-700 hover:underline block"
+                    >
+                      ★ सरकारी रिजल्ट टेबल व WhatsApp पोस्टर →
+                    </Link>
+                  )}
+                  {card.id === 'trend-2' && (
+                    <Link
+                      href="/jobs/mp-ayush-ug-counselling"
+                      className="mt-2 text-center text-[10px] font-bold text-emerald-700 hover:underline block"
+                    >
+                      ★ काउंसलिंग दिशानिर्देश व WhatsApp पोस्टर →
+                    </Link>
+                  )}
+                  {card.id === 'trend-3' && (
+                    <Link
+                      href="/jobs/ssc-chsl-2026"
+                      className="mt-2 text-center text-[10px] font-bold text-amber-800 hover:underline block"
+                    >
+                      ★ SSC CHSL टेबल व WhatsApp पोस्टर →
+                    </Link>
+                  )}
+                  {card.id === 'trend-4' && (
+                    <Link
+                      href="/jobs/railway-rrc-group-d"
+                      className="mt-2 text-center text-[10px] font-bold text-rose-700 hover:underline block"
+                    >
+                      ★ रेलवे भर्ती टेबल व WhatsApp पोस्टर →
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

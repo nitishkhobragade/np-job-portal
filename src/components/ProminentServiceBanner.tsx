@@ -1,6 +1,6 @@
 import React from 'react';
-import { MessageCircle, Phone, ShieldCheck, CheckCircle, Clock, Zap, FileCheck } from 'lucide-react';
-import { OWNER_INFO, SERVICE_BENEFITS } from '../data/portalData';
+import { MessageCircle, Phone, ShieldCheck, CheckCircle, Clock } from 'lucide-react';
+import { OWNER_INFO } from '../data/portalData';
 
 export const ProminentServiceBanner: React.FC = () => {
   return (

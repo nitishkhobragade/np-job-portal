@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, ExternalLink, MessageCircle, Phone, Calendar, Users, Award, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { X, ExternalLink, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
 
@@ -79,6 +80,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
                   <span className="text-xs text-neutral-500 font-medium">आवेदन की अंतिम तिथि:</span>
                   <p className="font-bold text-red-600 text-base">{job.lastDate}</p>
                 </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg flex items-center justify-between gap-3">
+                <div className="text-xs text-amber-900">
+                  <strong>नया:</strong> इस भर्ती का 1080×1350 WhatsApp पोस्टर एवं सरकारी रिजल्ट टेबल उपलब्ध है।
+                </div>
+                <Link
+                  href={`/jobs/${job.slug || job.id}`}
+                  className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-md shadow-xs transition-colors"
+                >
+                  पूरा पेज व पोस्टर देखें →
+                </Link>
               </div>
 
               <div className="bg-neutral-50 p-3 rounded-lg border border-neutral-200 space-y-2">

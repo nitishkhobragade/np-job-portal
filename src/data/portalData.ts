@@ -123,6 +123,7 @@ export const TRENDING_CARDS: TrendingCard[] = [
 export const LATEST_JOBS_DATA: JobItem[] = [
   {
     id: "job-1",
+    slug: "mp-police-constable-2026",
     title: "MP Police Constable GD / Radio Operator Bharti 2026",
     department: "MP Employees Selection Board (MPESB Bhopal)",
     totalPosts: "7,500 Posts",
@@ -138,6 +139,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-2",
+    slug: "mp-ayush-ug-counselling",
     title: "MP AYUSH UG BAMS / BHMS 2026 Online Counselling",
     department: "Directorate of AYUSH, Madhya Pradesh",
     totalPosts: "State Quota Seats",
@@ -153,6 +155,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-3",
+    slug: "ssc-chsl-2026",
     title: "SSC Combined Higher Secondary (10+2) Level CHSL 2026",
     department: "Staff Selection Commission (SSC Central)",
     totalPosts: "3,712 Posts",
@@ -168,6 +171,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-4",
+    slug: "railway-rrc-group-d",
     title: "Railway RRC Group D CEN 02/2026 Recruitment",
     department: "Railway Recruitment Cell (Indian Railways)",
     totalPosts: "32,450 Posts",
@@ -183,6 +187,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-5",
+    slug: "ibps-po-clerk-2026",
     title: "IBPS PO / Management Trainee XIV Online Form 2026",
     department: "Institute of Banking Personnel Selection",
     totalPosts: "4,455 Posts",
@@ -198,6 +203,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-6",
+    slug: "mp-forest-guard-2026",
     title: "MP Forest Guard (Vanrakshak) & Kshetra Rakshak 2026",
     department: "Madhya Pradesh Forest Department",
     totalPosts: "2,112 Posts",
@@ -213,6 +219,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-7",
+    slug: "mppsc-state-engineering-2026",
     title: "MPPSC State Engineering Service Exam 2026",
     department: "Madhya Pradesh Public Service Commission (Indore)",
     totalPosts: "184 Posts",
@@ -228,6 +235,7 @@ export const LATEST_JOBS_DATA: JobItem[] = [
   },
   {
     id: "job-8",
+    slug: "indian-army-agniveer-2026",
     title: "Indian Army Agniveer Rally General Duty & Clerk 2026",
     department: "Join Indian Army (Recruitment HQ Jabalpur/Bhopal)",
     totalPosts: "Various Rallies",

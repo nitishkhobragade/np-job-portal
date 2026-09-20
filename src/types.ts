@@ -1,5 +1,60 @@
+export interface JobPostDetail {
+  slug: string;
+  id: string;
+  title: string;
+  shortTitle: string;
+  department: string;
+  advtNo?: string;
+  totalPosts: string;
+  postDate: string;
+  startDate: string;
+  lastDate: string;
+  lastDateFee: string;
+  correctionDate?: string;
+  examDate?: string;
+  admitCardDate?: string;
+  feeGeneral: string;
+  feeReserved: string;
+  feePortal?: string;
+  paymentMode: string;
+  minAge: string;
+  maxAge: string;
+  ageCalculationDate?: string;
+  ageRelaxation: string;
+  state: 'MP' | 'Central' | 'All India';
+  category: 'Police' | 'Teaching' | 'Defense' | 'SSC/UPSC' | 'Railway' | 'Banking' | 'Health' | 'Other';
+  qualificationSummary: string;
+  vacanciesBreakdown: {
+    postName: string;
+    total: string;
+    eligibility: string;
+  }[];
+  categoryWisePosts?: {
+    category: string;
+    ur: string;
+    obc: string;
+    ews: string;
+    sc: string;
+    st: string;
+    total: string;
+  }[];
+  physicalStandards?: {
+    parameter: string;
+    male: string;
+    female: string;
+  }[];
+  howToApplySteps: string[];
+  requiredDocuments: string[];
+  applyUrl: string;
+  notificationPdfUrl: string;
+  syllabusUrl?: string;
+  officialWebsiteUrl: string;
+  serviceTagline?: string;
+}
+
 export interface JobItem {
   id: string;
+  slug?: string;
   title: string;
   department: string;
   totalPosts: string;

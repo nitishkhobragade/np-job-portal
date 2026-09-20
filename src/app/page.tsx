@@ -13,8 +13,7 @@ import { Footer } from '../components/Footer';
 import {
   LATEST_JOBS_DATA,
   ADMIT_CARD_DATA,
-  RESULTS_DATA,
-  OWNER_INFO
+  RESULTS_DATA
 } from '../data/portalData';
 import { JobItem, AdmitCardItem, ResultItem, TrendingCard } from '../types';
 

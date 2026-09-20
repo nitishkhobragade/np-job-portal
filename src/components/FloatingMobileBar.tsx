@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Phone, FileSignature, ShieldCheck } from 'lucide-react';
+import { MessageCircle, Phone, ShieldCheck } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 
 export const FloatingMobileBar: React.FC = () => {

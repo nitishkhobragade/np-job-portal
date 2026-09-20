@@ -1,14 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import Link from 'next/link';
 import {
   Briefcase,
   CreditCard,
   FileCheck2,
   Calendar,
   Users,
-  ExternalLink,
   MessageCircle,
   Clock,
-  Sparkles,
   ChevronRight,
   Filter
 } from 'lucide-react';
@@ -180,14 +179,23 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                     </div>
 
                     {/* Fast WhatsApp Call-to-Action */}
-                    <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <button
-                        type="button"
-                        onClick={() => onSelectJob(job)}
-                        className="text-neutral-600 hover:text-neutral-900 font-medium text-[11px] flex items-center gap-1"
-                      >
-                        पात्रता विवरण <ChevronRight className="w-3 h-3" />
-                      </button>
+                    <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs flex-wrap gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectJob(job)}
+                          className="text-neutral-600 hover:text-neutral-900 font-medium text-[11px] flex items-center gap-0.5"
+                        >
+                          क्विक व्यू
+                        </button>
+                        <span className="text-neutral-300">|</span>
+                        <Link
+                          href={`/jobs/${job.slug || job.id}`}
+                          className="text-red-700 hover:text-red-800 font-bold text-[11px] flex items-center gap-0.5"
+                        >
+                          पेज व पोस्टर <ChevronRight className="w-3 h-3" />
+                        </Link>
+                      </div>
 
                       <a
                         href={formBharwayeinUrl}

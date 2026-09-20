@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, MessageCircle, Search, ShieldCheck, FileText, CheckCircle2, Award } from 'lucide-react';
+import { Phone, MessageCircle, Search, CheckCircle2, Award } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 
 interface HeaderProps {
