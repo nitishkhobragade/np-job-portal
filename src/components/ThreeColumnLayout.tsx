@@ -46,7 +46,9 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
 
       const matchesCategory =
         selectedCategory === 'All Updates' ||
-        (selectedCategory === 'MP Special' && job.state === 'MP') ||
+        selectedCategory === 'Latest Jobs' ||
+        (selectedCategory === 'Tech Jobs' && (job.isTechJob || job.category === 'Tech/IT')) ||
+        (selectedCategory === 'MP Special' && (job.state === 'MP' || job.department.includes('MP') || job.title.includes('MP'))) ||
         (selectedCategory === 'SSC/UPSC' && (job.category === 'SSC/UPSC' || job.title.includes('SSC') || job.title.includes('UPSC'))) ||
         (selectedCategory === 'Police' && (job.category === 'Police' || job.title.includes('Police'))) ||
         (selectedCategory === 'Railway' && (job.category === 'Railway' || job.title.includes('Railway'))) ||
@@ -95,12 +97,29 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
           </p>
         </div>
 
-        {(searchQuery || selectedCategory !== 'All Updates') && (
-          <div className="flex items-center gap-2 text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 rounded-lg">
-            <Filter className="w-3.5 h-3.5 text-amber-700" />
-            <span>फ़िल्टर सक्रिय: {selectedCategory} {searchQuery && `| "${searchQuery}"`}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {(searchQuery || selectedCategory !== 'All Updates') && (
+            <div className="flex items-center gap-2 text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 rounded-lg">
+              <Filter className="w-3.5 h-3.5 text-amber-700" />
+              <span>फ़िल्टर: {selectedCategory} {searchQuery && `| "${searchQuery}"`}</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <Link
+              href="/category/latest-jobs"
+              className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-bold rounded-md shadow-2xs transition-colors flex items-center gap-1"
+            >
+              <span>Layout A (Sarkari Classic)</span>
+            </Link>
+            <Link
+              href="/category/latest-jobs"
+              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-md shadow-2xs transition-colors flex items-center gap-1"
+            >
+              <span>Layout B (FreeJobAlert)</span>
+            </Link>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 3-Column SarkariResult Layout */}
@@ -153,9 +172,16 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                           {job.title}
                         </button>
                         
-                        <p className="text-[11px] text-neutral-500 mt-0.5 line-clamp-1">
-                          {job.department}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <p className="text-[11px] text-neutral-500 line-clamp-1">
+                            {job.department}
+                          </p>
+                          {job.companyName && (
+                            <span className="bg-blue-600 text-white font-black text-[9px] px-1.5 py-0.2 rounded shrink-0">
+                              {job.companyName}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {job.isNew && (

@@ -94,6 +94,49 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
                 </Link>
               </div>
 
+              {/* Tech Job Highlights if applicable */}
+              {(job.isTechJob || job.companyName) && (
+                <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-blue-900 border-b border-blue-200/80 pb-2">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                      <span>कॉर्पोरेट / IT जॉब विवरण</span>
+                    </span>
+                    {job.companyName && (
+                      <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-[11px] font-black">
+                        {job.companyName}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {job.role && (
+                      <div>
+                        <span className="text-slate-500 font-medium">पद (Role):</span>
+                        <p className="font-bold text-slate-800">{job.role}</p>
+                      </div>
+                    )}
+                    {job.experience && (
+                      <div>
+                        <span className="text-slate-500 font-medium">अनुभव (Experience):</span>
+                        <p className="font-bold text-slate-800">{job.experience}</p>
+                      </div>
+                    )}
+                    {job.location && (
+                      <div>
+                        <span className="text-slate-500 font-medium">जॉब लोकेशन:</span>
+                        <p className="font-bold text-slate-800">{job.location}</p>
+                      </div>
+                    )}
+                    {job.batchEligibility && (
+                      <div>
+                        <span className="text-slate-500 font-medium">पात्र बैच (Batch):</span>
+                        <p className="font-bold text-emerald-700">{job.batchEligibility}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-neutral-50 p-3 rounded-lg border border-neutral-200 space-y-2">
                 <div>
                   <span className="text-xs text-neutral-500 font-medium">शैक्षणिक योग्यता (Eligibility):</span>

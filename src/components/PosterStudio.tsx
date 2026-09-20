@@ -17,43 +17,99 @@ import {
   ShieldCheck,
   Eye,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Sliders,
+  RotateCcw
 } from 'lucide-react';
-import { JobPostDetail } from '../types';
+import { JobPostDetail, PostRecord } from '../types';
 import { OWNER_INFO } from '../data/portalData';
 
 interface PosterStudioProps {
-  job: JobPostDetail;
+  job: JobPostDetail | PostRecord;
   onClose?: () => void;
   isModal?: boolean;
+  initialEditableMode?: boolean;
 }
 
 export const PosterStudio: React.FC<PosterStudioProps> = ({
   job,
   onClose,
   isModal = false,
+  initialEditableMode = false,
 }) => {
   const posterRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState<number>(0.35); // Responsive scale for desktop/mobile preview
+  const [zoomLevel, setZoomLevel] = useState<number>(0.35); // 1080x1350 preview scaling
+  const [showCustomizer, setShowCustomizer] = useState<boolean>(initialEditableMode);
+
+  // Normalize data between JobPostDetail and PostRecord
+  const isPostRecord = (j: JobPostDetail | PostRecord): j is PostRecord => 'dates' in j;
+  const postRec = isPostRecord(job) ? job : null;
+  const detailRec = !isPostRecord(job) ? (job as JobPostDetail) : null;
+
+  const defaultTitle = job.title;
+  const defaultShortTitle = job.shortTitle || job.title.slice(0, 30);
+  const defaultDept = postRec ? postRec.dept : detailRec?.department || '';
+  const defaultPosts = String(job.totalPosts);
+  const defaultStartDate = postRec ? postRec.dates?.start || '' : detailRec?.startDate || '';
+  const defaultLastDate = postRec ? postRec.dates?.end || '' : detailRec?.lastDate || '';
+  const defaultExamDate = postRec ? postRec.dates?.exam || 'शीघ्र घोषित' : detailRec?.examDate || 'शीघ्र घोषित';
+  const defaultFeeGen = postRec ? postRec.fee?.gen || '₹500/-' : detailRec?.feeGeneral || '₹500/-';
+  const defaultFeeRes = postRec ? postRec.fee?.reserved || '₹250/-' : detailRec?.feeReserved || '₹250/-';
+  const defaultEligibility = postRec ? postRec.eligibility || '' : detailRec?.qualificationSummary || '';
+  const posterConfig = postRec?.posterConfig;
+
+  // Dynamic Poster Customizer State
+  const [customHeadline, setCustomHeadline] = useState<string>(
+    posterConfig?.headline || `★ ${defaultShortTitle} भर्ती अलर्ट ★`
+  );
+  const [customPosts, setCustomPosts] = useState<string>(defaultPosts);
+  const [customLastDate, setCustomLastDate] = useState<string>(defaultLastDate);
+  const [customFeeAlert, setCustomFeeAlert] = useState<string>(`${defaultFeeGen} / ${defaultFeeRes}`);
+  const [customPoints, setCustomPoints] = useState<string[]>(
+    posterConfig?.keyPoints && posterConfig.keyPoints.length > 0
+      ? [...posterConfig.keyPoints]
+      : [
+          `कुल पद: ${defaultPosts}`,
+          `अंतिम तिथि: ${defaultLastDate}`,
+          `शैक्षणिक योग्यता: ${defaultEligibility.slice(0, 70)}...`
+        ]
+  );
+  const [customNote, setCustomNote] = useState<string>(
+    posterConfig?.note || 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
+  );
+
+  const handleResetDefaults = () => {
+    setCustomHeadline(posterConfig?.headline || `★ ${defaultShortTitle} भर्ती अलर्ट ★`);
+    setCustomPosts(defaultPosts);
+    setCustomLastDate(defaultLastDate);
+    setCustomFeeAlert(`${defaultFeeGen} / ${defaultFeeRes}`);
+    setCustomPoints(
+      posterConfig?.keyPoints && posterConfig.keyPoints.length > 0
+        ? [...posterConfig.keyPoints]
+        : [
+            `कुल पद: ${defaultPosts}`,
+            `अंतिम तिथि: ${defaultLastDate}`,
+            `शैक्षणिक योग्यता: ${defaultEligibility.slice(0, 70)}...`
+          ]
+    );
+    setCustomNote(posterConfig?.note || 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।');
+  };
 
   // Generate formatted WhatsApp Share Text
   const generateWhatsAppMessage = () => {
-    return `📢 *${job.title}*\n` +
-      `🏢 विभाग: ${job.department}\n` +
-      `👥 कुल पद: *${job.totalPosts}*\n` +
-      `🎓 शैक्षणिक योग्यता: ${job.qualificationSummary}\n` +
-      `📅 आवेदन की अंतिम तिथि: *${job.lastDate}*\n` +
-      `💰 आवेदन शुल्क: ${job.feeGeneral} / ${job.feeReserved}\n\n` +
-      `📝 *आवश्यक दस्तावेज:*\n` +
-      job.requiredDocuments.slice(0, 5).map((doc, i) => `   ${i + 1}. ${doc}`).join('\n') +
-      `\n\n` +
+    return `📢 *${defaultTitle}*\n` +
+      `🏢 विभाग: ${defaultDept}\n` +
+      `👥 कुल पद: *${customPosts}*\n` +
+      `🎓 शैक्षणिक योग्यता: ${defaultEligibility}\n` +
+      `📅 आवेदन की अंतिम तिथि: *${customLastDate}*\n` +
+      `💰 आवेदन शुल्क: ${customFeeAlert}\n\n` +
       `🎯 *घर बैठे 100% सही व सुरक्षित फॉर्म भरवाने के लिए संपर्क करें:*\n` +
       `👤 *${OWNER_INFO.name}* (NP ONLINE)\n` +
       `📞 कॉल/व्हाट्सएप: ${OWNER_INFO.phone}\n` +
-      `📲 सीधा चैट लिंक: https://wa.me/91${OWNER_INFO.phone}?text=${encodeURIComponent('नमस्ते Nitish Ji, मुझे ' + job.shortTitle + ' का फॉर्म भरवाना है।')}\n` +
+      `📲 सीधा चैट लिंक: https://wa.me/91${OWNER_INFO.phone}?text=${encodeURIComponent('नमस्ते Nitish Ji, मुझे ' + defaultShortTitle + ' का फॉर्म भरवाना है।')}\n` +
       `🌐 विजिट करें: NP Job Portal`;
   };
 
@@ -64,7 +120,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 3000);
     } catch {
-      // Fallback
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 3000);
     }
@@ -86,7 +141,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       });
 
       const link = document.createElement('a');
-      link.download = `NP_Job_Poster_${job.slug || 'recruitment'}.png`;
+      link.download = `NP_Job_Poster_${job.id || 'recruitment'}.png`;
       link.href = dataUrl;
       link.click();
 
@@ -100,43 +155,58 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     }
   };
 
-  const directWhatsAppUrl = `https://wa.me/?text=${encodeURIComponent(generateWhatsAppMessage())}`;
+  const directWhatsAppUrl = `https://wa.me/91${OWNER_INFO.phone}?text=${encodeURIComponent(
+    `नमस्ते Nitish Ji, मैंने NP Job Portal पर *${defaultTitle}* का पोस्टर देखा है। मुझे इसका फॉर्म भरवाना है।`
+  )}`;
 
   return (
-    <div className={`bg-slate-900 text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-700 ${isModal ? 'max-w-4xl w-full p-4 sm:p-6' : 'p-4 sm:p-6 my-6'}`}>
-      {/* Studio Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-700">
+    <div className={`w-full bg-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-2xl text-white ${isModal ? 'max-w-6xl mx-auto' : ''}`}>
+      {/* Studio Header Bar with Action Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-700/80">
         <div>
           <div className="flex items-center gap-2">
-            <span className="bg-amber-400 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> 1080 × 1350 HD
-            </span>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              व्हाट्सएप पोस्टर स्टूडियो
-            </h3>
+            <div className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-sm">
+              NP
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+              WhatsApp पोस्टर स्टूडियो <span className="text-amber-400 text-xs font-mono font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">1080×1350 HD</span>
+            </h2>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            व्हाट्सएप स्टेटस, ग्रुप्स एवं इंस्टाग्राम स्टोरी हेतु 1-क्लिक हाई-रेजोल्यूशन पोस्टर डाउनलोड करें।
+            व्हाट्सएप स्टेटस एवं सोशल मीडिया के लिए तैयार हाई-रेसोल्यूशन पोस्टर।
           </p>
         </div>
 
-        {/* Action Buttons Toolbar */}
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Zoom controls for preview */}
-          <div className="hidden sm:flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700 mr-2">
+        {/* Action Controls & Zoom */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Customizer Toggle */}
+          <button
+            onClick={() => setShowCustomizer(!showCustomizer)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all border ${
+              showCustomizer
+                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            <span>{showCustomizer ? 'कस्टमाइज़र छिपाएं' : 'पोस्टर कस्टमाइज़ करें'}</span>
+          </button>
+
+          {/* Zoom controls */}
+          <div className="hidden sm:flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1 text-xs">
             <button
-              onClick={() => setZoomLevel((prev) => Math.max(0.25, prev - 0.05))}
-              className="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white transition-colors"
+              onClick={() => setZoomLevel(Math.max(0.25, zoomLevel - 0.05))}
+              className="p-1 hover:bg-slate-700 rounded text-slate-300 hover:text-white"
               title="Zoom Out"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
-            <span className="text-xs px-2 font-mono text-slate-300">
+            <span className="px-2 font-mono text-amber-300 font-bold">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
-              onClick={() => setZoomLevel((prev) => Math.min(0.65, prev + 0.05))}
-              className="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white transition-colors"
+              onClick={() => setZoomLevel(Math.min(0.6, zoomLevel + 0.05))}
+              className="p-1 hover:bg-slate-700 rounded text-slate-300 hover:text-white"
               title="Zoom In"
             >
               <ZoomIn className="w-4 h-4" />
@@ -145,7 +215,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
           <button
             onClick={handleCopyText}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs sm:text-sm font-semibold text-slate-100 hover:text-white transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs sm:text-sm font-semibold text-slate-100 hover:text-white transition-all shadow-xs"
           >
             {copiedText ? (
               <>
@@ -155,7 +225,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             ) : (
               <>
                 <Copy className="w-4 h-4" />
-                <span>टेक्स्ट कॉपी करें</span>
+                <span>टेक्स्ट कॉपी</span>
               </>
             )}
           </button>
@@ -164,7 +234,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             href={directWhatsAppUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs sm:text-sm font-bold text-white transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs sm:text-sm font-bold text-white transition-all shadow-xs"
           >
             <Share2 className="w-4 h-4" />
             <span>व्हाट्सएप शेयर</span>
@@ -204,16 +274,82 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         </div>
       </div>
 
+      {/* Dynamic Customizer Drawer / Panel */}
+      {showCustomizer && (
+        <div className="mt-4 p-4 bg-slate-800/90 border border-amber-500/40 rounded-xl">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-amber-400" />
+              <span className="font-bold text-sm text-amber-300">पोस्टर कंटेंट कस्टमाइज़र (Live Editor)</span>
+            </div>
+            <button
+              onClick={handleResetDefaults}
+              className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1"
+            >
+              <RotateCcw className="w-3 h-3" /> रीसेट करें
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">हेडलाइन / घोषणा बैनर:</label>
+              <input
+                type="text"
+                value={customHeadline}
+                onChange={(e) => setCustomHeadline(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">कुल पद संख्या हाइलाइट:</label>
+              <input
+                type="text"
+                value={customPosts}
+                onChange={(e) => setCustomPosts(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">अंतिम तिथि हाइलाइट:</label>
+              <input
+                type="text"
+                value={customLastDate}
+                onChange={(e) => setCustomLastDate(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">फीस अलर्ट सारांश:</label>
+              <input
+                type="text"
+                value={customFeeAlert}
+                onChange={(e) => setCustomFeeAlert(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-slate-300 font-semibold mb-1">कस्टम नोट / सर्विस लाइन:</label>
+              <input
+                type="text"
+                value={customNote}
+                onChange={(e) => setCustomNote(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Studio Viewport */}
-      <div className="mt-6 flex flex-col items-center">
+      <div className="mt-5 flex flex-col items-center">
         {/* Helper Instructions Banner */}
-        <div className="w-full max-w-xl bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 mb-5 flex items-center justify-between text-xs text-slate-300">
+        <div className="w-full max-w-xl bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2 mb-4 flex items-center justify-between text-xs text-slate-300">
           <span className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-amber-400 shrink-0" />
             <span>यह पोस्टर 1080×1350 पिक्सल अल्ट्रा-HD साइज में एक्सपोर्ट होगा।</span>
           </span>
-          <span className="text-emerald-400 font-semibold flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" /> वाटरमार्क-फ्री
+          <span className="text-amber-400 font-semibold flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5" /> ओरिजिनल अधिकृत मुहर
           </span>
         </div>
 
@@ -235,10 +371,35 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 transform: `scale(${zoomLevel})`,
                 transformOrigin: 'top left',
               }}
-              className="absolute top-0 left-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col justify-between select-none font-sans"
+              className="absolute top-0 left-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col justify-between select-none font-sans overflow-hidden"
             >
+              {/* FAINT DIAGONAL REPEATED WATERMARK ACROSS 3 STAGGERED ROWS (-30 deg, opacity 12-15%) */}
+              <div
+                className="absolute inset-0 pointer-events-none overflow-hidden z-20 flex flex-col justify-around opacity-[0.14] select-none"
+                aria-hidden="true"
+              >
+                <div
+                  style={{ transform: 'rotate(-30deg) translateX(-15%)' }}
+                  className="whitespace-nowrap text-white text-3xl font-black tracking-widest uppercase"
+                >
+                  NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
+                </div>
+                <div
+                  style={{ transform: 'rotate(-30deg) translateX(-30%)' }}
+                  className="whitespace-nowrap text-amber-300 text-3xl font-black tracking-widest uppercase"
+                >
+                  NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
+                </div>
+                <div
+                  style={{ transform: 'rotate(-30deg) translateX(-10%)' }}
+                  className="whitespace-nowrap text-white text-3xl font-black tracking-widest uppercase"
+                >
+                  NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
+                </div>
+              </div>
+
               {/* --- 1. TOP BRANDING HEADER --- */}
-              <div className="bg-gradient-to-r from-red-700 via-red-600 to-rose-700 p-7 text-white shadow-lg border-b-4 border-amber-400 relative">
+              <div className="bg-gradient-to-r from-red-700 via-red-600 to-rose-700 p-7 text-white shadow-lg border-b-4 border-amber-400 relative z-10">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-20 h-20 bg-white rounded-2xl flex flex-col items-center justify-center shadow-xl border-2 border-amber-300">
@@ -277,26 +438,26 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               </div>
 
               {/* --- 2. MAIN NOTICE BANNER --- */}
-              <div className="px-10 py-6">
+              <div className="px-10 py-6 relative z-10">
                 <div className="bg-amber-400 text-slate-950 py-3 px-6 rounded-2xl font-black text-center text-2xl tracking-wide shadow-md flex items-center justify-center gap-3">
                   <Sparkles className="w-7 h-7" />
-                  <span>★ नया भर्ती विज्ञापन एवं ऑनलाइन आवेदन प्रारंभ ★</span>
+                  <span>{customHeadline}</span>
                   <Sparkles className="w-7 h-7" />
                 </div>
 
                 {/* Job Title Big Box */}
                 <div className="mt-5 bg-gradient-to-r from-blue-900/90 via-indigo-950 to-slate-900 border-2 border-blue-500/60 rounded-3xl p-7 shadow-2xl text-center relative overflow-hidden">
                   <div className="absolute top-0 right-0 bg-blue-600 text-white text-sm font-black px-5 py-1.5 rounded-bl-2xl uppercase tracking-wider">
-                    {job.state} Government
+                    {'state' in job && job.state ? job.state : 'Govt'} Recruitment 2026
                   </div>
                   <h1 className="text-4xl font-extrabold text-white leading-tight drop-shadow-sm mt-2">
-                    {job.title}
+                    {defaultTitle}
                   </h1>
                   <p className="text-xl text-blue-200 font-semibold mt-2">
-                    {job.department}
+                    {defaultDept}
                   </p>
                   <div className="mt-4 inline-flex items-center gap-3 bg-amber-400 text-slate-950 px-8 py-2.5 rounded-full font-black text-2xl shadow-xl">
-                    <Users className="w-7 h-7" /> कुल पद: {job.totalPosts}
+                    <Users className="w-7 h-7" /> कुल पद: {customPosts}
                   </div>
                 </div>
 
@@ -308,9 +469,9 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                       <GraduationCap className="w-5 h-5" /> शैक्षणिक योग्यता
                     </div>
                     <div className="text-white text-xl font-bold mt-2 leading-snug">
-                      {job.qualificationSummary.length > 70
-                        ? job.qualificationSummary.slice(0, 68) + '...'
-                        : job.qualificationSummary}
+                      {defaultEligibility.length > 70
+                        ? defaultEligibility.slice(0, 68) + '...'
+                        : defaultEligibility}
                     </div>
                     <div className="text-xs text-slate-400 mt-2 font-medium">विस्तृत नियम पुस्तिका देखें</div>
                   </div>
@@ -321,7 +482,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                       <Users className="w-5 h-5" /> आयु सीमा
                     </div>
                     <div className="text-white text-2xl font-black mt-2">
-                      {job.minAge} से {job.maxAge.split(' ')[0]} वर्ष
+                      {'minAge' in job && job.minAge ? job.minAge : '18 वर्ष'} से {'maxAge' in job && job.maxAge ? job.maxAge.split(' ')[0] : '33'} वर्ष
                     </div>
                     <div className="text-xs text-emerald-300 mt-2 font-semibold">नियमानुसार छूट लागू</div>
                   </div>
@@ -332,7 +493,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                       <Calendar className="w-5 h-5" /> अंतिम तिथि
                     </div>
                     <div className="text-amber-300 text-2xl font-black mt-2">
-                      {job.lastDate}
+                      {customLastDate}
                     </div>
                     <div className="text-xs text-rose-200 mt-2 font-bold animate-pulse">अंतिम तिथि से पहले भरें</div>
                   </div>
@@ -348,42 +509,38 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                     <ul className="space-y-2.5 text-base">
                       <li className="flex justify-between items-center text-slate-200">
                         <span className="text-slate-400">आवेदन प्रारंभ:</span>
-                        <span className="font-bold text-white">{job.startDate}</span>
+                        <span className="font-bold text-white">{defaultStartDate}</span>
                       </li>
                       <li className="flex justify-between items-center text-slate-200">
                         <span className="text-slate-400">अंतिम तिथि:</span>
-                        <span className="font-black text-rose-400">{job.lastDate}</span>
+                        <span className="font-black text-rose-400">{customLastDate}</span>
                       </li>
                       <li className="flex justify-between items-center text-slate-200">
                         <span className="text-slate-400">परीक्षा तिथि:</span>
-                        <span className="font-bold text-amber-300">{job.examDate || 'शीघ्र घोषित'}</span>
+                        <span className="font-bold text-amber-300">{defaultExamDate}</span>
                       </li>
                       <li className="flex justify-between items-center text-slate-200 pt-2 border-t border-slate-800">
-                        <span className="text-slate-400">सामान्य / अन्य:</span>
-                        <span className="font-bold text-emerald-300">{job.feeGeneral}</span>
-                      </li>
-                      <li className="flex justify-between items-center text-slate-200">
-                        <span className="text-slate-400">आरक्षित वर्ग:</span>
-                        <span className="font-bold text-emerald-300">{job.feeReserved}</span>
+                        <span className="text-slate-400">शुल्क सारांश:</span>
+                        <span className="font-bold text-emerald-300">{customFeeAlert}</span>
                       </li>
                     </ul>
                   </div>
 
-                  {/* Required Documents Checklist */}
+                  {/* Bullet Points / Checklist */}
                   <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-5 shadow-md">
                     <h4 className="text-emerald-400 font-bold text-lg mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">
-                      <FileCheck2 className="w-5 h-5" /> फॉर्म हेतु आवश्यक दस्तावेज
+                      <FileCheck2 className="w-5 h-5" /> भर्ती मुख्य बिंदु
                     </h4>
                     <ul className="space-y-2 text-base text-slate-200">
-                      {job.requiredDocuments.slice(0, 5).map((doc, idx) => (
+                      {customPoints.map((pt, idx) => (
                         <li key={idx} className="flex items-start gap-2.5">
                           <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                          <span className="font-medium text-slate-100">{doc}</span>
+                          <span className="font-medium text-slate-100">{pt}</span>
                         </li>
                       ))}
                       <li className="flex items-start gap-2.5 text-amber-300 text-sm font-semibold pt-1">
                         <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>व्हाट्सएप पर फोटो भेजकर फॉर्म भरवा सकते हैं</span>
+                        <span>{customNote}</span>
                       </li>
                     </ul>
                   </div>
@@ -411,31 +568,34 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 </div>
               </div>
 
-              {/* --- 6. PROMINENT BOTTOM FOOTER STRIP --- */}
-              <div className="bg-slate-950 border-t-4 border-amber-400 py-6 px-10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-amber-400 text-sm font-bold uppercase tracking-widest">
-                      संपर्क सूत्र एवं ऑनलाइन सेवा केंद्र
-                    </div>
-                    <div className="text-3xl font-black text-white mt-1 flex items-center gap-3">
-                      <span>{OWNER_INFO.name}</span>
-                      <span className="text-slate-500 text-xl font-normal">|</span>
-                      <span className="text-emerald-400 font-mono tracking-wider">{OWNER_INFO.phone}</span>
-                    </div>
-                    <p className="text-slate-400 text-sm mt-1">
-                      {OWNER_INFO.address} • MP Online & CSC अधिकृत केंद्र
-                    </p>
+              {/* --- 6. FIXED BOTTOM BRANDING BAR (PROMINENT CALL & WHATSAPP) --- */}
+              <div className="bg-slate-950 border-t-4 border-amber-400 py-4 px-8 flex items-center justify-between text-white relative z-30">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-md">
+                    NP
                   </div>
+                  <div>
+                    <div className="text-amber-300 text-sm font-black uppercase tracking-wider">
+                      घर बैठे सुरक्षित फॉर्म भरने हेतु संपर्क करें:
+                    </div>
+                    <div className="text-2xl font-black text-white flex items-center gap-2 mt-0.5">
+                      <span>Nitish Khobragade</span>
+                      <span className="text-amber-400 font-mono">- 8982324497</span>
+                    </div>
+                    <div className="text-xs text-slate-400 font-medium">
+                      MP Online & CSC अधिकृत केंद्र • 100% सही फॉर्म व तुरंत कम्प्यूटर रसीद
+                    </div>
+                  </div>
+                </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-xs text-slate-400 uppercase font-semibold">ऑनलाइन सहायता समय</div>
-                      <div className="text-base font-bold text-amber-300">{OWNER_INFO.hours}</div>
-                    </div>
-                    <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg border-2 border-emerald-300">
-                      <Phone className="w-8 h-8 fill-white" />
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-emerald-600 px-4 py-2.5 rounded-xl font-black text-base shadow-lg text-white">
+                    <MessageCircle className="w-5 h-5 fill-white" />
+                    <span>WhatsApp: 8982324497</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-blue-600 px-4 py-2.5 rounded-xl font-black text-base shadow-lg text-white">
+                    <Phone className="w-5 h-5 fill-white" />
+                    <span>Call</span>
                   </div>
                 </div>
               </div>
@@ -447,15 +607,15 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400">
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>व्हाट्सएप डीपी एवं स्टेटस के लिए उपयुक्त</span>
+            <span>व्हाट्सएप डीपी एवं स्टेटस के लिए उपयुक्त (4:5 रेशियो)</span>
           </span>
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>हाई क्वालिटी 4:5 रेशियो (1080×1350 px)</span>
+            <span>1080×1350 px अल्ट्रा-क्लियर टेक्स्ट</span>
           </span>
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>कस्टमर शेयरिंग एवं कियोस्क डिस्प्ले तैयार</span>
+            <span>डायगोनल ओरिजिनल वाटरमार्क सहित</span>
           </span>
         </div>
       </div>

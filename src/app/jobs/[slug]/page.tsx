@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import {
   Briefcase,
@@ -27,6 +27,9 @@ import { OWNER_INFO } from '../../../data/portalData';
 import { AdSenseBanner } from '../../../components/AdSenseBanner';
 import { PosterStudio } from '../../../components/PosterStudio';
 import { Footer } from '../../../components/Footer';
+import { PopupAdModal } from '../../../components/PopupAdModal';
+import { getJobBySlug } from '../../../lib/firebase';
+import { JobPostDetail } from '../../../types';
 
 interface JobPageProps {
   params: Promise<{
@@ -38,7 +41,74 @@ export default function JobDetailPage({ params }: JobPageProps) {
   // Unwrap Next.js 15+ promise params
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
-  const job = getJobDetailBySlug(slug);
+  const staticJob = getJobDetailBySlug(slug);
+
+  const [dynamicJob, setDynamicJob] = useState<JobPostDetail | null>(null);
+
+  useEffect(() => {
+    if (!staticJob) {
+      getJobBySlug(slug).then((record) => {
+        if (record) {
+          const synthesized: JobPostDetail = {
+            slug: record.id,
+            id: record.id,
+            title: record.title,
+            shortTitle: record.shortTitle || record.title.slice(0, 30),
+            department: record.dept,
+            advtNo: 'ESB/MP/' + record.id,
+            totalPosts: String(record.totalPosts),
+            postDate: 'नवीनतम अपडेट',
+            startDate: record.dates?.start || 'शीघ्र प्रारंभ',
+            lastDate: record.dates?.end || 'विज्ञप्ति अनुसार',
+            lastDateFee: record.dates?.end || 'विज्ञप्ति अनुसार',
+            correctionDate: 'अंतिम तिथि के पश्चात',
+            examDate: record.dates?.exam || 'शीघ्र घोषित',
+            admitCardDate: 'परीक्षा से 10 दिन पूर्व',
+            feeGeneral: record.fee?.gen || '₹500/-',
+            feeReserved: record.fee?.reserved || '₹250/-',
+            feePortal: '₹60/- (कियोस्क पोर्टल शुल्क)',
+            paymentMode: 'MP Online Kiosk, UPI, Net Banking',
+            minAge: '18 वर्ष',
+            maxAge: '40 वर्ष',
+            ageCalculationDate: '01/01/2026',
+            ageRelaxation: 'मध्य प्रदेश शासन के नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट',
+            state: record.state || 'MP',
+            category: 'Other',
+            qualificationSummary: record.eligibility,
+            vacanciesBreakdown: [
+              {
+                postName: record.shortTitle || record.title,
+                total: String(record.totalPosts),
+                eligibility: record.eligibility
+              }
+            ],
+            categoryWisePosts: [
+              { category: 'सामान्य / आरक्षित', ur: '—', obc: '—', ews: '—', sc: '—', st: '—', total: String(record.totalPosts) }
+            ],
+            howToApplySteps: [
+              'चरण 1: ऑफिशियल नोटिफिकेशन PDF डाउनलोड कर पात्रता एवं नियमों को ध्यानपूर्वक पढ़ें।',
+              'चरण 2: ऑनलाइन फॉर्म घर बैठे सुरक्षित भरवाने के लिए आवश्यक दस्तावेज (आधार कार्ड, 10वीं/12वीं अंकसूची, जाति व निवास प्रमाण पत्र) तैयार रखें।',
+              'चरण 3: Nitish Khobragade (NP ONLINE KIOSK - 8982324497) से व्हाट्सएप पर संपर्क करें।',
+              'चरण 4: फॉर्म का प्रीव्यू जांचें एवं आधिकारिक एमपी ऑनलाइन रसीद प्राप्त करें।'
+            ],
+            requiredDocuments: [
+              'आधार कार्ड (मोबाइल नंबर लिंक)',
+              '10वीं/12वीं अंकसूची',
+              'जाति प्रमाण पत्र एवं मूल निवासी प्रमाण पत्र',
+              'पासपोर्ट साइज फोटो एवं हस्ताक्षर'
+            ],
+            applyUrl: record.links?.apply || 'https://esb.mp.gov.in',
+            notificationPdfUrl: record.links?.notificationPdf || 'https://esb.mp.gov.in',
+            syllabusUrl: record.links?.syllabusPdf,
+            officialWebsiteUrl: record.links?.officialSite || 'https://esb.mp.gov.in'
+          };
+          setDynamicJob(synthesized);
+        }
+      });
+    }
+  }, [slug, staticJob]);
+
+  const job = staticJob || dynamicJob || getJobDetailBySlug('mp-police-constable-2026');
 
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -626,6 +696,9 @@ export default function JobDetailPage({ params }: JobPageProps) {
           <Phone className="w-4 h-4" />
         </a>
       </div>
+
+      {/* 5-6 Second Custom Pop-Up Ad Campaign Modal (Tied to Admin Settings) */}
+      <PopupAdModal />
 
       <Footer />
     </div>
