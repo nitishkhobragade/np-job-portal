@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Phone, MessageCircle, ShieldAlert, Award, ExternalLink, Lock } from 'lucide-react';
+import { Phone, MessageCircle, ShieldAlert, Award, ExternalLink, Lock, Send, BellRing } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 
 export const Footer: React.FC = () => {
@@ -115,15 +115,35 @@ export const Footer: React.FC = () => {
               </p>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
+              <a
+                href="https://whatsapp.com/channel/0029Vb9N2gfGZNClzwFazG3L"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-colors"
+              >
+                <BellRing className="w-3.5 h-3.5 text-amber-300" />
+                <span>Join Official WhatsApp Channel</span>
+              </a>
+
+              <a
+                href="https://t.me/npjobportal"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs shadow-md transition-colors"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Join Telegram Channel</span>
+              </a>
+
               <a
                 href={OWNER_INFO.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs border border-emerald-500/30 transition-colors"
               >
-                <MessageCircle className="w-4 h-4 fill-white" />
-                <span>सीधे WhatsApp पर संपर्क करें</span>
+                <MessageCircle className="w-4 h-4 fill-emerald-400" />
+                <span>सीधे WhatsApp पर चैट करें</span>
               </a>
             </div>
           </div>

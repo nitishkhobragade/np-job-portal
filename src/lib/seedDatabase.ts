@@ -543,12 +543,31 @@ export function seedPostToPostRecord(post: SeedPostData): PostRecord {
     dept: post.dept,
     category: post.category,
     categories: post.categories,
-    status: post.status,
-    publishedAt: post.publishedAt,
+    status: (post.status as 'published' | 'draft' | 'suspended') || 'published',
+    publishedDate: post.publishedAt || '21/09/2026',
+    publishedAt: post.publishedAt || '21/09/2026',
+    startDate: post.dates?.start || '15/09/2026',
+    lastDate: post.lastDate || post.dates?.end || '15/10/2026',
+    examDate: post.dates?.exam || 'शीघ्र घोषित',
+    admitCardDate: 'परीक्षा से 7 दिन पूर्व',
     totalPosts: post.totalPosts,
     qualification: post.qualification,
     eligibility: post.qualification,
-    lastDate: post.lastDate,
+    ageLimit: {
+      min: post.minAge || '18 वर्ष',
+      max: post.maxAge || '33 वर्ष',
+      relaxation: 'SC/ST/OBC को नियमानुसार 5 वर्ष छूट'
+    },
+    applicationFees: {
+      ur: post.fee?.gen || 'विज्ञप्ति अनुसार',
+      reserved: post.fee?.reserved || 'विज्ञप्ति अनुसार',
+      portalFee: '₹60/-'
+    },
+    isItMnc: !!post.isTechJob,
+    jobLocation: post.location,
+    batch: post.batchEligibility,
+    applyLink: post.links?.apply || 'https://esb.mp.gov.in',
+    notificationPdf: post.links?.notificationPdf || 'https://esb.mp.gov.in',
     detailsUrl: post.detailsUrl,
     content: post.content,
     state: post.state,
@@ -571,7 +590,8 @@ export function seedPostToPostRecord(post: SeedPostData): PostRecord {
 }
 
 /**
- * Returns formatted in-memory list for immediate rendering without delays
+ * Returns formatted in-memory list for immediate rendering without delays,
+ * incorporating both base seeds and audited drafts.
  */
 export function getInitialSeedPosts(): PostRecord[] {
   return INITIAL_SEED_POSTS.map(seedPostToPostRecord);

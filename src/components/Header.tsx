@@ -13,7 +13,9 @@ import {
   X,
   ChevronDown,
   FileText,
-  Briefcase
+  Briefcase,
+  Send,
+  BellRing
 } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 
@@ -151,13 +153,35 @@ const HeaderInner: React.FC<HeaderProps> = ({
             </div>
 
             <a
+              href="https://whatsapp.com/channel/0029Vb9N2gfGZNClzwFazG3L"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+              title="Join Official WhatsApp Channel"
+            >
+              <BellRing className="w-3.5 h-3.5 text-amber-300" />
+              <span>WA Channel</span>
+            </a>
+
+            <a
+              href="https://t.me/npjobportal"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+              title="Join Telegram Channel"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Telegram</span>
+            </a>
+
+            <a
               href={OWNER_INFO.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
             >
               <MessageCircle className="w-4 h-4 fill-white" />
-              <span>WhatsApp: 8982324497</span>
+              <span>WhatsApp</span>
             </a>
 
             <a

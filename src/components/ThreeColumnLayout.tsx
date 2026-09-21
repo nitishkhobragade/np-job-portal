@@ -85,7 +85,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
   }, [results, searchQuery]);
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 my-6">
+    <section className="w-full max-w-7xl mx-auto px-2 sm:px-4 my-6 overflow-hidden">
       {/* Section Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-neutral-200">
         <div>
@@ -124,7 +124,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
       </div>
 
       {/* 3-Column SarkariResult Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start w-full max-w-full overflow-hidden">
         
         {/* ================= COLUMN 1: LATEST JOBS ================= */}
         <div className="bg-white rounded-xl border-2 border-red-200/90 shadow-sm overflow-hidden flex flex-col">
@@ -192,11 +192,15 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                       )}
                     </div>
 
-                    {/* Badges: Total Posts & Last Date */}
-                    <div className="flex items-center gap-2 mt-2 flex-wrap text-xs">
+                    {/* Badges: Total Posts, Published Date & Last Date */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
                       <span className="inline-flex items-center gap-1 font-bold text-blue-800 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded text-[11px]">
                         <Users className="w-3 h-3 text-blue-600" />
                         {job.totalPosts}
+                      </span>
+
+                      <span className="inline-flex items-center gap-1 font-medium text-neutral-600 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded text-[10px]">
+                        प्रकाशित तिथि: {job.publishedDate || job.postDate || '21/09/2026'}
                       </span>
 
                       <span className="inline-flex items-center gap-1 font-bold text-rose-800 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded text-[11px]">
@@ -305,15 +309,15 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                       </span>
                     </div>
 
-                    {/* Badges: Exam Date Tag */}
-                    <div className="flex items-center gap-2 mt-2 flex-wrap text-xs">
+                    {/* Badges: Exam Date & Published Date Tag */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
                       <span className="inline-flex items-center gap-1 font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
                         <Clock className="w-3 h-3 text-amber-700" />
                         {card.examDate}
                       </span>
 
-                      <span className="inline-flex items-center text-[11px] text-neutral-500">
-                        {card.releaseDate}
+                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
+                        प्रकाशित तिथि: {card.publishedDate || card.releaseDate || '21/09/2026'}
                       </span>
                     </div>
 
@@ -414,10 +418,14 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                     </div>
 
                     {/* Declaration Date & Scorecard status */}
-                    <div className="flex items-center gap-2 mt-2 flex-wrap text-xs">
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
                       <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
                         <Calendar className="w-3 h-3 text-emerald-600" />
                         {res.declaredDate}
+                      </span>
+
+                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
+                        प्रकाशित तिथि: {res.publishedDate || res.declaredDate || '21/09/2026'}
                       </span>
 
                       {res.scoreCardAvailable && (

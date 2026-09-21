@@ -1,28 +1,23 @@
 "use client";
 
 import React, { useRef, useState } from 'react';
+import html2canvas from 'html2canvas';
 import { toPng } from 'html-to-image';
 import {
   Download,
   Copy,
   Check,
   Share2,
-  Phone,
-  MessageCircle,
-  Calendar,
-  Users,
-  GraduationCap,
-  FileCheck2,
-  Sparkles,
-  ShieldCheck,
   Eye,
   ZoomIn,
   ZoomOut,
   Sliders,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 import { JobPostDetail, PostRecord } from '../types';
 import { OWNER_INFO } from '../data/portalData';
+import { JobPoster } from './JobPoster';
 
 interface PosterStudioProps {
   job: JobPostDetail | PostRecord;
@@ -76,9 +71,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const defaultShortTitle = job.shortTitle || job.title.slice(0, 30);
   const defaultDept = postRec ? postRec.dept : detailRec?.department || '';
   const defaultPosts = String(job.totalPosts);
-  const defaultStartDate = postRec ? postRec.dates?.start || '' : detailRec?.startDate || '';
   const defaultLastDate = postRec ? postRec.dates?.end || '' : detailRec?.lastDate || '';
-  const defaultExamDate = postRec ? postRec.dates?.exam || 'शीघ्र घोषित' : detailRec?.examDate || 'शीघ्र घोषित';
   const defaultFeeGen = postRec ? postRec.fee?.gen || '₹500/-' : detailRec?.feeGeneral || '₹500/-';
   const defaultFeeRes = postRec ? postRec.fee?.reserved || '₹250/-' : detailRec?.feeReserved || '₹250/-';
   const defaultEligibility = postRec ? postRec.eligibility || '' : detailRec?.qualificationSummary || '';
@@ -154,26 +147,33 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       setIsDownloading(true);
       setDownloadSuccess(false);
 
-      // Render at fixed resolution without scale transform interference
-      const dataUrl = await toPng(posterRef.current, {
-        cacheBust: true,
-        quality: 1,
-        pixelRatio: 2,
-        width: targetWidth,
-        height: targetHeight,
-        canvasWidth: targetWidth * 2,
-        canvasHeight: targetHeight * 2,
-        style: {
-          transform: 'none',
-          transformOrigin: 'top left',
-          width: `${targetWidth}px`,
-          height: `${targetHeight}px`,
-          left: '0px',
-          top: '0px',
-          position: 'relative',
-          margin: '0px',
-        },
-      });
+      let dataUrl = '';
+      try {
+        // Preferred engine: html2canvas with scale: 2 and useCORS: true
+        const canvas = await html2canvas(posterRef.current, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#020617',
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+        });
+        dataUrl = canvas.toDataURL('image/png', 1.0);
+      } catch {
+        // Fallback to toPng
+        dataUrl = await toPng(posterRef.current, {
+          cacheBust: true,
+          quality: 1,
+          pixelRatio: 2,
+          width: targetWidth,
+          height: targetHeight,
+        });
+      }
+
+      if (!dataUrl) {
+        throw new Error('Canvas export failed');
+      }
 
       const link = document.createElement('a');
       link.download = `NP_Job_Poster_${aspectRatio === 'story' ? '9x16_Story' : '4x3_Feed'}_${job.id || 'recruitment'}.png`;
@@ -437,285 +437,23 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           >
             {/* The Actual Canvas Being Scaled */}
             <div
-              ref={posterRef}
               style={{
-                width: `${targetWidth}px`,
-                height: `${targetHeight}px`,
                 transform: `scale(${zoomLevel})`,
                 transformOrigin: 'top left',
               }}
-              className="absolute top-0 left-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col justify-between select-none font-sans overflow-hidden"
+              className="absolute top-0 left-0"
             >
-              {/* FAINT DIAGONAL REPEATED WATERMARK ACROSS 3-4 STAGGERED ROWS (-30 deg, opacity 14%) */}
-              <div
-                className="absolute inset-0 pointer-events-none overflow-hidden z-20 flex flex-col justify-around opacity-[0.14] select-none"
-                aria-hidden="true"
-              >
-                <div
-                  style={{ transform: 'rotate(-30deg) translateX(-15%)' }}
-                  className="whitespace-nowrap text-white text-3xl font-black tracking-widest uppercase"
-                >
-                  NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
-                </div>
-                <div
-                  style={{ transform: 'rotate(-30deg) translateX(-30%)' }}
-                  className="whitespace-nowrap text-amber-300 text-3xl font-black tracking-widest uppercase"
-                >
-                  NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
-                </div>
-                <div
-                  style={{ transform: 'rotate(-30deg) translateX(-10%)' }}
-                  className="whitespace-nowrap text-white text-3xl font-black tracking-widest uppercase"
-                >
-                  NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
-                </div>
-                {aspectRatio === 'story' && (
-                  <div
-                    style={{ transform: 'rotate(-30deg) translateX(-25%)' }}
-                    className="whitespace-nowrap text-amber-300 text-3xl font-black tracking-widest uppercase"
-                  >
-                    NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE • NP JOB PORTAL • NP ONLINE • NITISH KHOBRAGADE
-                  </div>
-                )}
-              </div>
-
-              {/* --- 1. TOP BRANDING HEADER --- */}
-              <div className="bg-gradient-to-r from-red-700 via-red-600 to-rose-700 p-7 text-white shadow-lg border-b-4 border-amber-400 relative z-10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 bg-white rounded-2xl flex flex-col items-center justify-center shadow-xl border-2 border-amber-300">
-                      <span className="text-red-700 font-black text-2xl tracking-tighter leading-none">NP</span>
-                      <span className="text-[10px] font-bold text-slate-800 tracking-widest mt-0.5">ONLINE</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-3xl font-black tracking-tight text-white drop-shadow-md">
-                          NP JOB PORTAL
-                        </span>
-                        <span className="bg-amber-400 text-slate-950 text-sm font-black px-2.5 py-0.5 rounded shadow">
-                          सरकारी भर्ती अलर्ट
-                        </span>
-                      </div>
-                      <p className="text-amber-100 text-base font-semibold mt-1">
-                        मध्य प्रदेश एवं केंद्र सरकार की सभी सरकारी भर्तियों की प्रामाणिक जानकारी
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Top Owner Badge */}
-                  <div className="bg-slate-950/80 backdrop-blur-sm border border-amber-400/80 rounded-2xl p-4 text-right shadow-lg">
-                    <div className="text-amber-300 text-xs font-bold uppercase tracking-wider">
-                      संचालक व फॉर्म विशेषज्ञ
-                    </div>
-                    <div className="text-white text-xl font-black mt-0.5">
-                      {OWNER_INFO.name}
-                    </div>
-                    <div className="text-amber-400 font-mono font-bold text-lg flex items-center justify-end gap-1.5 mt-0.5">
-                      <Phone className="w-4 h-4 fill-amber-400" />
-                      {OWNER_INFO.phone}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* --- 2. MAIN NOTICE BANNER --- */}
-              <div className="px-10 py-6 relative z-10">
-                <div className="bg-amber-400 text-slate-950 py-3 px-6 rounded-2xl font-black text-center text-2xl tracking-wide shadow-md flex items-center justify-center gap-3">
-                  <Sparkles className="w-7 h-7" />
-                  <span>{customHeadline}</span>
-                  <Sparkles className="w-7 h-7" />
-                </div>
-
-                {/* Job Title Big Box */}
-                <div className="mt-5 bg-gradient-to-r from-blue-900/90 via-indigo-950 to-slate-900 border-2 border-blue-500/60 rounded-3xl p-7 shadow-2xl text-center relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-blue-600 text-white text-sm font-black px-5 py-1.5 rounded-bl-2xl uppercase tracking-wider">
-                    {'state' in job && job.state ? job.state : 'Govt'} Recruitment 2026
-                  </div>
-                  <h1 className="text-4xl font-extrabold text-white leading-tight drop-shadow-sm mt-2">
-                    {defaultTitle}
-                  </h1>
-                  <p className="text-xl text-blue-200 font-semibold mt-2">
-                    {defaultDept}
-                  </p>
-                  <div className="mt-4 inline-flex items-center gap-3 bg-amber-400 text-slate-950 px-8 py-2.5 rounded-full font-black text-2xl shadow-xl">
-                    <Users className="w-7 h-7" /> कुल पद: {customPosts}
-                  </div>
-                </div>
-
-                {/* --- 3. KEY HIGHLIGHTS 3-BOX GRID --- */}
-                <div className="grid grid-cols-3 gap-5 mt-6">
-                  {/* Qualification */}
-                  <div className="bg-slate-800/95 border-2 border-slate-600/80 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-                    <div className="flex items-center gap-2 text-amber-400 text-sm font-bold uppercase tracking-wider">
-                      <GraduationCap className="w-5 h-5" /> शैक्षणिक योग्यता
-                    </div>
-                    <div className="text-white text-xl font-bold mt-2 leading-snug">
-                      {defaultEligibility.length > 70
-                        ? defaultEligibility.slice(0, 68) + '...'
-                        : defaultEligibility}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-2 font-medium">विस्तृत नियम पुस्तिका देखें</div>
-                  </div>
-
-                  {/* Age Limit */}
-                  <div className="bg-slate-800/95 border-2 border-slate-600/80 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold uppercase tracking-wider">
-                      <Users className="w-5 h-5" /> आयु सीमा
-                    </div>
-                    <div className="text-white text-2xl font-black mt-2">
-                      {'minAge' in job && job.minAge ? job.minAge : '18 वर्ष'} से {'maxAge' in job && job.maxAge ? job.maxAge.split(' ')[0] : '33'} वर्ष
-                    </div>
-                    <div className="text-xs text-emerald-300 mt-2 font-semibold">नियमानुसार छूट लागू</div>
-                  </div>
-
-                  {/* Last Date */}
-                  <div className="bg-gradient-to-br from-rose-950 to-red-900 border-2 border-red-500 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-                    <div className="flex items-center gap-2 text-red-300 text-sm font-bold uppercase tracking-wider">
-                      <Calendar className="w-5 h-5" /> अंतिम तिथि
-                    </div>
-                    <div className="text-amber-300 text-2xl font-black mt-2">
-                      {customLastDate}
-                    </div>
-                    <div className="text-xs text-rose-200 mt-2 font-bold animate-pulse">अंतिम तिथि से पहले भरें</div>
-                  </div>
-                </div>
-
-                {/* --- 4. REQUIRED DOCUMENTS & IMPORTANT DATES --- */}
-                <div className="grid grid-cols-2 gap-6 mt-6">
-                  {/* Important Dates Table */}
-                  <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-5 shadow-md">
-                    <h4 className="text-amber-400 font-bold text-lg mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">
-                      <Calendar className="w-5 h-5" /> महत्वपूर्ण तिथियां एवं शुल्क
-                    </h4>
-                    <ul className="space-y-2.5 text-base">
-                      <li className="flex justify-between items-center text-slate-200">
-                        <span className="text-slate-400">आवेदन प्रारंभ:</span>
-                        <span className="font-bold text-white">{defaultStartDate}</span>
-                      </li>
-                      <li className="flex justify-between items-center text-slate-200">
-                        <span className="text-slate-400">अंतिम तिथि:</span>
-                        <span className="font-black text-rose-400">{customLastDate}</span>
-                      </li>
-                      <li className="flex justify-between items-center text-slate-200">
-                        <span className="text-slate-400">परीक्षा तिथि:</span>
-                        <span className="font-bold text-amber-300">{defaultExamDate}</span>
-                      </li>
-                      <li className="flex justify-between items-center text-slate-200 pt-2 border-t border-slate-800">
-                        <span className="text-slate-400">शुल्क सारांश:</span>
-                        <span className="font-bold text-emerald-300">{customFeeAlert}</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  {/* Bullet Points / Checklist */}
-                  <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-5 shadow-md">
-                    <h4 className="text-emerald-400 font-bold text-lg mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">
-                      <FileCheck2 className="w-5 h-5" /> भर्ती मुख्य बिंदु
-                    </h4>
-                    <ul className="space-y-2 text-base text-slate-200">
-                      {customPoints.map((pt, idx) => (
-                        <li key={idx} className="flex items-start gap-2.5">
-                          <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                          <span className="font-medium text-slate-100">{pt}</span>
-                        </li>
-                      ))}
-                      <li className="flex items-start gap-2.5 text-amber-300 text-sm font-semibold pt-1">
-                        <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>{customNote}</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* --- 5. CALLOUT SERVICE BOX --- */}
-                <div className="mt-6 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 p-5 rounded-2xl shadow-xl flex items-center justify-between border-2 border-amber-300">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-slate-950 text-amber-400 rounded-2xl flex items-center justify-center shadow-md shrink-0">
-                      <ShieldCheck className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-black tracking-tight leading-tight">
-                        दुकान जाने की जरूरत नहीं — घर बैठे फॉर्म भरवाएं!
-                      </h3>
-                      <p className="text-slate-900 font-semibold text-base mt-0.5">
-                        व्हाट्सएप पर दस्तावेज भेजें, 100% सही फॉर्म व पक्की कम्प्यूटर रसीद तुरंत पाएं।
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-slate-950 text-white px-5 py-2.5 rounded-xl font-black text-xl flex items-center gap-2 shadow-lg shrink-0">
-                    <MessageCircle className="w-6 h-6 text-emerald-400 fill-emerald-400" />
-                    व्हाट्सएप करें
-                  </div>
-                </div>
-
-                {/* --- 5.1 EXTRA 9:16 STORY SECTION (DOCUMENTS CHECKLIST & ASSURANCE) --- */}
-                {aspectRatio === 'story' && (
-                  <div className="mt-6 bg-slate-900/90 border border-slate-700 rounded-2xl p-6 shadow-md">
-                    <h4 className="text-amber-400 font-black text-xl mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">
-                      <FileCheck2 className="w-6 h-6 text-amber-400" />
-                      <span>ऑनलाइन फॉर्म भरने हेतु आवश्यक दस्तावेज (Document Checklist):</span>
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4 text-base text-slate-200">
-                      <div className="flex items-center gap-2.5">
-                        <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <span>आधार कार्ड एवं लिंक मोबाइल नंबर</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <span>10वीं / 12वीं / संबंधित योग्यता अंकसूची</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <span>जाति प्रमाण पत्र (SC/ST/OBC)</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <span>मध्य प्रदेश मूल निवासी प्रमाण पत्र</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <span>पासपोर्ट साइज रंगीन फोटो व हस्ताक्षर</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <span>सक्रिय ईमेल आईडी एवं मोबाइल</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* --- 6. FIXED BOTTOM BRANDING BAR (PROMINENT CALL & WHATSAPP) --- */}
-              <div className="bg-slate-950 border-t-4 border-amber-400 py-4 px-8 flex items-center justify-between text-white relative z-30">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-md">
-                    NP
-                  </div>
-                  <div>
-                    <div className="text-amber-300 text-sm font-black uppercase tracking-wider">
-                      घर बैठे फॉर्म भराने संपर्क करें: 8982324497
-                    </div>
-                    <div className="text-2xl font-black text-white flex items-center gap-2 mt-0.5">
-                      <span>Nitish Khobragade</span>
-                      <span className="text-amber-400 font-mono">- 8982324497</span>
-                    </div>
-                    <div className="text-xs text-slate-400 font-medium">
-                      NP Job Portal • Nitish Khobragade (8982324497) • घर बैठे सुरक्षित फॉर्म भरवाएं
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-emerald-600 px-4 py-2.5 rounded-xl font-black text-base shadow-lg text-white">
-                    <MessageCircle className="w-5 h-5 fill-white" />
-                    <span>WhatsApp: 8982324497</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-blue-600 px-4 py-2.5 rounded-xl font-black text-base shadow-lg text-white">
-                    <Phone className="w-5 h-5 fill-white" />
-                    <span>Call</span>
-                  </div>
-                </div>
-              </div>
+              <JobPoster
+                ref={posterRef}
+                job={job}
+                customHeadline={customHeadline}
+                customPosts={customPosts}
+                customLastDate={customLastDate}
+                customFeeAlert={customFeeAlert}
+                customPoints={customPoints}
+                customNote={customNote}
+                aspectRatio={aspectRatio}
+              />
             </div>
           </div>
         </div>

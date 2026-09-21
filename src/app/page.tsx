@@ -14,6 +14,7 @@ import { PopupAdModal } from '../components/PopupAdModal';
 import { JobItem, AdmitCardItem, ResultItem, TrendingCard, PostRecord } from '../types';
 import { subscribeToPosts } from '../lib/firebase';
 import { seedPostsIfEmpty, getInitialSeedPosts } from '../lib/seedDatabase';
+import { runDatabaseSanitizationAudit } from '../lib/autoCorrectPosts';
 
 // Helper to convert PostRecord to JobItem
 function mapPostToJob(p: PostRecord): JobItem {
@@ -27,6 +28,8 @@ function mapPostToJob(p: PostRecord): JobItem {
     department: p.dept,
     totalPosts: String(p.totalPosts || 'विज्ञप्ति अनुसार'),
     lastDate: p.dates?.end || p.lastDate || 'विज्ञप्ति देखें',
+    postDate: p.publishedDate || p.publishedAt || '21/09/2026',
+    publishedDate: p.publishedDate || p.publishedAt || '21/09/2026',
     state: p.state || (p.categories?.includes('mp_special') ? 'MP' : 'Central'),
     qualification: p.qualification || p.eligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
     category: (p.isTechJob || p.categories?.includes('tech'))
@@ -44,14 +47,14 @@ function mapPostToJob(p: PostRecord): JobItem {
       : 'Other',
     fee: `सामान्य: ${p.fee?.gen || '₹500/-'} | आरक्षित: ${p.fee?.reserved || '₹250/-'}`,
     isNew: true,
-    applyUrl: p.links?.apply,
-    notificationUrl: p.links?.notificationPdf,
+    applyUrl: p.applyLink || p.links?.apply,
+    notificationUrl: p.notificationPdf || p.links?.notificationPdf,
     isTechJob: p.isTechJob || p.categories?.includes('tech'),
     companyName: p.companyName,
     role: p.role,
     experience: p.experience,
-    location: p.location,
-    batchEligibility: p.batchEligibility
+    location: p.location || p.jobLocation,
+    batchEligibility: p.batchEligibility || p.batch
   };
 }
 
@@ -61,11 +64,12 @@ function mapPostToAdmitCard(p: PostRecord): AdmitCardItem {
     id: p.id,
     title: p.title,
     department: p.dept,
-    examDate: p.dates?.exam || 'शीघ्र घोषित',
-    releaseDate: p.dates?.start || p.publishedAt || 'जारी',
+    examDate: p.examDate || p.dates?.exam || 'शीघ्र घोषित',
+    releaseDate: p.publishedDate || p.publishedAt || p.dates?.start || '21/09/2026',
+    publishedDate: p.publishedDate || p.publishedAt || '21/09/2026',
     hallTicketStatus: 'Live Now',
     isNew: true,
-    downloadUrl: p.links?.apply || p.links?.notificationPdf
+    downloadUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf
   };
 }
 
@@ -75,11 +79,14 @@ function mapPostToResult(p: PostRecord): ResultItem {
     id: p.id,
     title: p.title,
     department: p.dept,
-    resultDate: p.publishedAt || p.dates?.start || 'जारी',
+    declaredDate: p.publishedDate || p.publishedAt || '21/09/2026',
+    resultDate: p.publishedDate || p.publishedAt || p.dates?.start || '21/09/2026',
+    publishedDate: p.publishedDate || p.publishedAt || '21/09/2026',
     type: p.title.toLowerCase().includes('answer key') ? 'Answer Key' : 'Final Result',
     isNew: true,
     status: 'Declared',
-    resultUrl: p.links?.apply || p.links?.notificationPdf
+    viewUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf,
+    resultUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf
   };
 }
 
@@ -113,10 +120,13 @@ export default function NPJobPortalPage() {
   const [selectedItemType, setSelectedItemType] = useState<'job' | 'admit' | 'result' | null>(null);
 
   useEffect(() => {
-    // 1. Ensure Firestore is seeded if empty
+    // 1. Run database sanitization audit to ensure all existing & draft posts comply with schema
+    runDatabaseSanitizationAudit().catch((err) => console.warn('Sanitization audit check:', err));
+
+    // 2. Ensure Firestore is seeded if empty
     seedPostsIfEmpty().catch((err) => console.warn('Seeding check:', err));
 
-    // 2. Realtime listener for Firestore posts
+    // 3. Realtime listener for Firestore posts
     const unsubscribe = subscribeToPosts((allPosts) => {
       if (!allPosts || allPosts.length === 0) return;
 
@@ -208,7 +218,7 @@ export default function NPJobPortalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-100/70 text-neutral-900 flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-neutral-100/70 text-neutral-900 flex flex-col font-sans antialiased w-full max-w-full overflow-x-hidden">
       {/* 1. Top Alert / Ticker Bar */}
       <TopTicker />
 
@@ -224,7 +234,7 @@ export default function NPJobPortalPage() {
       <AdSenseBanner slotType="leaderboard" id="header-leaderboard-adsense" />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full max-w-full overflow-x-hidden">
         {/* Trending Cards Grid */}
         <TrendingGrid onSelectCard={handleSelectTrendingCard} />
 

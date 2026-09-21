@@ -29,7 +29,8 @@ import {
   Briefcase,
   Building2,
   Layers,
-  Share2
+  Share2,
+  Calendar
 } from 'lucide-react';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket } from '../../types';
 import {
@@ -161,9 +162,17 @@ export default function AdminPage() {
   const [formState, setFormState] = useState<'MP' | 'Central' | 'All India'>('MP');
   const [formStartDate, setFormStartDate] = useState<string>('');
   const [formEndDate, setFormEndDate] = useState<string>('');
+  const [formLastDateFee, setFormLastDateFee] = useState<string>('');
   const [formExamDate, setFormExamDate] = useState<string>('शीघ्र घोषित');
+  const [formAdmitCardDate, setFormAdmitCardDate] = useState<string>('परीक्षा से 7 दिन पूर्व');
   const [formFeeGen, setFormFeeGen] = useState<string>('₹500/-');
   const [formFeeRes, setFormFeeRes] = useState<string>('₹250/-');
+  const [formFeePortal, setFormFeePortal] = useState<string>('₹50/-');
+  const [formPaymentMode, setFormPaymentMode] = useState<string>('Online Net Banking, Debit/Credit Card, UPI');
+  const [formMinAge, setFormMinAge] = useState<string>('18 वर्ष');
+  const [formMaxAge, setFormMaxAge] = useState<string>('33 वर्ष');
+  const [formAgeRelaxation, setFormAgeRelaxation] = useState<string>('नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
+  const [formShowReservation, setFormShowReservation] = useState<boolean>(true);
   const [formEligibility, setFormEligibility] = useState<string>('');
   const [formApplyLink, setFormApplyLink] = useState<string>('');
   const [formPdfLink, setFormPdfLink] = useState<string>('');
@@ -184,6 +193,10 @@ export default function AdminPage() {
   const [formLocation, setFormLocation] = useState<string>('');
   const [formBatchEligibility, setFormBatchEligibility] = useState<string>('');
 
+  // Single URL Gemini Scraper state
+  const [scraperUrlInput, setScraperUrlInput] = useState<string>('');
+  const [isGeminiExtracting, setIsGeminiExtracting] = useState<boolean>(false);
+
   // Link Override Modal State
   const [overrideJob, setOverrideJob] = useState<PostRecord | null>(null);
   const [overrideApplyUrl, setOverrideApplyUrl] = useState<string>('');
@@ -202,7 +215,7 @@ export default function AdminPage() {
   const [scrapedDrafts, setScrapedDrafts] = useState<ScrapedJobDraft[]>([]);
   const [isScraping, setIsScraping] = useState<boolean>(false);
   const [draftBucketFilter, setDraftBucketFilter] = useState<'all' | 'central' | 'mp' | 'tech'>('all');
-  const [activeScraperSubTab, setActiveScraperSubTab] = useState<'govt' | 'tech' | 'queue'>('govt');
+  const [activeScraperSubTab, setActiveScraperSubTab] = useState<'registry' | 'govt' | 'tech' | 'queue'>('registry');
   const [isFetchingSourceId, setIsFetchingSourceId] = useState<string | null>(null);
 
   // Add Source Form / Modal State
@@ -447,11 +460,24 @@ export default function AdminPage() {
         end: formEndDate || 'विज्ञप्ति अनुसार',
         exam: formExamDate || 'शीघ्र घोषित'
       },
+      lastDate: formEndDate || 'विज्ञप्ति अनुसार',
+      lastDateFee: formLastDateFee || formEndDate || 'विज्ञप्ति अनुसार',
+      examDate: formExamDate || 'शीघ्र घोषित',
+      admitCardDate: formAdmitCardDate || 'परीक्षा से 7 दिन पूर्व',
       fee: {
         gen: formFeeGen,
         reserved: formFeeRes
       },
+      feeGeneral: formFeeGen,
+      feeReserved: formFeeRes,
+      feePortal: formFeePortal,
+      paymentMode: formPaymentMode,
+      minAge: formMinAge,
+      maxAge: formMaxAge,
+      ageRelaxation: formAgeRelaxation,
+      showReservationSection: formShowReservation,
       eligibility: formEligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
+      qualification: formEligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
       links: {
         apply: formApplyLink || 'https://esb.mp.gov.in',
         notificationPdf: formPdfLink || 'https://esb.mp.gov.in',
@@ -506,9 +532,17 @@ export default function AdminPage() {
     setFormState('MP');
     setFormStartDate('');
     setFormEndDate('');
+    setFormLastDateFee('');
     setFormExamDate('शीघ्र घोषित');
+    setFormAdmitCardDate('परीक्षा से 7 दिन पूर्व');
     setFormFeeGen('₹500/-');
     setFormFeeRes('₹250/-');
+    setFormFeePortal('₹50/-');
+    setFormPaymentMode('Online Net Banking, Debit/Credit Card, UPI');
+    setFormMinAge('18 वर्ष');
+    setFormMaxAge('33 वर्ष');
+    setFormAgeRelaxation('नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
+    setFormShowReservation(true);
     setFormEligibility('');
     setFormApplyLink('');
     setFormPdfLink('');
@@ -537,11 +571,19 @@ export default function AdminPage() {
     setFormCategories(p.categories || ['vacancy']);
     setFormState(p.state || 'MP');
     setFormStartDate(p.dates?.start || '');
-    setFormEndDate(p.dates?.end || '');
-    setFormExamDate(p.dates?.exam || 'शीघ्र घोषित');
-    setFormFeeGen(p.fee?.gen || '₹500/-');
-    setFormFeeRes(p.fee?.reserved || '₹250/-');
-    setFormEligibility(p.eligibility || '');
+    setFormEndDate(p.dates?.end || p.lastDate || '');
+    setFormLastDateFee(p.lastDateFee || p.dates?.end || p.lastDate || '');
+    setFormExamDate(p.examDate || p.dates?.exam || 'शीघ्र घोषित');
+    setFormAdmitCardDate(p.admitCardDate || 'परीक्षा से 7 दिन पूर्व');
+    setFormFeeGen(p.feeGeneral || p.fee?.gen || '₹500/-');
+    setFormFeeRes(p.feeReserved || p.fee?.reserved || '₹250/-');
+    setFormFeePortal(p.feePortal || '₹50/-');
+    setFormPaymentMode(p.paymentMode || 'Online Net Banking, Debit/Credit Card, UPI');
+    setFormMinAge(p.minAge || '18 वर्ष');
+    setFormMaxAge(p.maxAge || '33 वर्ष');
+    setFormAgeRelaxation(p.ageRelaxation || 'नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
+    setFormShowReservation(p.showReservationSection !== false);
+    setFormEligibility(p.eligibility || p.qualification || '');
     setFormApplyLink(p.links?.apply || '');
     setFormPdfLink(p.links?.notificationPdf || '');
     setFormSyllabusLink(p.links?.syllabusPdf || '');
@@ -576,16 +618,24 @@ export default function AdminPage() {
     setFormCategories(p.categories || ['vacancy']);
     setFormState((p.state as 'MP' | 'Central' | 'All India') || 'MP');
     setFormStartDate(p.dates?.start || '');
-    setFormEndDate(p.dates?.end || '');
-    setFormExamDate(p.dates?.exam || 'शीघ्र घोषित');
-    setFormFeeGen(p.fee?.gen || '₹500/-');
-    setFormFeeRes(p.fee?.reserved || '₹250/-');
-    setFormEligibility(p.eligibility || '');
+    setFormEndDate(p.dates?.end || p.lastDate || '');
+    setFormLastDateFee(p.lastDateFee || p.dates?.end || '');
+    setFormExamDate(p.examDate || p.dates?.exam || 'शीघ्र घोषित');
+    setFormAdmitCardDate(p.admitCardDate || 'परीक्षा से 7 दिन पूर्व');
+    setFormFeeGen(p.feeGeneral || p.fee?.gen || '₹500/-');
+    setFormFeeRes(p.feeReserved || p.fee?.reserved || '₹250/-');
+    setFormFeePortal(p.feePortal || '₹50/-');
+    setFormPaymentMode(p.paymentMode || 'Online Net Banking, Debit/Credit Card, UPI');
+    setFormMinAge(p.minAge || '18 वर्ष');
+    setFormMaxAge(p.maxAge || '33 वर्ष');
+    setFormAgeRelaxation(p.ageRelaxation || 'नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
+    setFormShowReservation(p.showReservationSection !== false);
+    setFormEligibility(p.eligibility || p.qualification || '');
     setFormApplyLink(p.links?.apply || '');
     setFormPdfLink(p.links?.notificationPdf || '');
     setFormSyllabusLink(p.links?.syllabusPdf || '');
     setFormOfficialSite(p.links?.officialSite || '');
-    setFormStatus('published');
+    setFormStatus('draft');
     setFormYear(curYear);
     setFormMonth(curMonth);
     setFormBlogNo(getNextBlogNumber(posts, curYear, curMonth));
@@ -601,6 +651,81 @@ export default function AdminPage() {
     setActiveTab('posts');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast(`ड्राफ्ट समीक्षा फॉर्म में लोड किया गया: ${p.shortTitle || p.title} (क्रम संख्या: ${getNextBlogNumber(posts, curYear, curMonth)})`);
+  };
+
+  // Instant URL Scraper & Gemini Grounding Extractor
+  const handleExtractFromUrl = async () => {
+    if (!scraperUrlInput.trim()) {
+      showToast('कृपया किसी आधिकारिक भर्ती पृष्ठ का URL दर्ज करें!');
+      return;
+    }
+    setIsGeminiExtracting(true);
+    try {
+      const res = await fetch('/api/scraper/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: scraperUrlInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Extraction failed');
+      }
+
+      const job = data.extractedJob;
+      const now = new Date();
+      const curYear = String(now.getFullYear());
+      const curMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+      setEditingPostId(null);
+      setFormTitle(job.title || '');
+      setFormShortTitle(job.shortTitle || job.title?.slice(0, 30) || '');
+      setFormDept(job.dept || '');
+      setFormTotalPosts(String(job.totalPosts || ''));
+      setFormCategories(job.category ? [job.category] : ['vacancy']);
+      setFormState(job.isTechJob ? 'All India' : 'MP');
+      setFormStartDate(job.startDate || '');
+      setFormEndDate(job.lastDate || '');
+      setFormLastDateFee(job.lastDateFee || job.lastDate || '');
+      setFormExamDate(job.examDate || 'शीघ्र घोषित');
+      setFormAdmitCardDate(job.admitCardDate || 'परीक्षा से 7 दिन पूर्व');
+      setFormFeeGen(job.feeGeneral || '₹500/-');
+      setFormFeeRes(job.feeReserved || '₹250/-');
+      setFormFeePortal(job.feePortal || '₹50/-');
+      setFormPaymentMode(job.paymentMode || 'Online Net Banking, Debit/Credit Card, UPI');
+      setFormMinAge(job.minAge || '18 वर्ष');
+      setFormMaxAge(job.maxAge || '33 वर्ष');
+      setFormAgeRelaxation(job.ageRelaxation || 'नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
+      setFormShowReservation(job.showReservationSection !== false);
+      setFormEligibility(job.eligibility || job.qualification || '');
+      setFormApplyLink(job.applyUrl || '');
+      setFormPdfLink(job.notificationPdfUrl || '');
+      setFormOfficialSite(job.officialSite || '');
+      setFormStatus('draft');
+      setFormYear(curYear);
+      setFormMonth(curMonth);
+      setFormBlogNo(getNextBlogNumber(posts, curYear, curMonth));
+      setFormSlug('');
+      setFormIsTechJob(Boolean(job.isTechJob));
+      setFormCompanyName(job.dept || '');
+      setFormRole(job.role || job.shortTitle || '');
+      setFormLocation(job.location || '');
+      setFormBatchEligibility(job.batchEligibility || '');
+
+      setShowAddForm(true);
+      setActiveTab('posts');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showToast(
+        data.isGeminiVerified
+          ? 'जेमिनी द्वारा सत्यापित डेटा लोड किया गया! कृपया समीक्षा कर "प्रकाशित करें" दबाएं।'
+          : 'डेटा लोड हुआ। कृपया समीक्षा करें।'
+      );
+    } catch (err: unknown) {
+      console.error('URL extraction error:', err);
+      const error = err as Error;
+      showToast(error.message || 'URL निष्कर्षण में त्रुटि हुई');
+    } finally {
+      setIsGeminiExtracting(false);
+    }
   };
 
   // Scraper Sources Handlers
@@ -1220,96 +1345,265 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Dates & Fees Grid with dd/mm/yyyy Standardization */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-slate-300 font-bold text-xs">
+                  {/* Section: Important Dates (dd/mm/yyyy) */}
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-amber-400 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>महत्वपूर्ण तिथियां (Important Dates - dd/mm/yyyy)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">मानकीकृत दिनांक प्रारूप</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
                           आवेदन प्रारंभ तिथि:
                         </label>
-                        <span className="text-[10px] text-amber-400 font-mono">dd/mm/yyyy</span>
+                        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
+                          <input
+                            type="text"
+                            value={formStartDate}
+                            onChange={(e) => setFormStartDate(e.target.value)}
+                            placeholder="dd/mm/yyyy"
+                            className="flex-1 bg-transparent px-2 py-0.5 text-white text-xs font-mono focus:outline-hidden"
+                          />
+                          <input
+                            type="date"
+                            value={ddmmyyyyToInputDate(formStartDate)}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setFormStartDate(inputDateToDDMMYYYY(e.target.value));
+                              }
+                            }}
+                            className="bg-slate-800 text-amber-300 rounded px-1.5 py-0.5 text-[11px] cursor-pointer border border-slate-600"
+                            title="कैलेंडर से प्रारंभ तिथि चुनें (dd/mm/yyyy)"
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
-                        <input
-                          type="text"
-                          value={formStartDate}
-                          onChange={(e) => setFormStartDate(e.target.value)}
-                          placeholder="dd/mm/yyyy"
-                          className="flex-1 bg-transparent px-2 py-1 text-white text-xs font-mono focus:outline-hidden"
-                        />
-                        <input
-                          type="date"
-                          value={ddmmyyyyToInputDate(formStartDate)}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              setFormStartDate(inputDateToDDMMYYYY(e.target.value));
-                            }
-                          }}
-                          className="bg-slate-800 text-amber-300 rounded px-1.5 py-0.5 text-xs cursor-pointer border border-slate-600"
-                          title="कैलेंडर से प्रारंभ तिथि चुनें (dd/mm/yyyy)"
-                        />
-                      </div>
-                    </div>
 
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-slate-300 font-bold text-xs">
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
                           आवेदन अंतिम तिथि:
                         </label>
-                        <span className="text-[10px] text-rose-400 font-mono">dd/mm/yyyy</span>
+                        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
+                          <input
+                            type="text"
+                            value={formEndDate}
+                            onChange={(e) => setFormEndDate(e.target.value)}
+                            placeholder="dd/mm/yyyy"
+                            className="flex-1 bg-transparent px-2 py-0.5 text-white text-xs font-mono focus:outline-hidden"
+                          />
+                          <input
+                            type="date"
+                            value={ddmmyyyyToInputDate(formEndDate)}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setFormEndDate(inputDateToDDMMYYYY(e.target.value));
+                              }
+                            }}
+                            className="bg-slate-800 text-rose-300 rounded px-1.5 py-0.5 text-[11px] cursor-pointer border border-slate-600"
+                            title="कैलेंडर से अंतिम तिथि चुनें (dd/mm/yyyy)"
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          फीस भुगतान अंतिम तिथि:
+                        </label>
+                        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
+                          <input
+                            type="text"
+                            value={formLastDateFee}
+                            onChange={(e) => setFormLastDateFee(e.target.value)}
+                            placeholder="उदा: 25/10/2026"
+                            className="flex-1 bg-transparent px-2 py-0.5 text-white text-xs font-mono focus:outline-hidden"
+                          />
+                          <input
+                            type="date"
+                            value={ddmmyyyyToInputDate(formLastDateFee)}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setFormLastDateFee(inputDateToDDMMYYYY(e.target.value));
+                              }
+                            }}
+                            className="bg-slate-800 text-amber-300 rounded px-1.5 py-0.5 text-[11px] cursor-pointer border border-slate-600"
+                            title="कैलेंडर से फीस अंतिम तिथि चुनें"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          परीक्षा तिथि (Exam Date):
+                        </label>
                         <input
                           type="text"
-                          value={formEndDate}
-                          onChange={(e) => setFormEndDate(e.target.value)}
-                          placeholder="dd/mm/yyyy"
-                          className="flex-1 bg-transparent px-2 py-1 text-white text-xs font-mono focus:outline-hidden"
-                        />
-                        <input
-                          type="date"
-                          value={ddmmyyyyToInputDate(formEndDate)}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              setFormEndDate(inputDateToDDMMYYYY(e.target.value));
-                            }
-                          }}
-                          className="bg-slate-800 text-rose-300 rounded px-1.5 py-0.5 text-xs cursor-pointer border border-slate-600"
-                          title="कैलेंडर से अंतिम तिथि चुनें (dd/mm/yyyy)"
+                          value={formExamDate}
+                          onChange={(e) => setFormExamDate(e.target.value)}
+                          placeholder="उदा: 18 नवंबर 2026 / शीघ्र घोषित"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">
-                        सामान्य/OBC फीस:
-                      </label>
-                      <input
-                        type="text"
-                        value={formFeeGen}
-                        onChange={(e) => setFormFeeGen(e.target.value)}
-                        placeholder="उदा: ₹500/-"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">
-                        आरक्षित (SC/ST) फीस:
-                      </label>
-                      <input
-                        type="text"
-                        value={formFeeRes}
-                        onChange={(e) => setFormFeeRes(e.target.value)}
-                        placeholder="उदा: ₹250/-"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                      />
+                      <div className="sm:col-span-2 lg:col-span-2">
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          प्रवेश पत्र / एडमिट कार्ड तिथि (Admit Card Date):
+                        </label>
+                        <input
+                          type="text"
+                          value={formAdmitCardDate}
+                          onChange={(e) => setFormAdmitCardDate(e.target.value)}
+                          placeholder="उदा: परीक्षा से 7 दिन पूर्व / शीघ्र घोषित"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Qualification */}
+                  {/* Section: Application Fees & Reservation Switch */}
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                      <span className="text-xs font-black text-emerald-400">
+                        आवेदन शुल्क विवरण (Application Fees Breakdown)
+                      </span>
+                      <label className="inline-flex items-center gap-2 cursor-pointer bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-emerald-500 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={formShowReservation}
+                          onChange={(e) => setFormShowReservation(e.target.checked)}
+                          className="w-3.5 h-3.5 accent-emerald-500 rounded"
+                        />
+                        <span className="text-[11px] font-bold text-slate-200">
+                          आरक्षण व श्रेणी-वार फीस दिखाएं (Show Reservation Section)
+                        </span>
+                      </label>
+                    </div>
+
+                    {formShowReservation ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        <div>
+                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                            सामान्य / OBC / EWS फीस:
+                          </label>
+                          <input
+                            type="text"
+                            value={formFeeGen}
+                            onChange={(e) => setFormFeeGen(e.target.value)}
+                            placeholder="उदा: ₹500/-"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                            आरक्षित (SC / ST / Divyang) फीस:
+                          </label>
+                          <input
+                            type="text"
+                            value={formFeeRes}
+                            onChange={(e) => setFormFeeRes(e.target.value)}
+                            placeholder="उदा: ₹250/- (SC/ST/महिला)"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                            पोर्टल / कियोस्क शुल्क (Portal Charge):
+                          </label>
+                          <input
+                            type="text"
+                            value={formFeePortal}
+                            onChange={(e) => setFormFeePortal(e.target.value)}
+                            placeholder="उदा: ₹50/- MP Online / पोर्टल"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                            भुगतान का माध्यम (Payment Mode):
+                          </label>
+                          <input
+                            type="text"
+                            value={formPaymentMode}
+                            onChange={(e) => setFormPaymentMode(e.target.value)}
+                            placeholder="उदा: Net Banking / Debit Card / UPI"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-blue-950/20 border border-blue-900/50 rounded-lg text-xs text-blue-300 flex items-center justify-between">
+                        <span>
+                          ℹ️ आरक्षण सेक्शन बंद है (निःशुल्क IT/MNC जॉब या ऑल-इंडिया फ्लैट रजिस्ट्रेशन)।
+                        </span>
+                        <input
+                          type="text"
+                          value={formFeeGen}
+                          onChange={(e) => {
+                            setFormFeeGen(e.target.value);
+                            setFormFeeRes(e.target.value);
+                          }}
+                          placeholder="उदा: ₹0/- (Free Registration)"
+                          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section: Age Limits */}
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <span className="text-xs font-black text-amber-300">
+                      आयु सीमा विवरण (Age Limit & Relaxation Rules)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          न्यूनतम आयु (Minimum Age):
+                        </label>
+                        <input
+                          type="text"
+                          value={formMinAge}
+                          onChange={(e) => setFormMinAge(e.target.value)}
+                          placeholder="उदा: 18 वर्ष"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          अधिकतम आयु (Maximum Age):
+                        </label>
+                        <input
+                          type="text"
+                          value={formMaxAge}
+                          onChange={(e) => setFormMaxAge(e.target.value)}
+                          placeholder="उदा: 33 वर्ष / 40 वर्ष"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          आयु छूट नियम (Age Relaxation):
+                        </label>
+                        <input
+                          type="text"
+                          value={formAgeRelaxation}
+                          onChange={(e) => setFormAgeRelaxation(e.target.value)}
+                          placeholder="उदा: SC/ST/OBC हेतु 5 वर्ष की छूट"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section: Qualification */}
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">
+                    <label className="block text-slate-300 font-bold text-xs mb-1">
                       शैक्षणिक योग्यता सारांश (Qualification Summary):
                     </label>
                     <textarea
@@ -1317,81 +1611,93 @@ export default function AdminPage() {
                       value={formEligibility}
                       onChange={(e) => setFormEligibility(e.target.value)}
                       placeholder="उदा: 10वीं हाई स्कूल उत्तीर्ण अथवा 12वीं इंटरमीडिएट। प्रासंगिक पदों हेतु तकनीकी डिप्लोमा आवश्यक।"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-hidden focus:border-amber-400"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
                     />
                   </div>
 
-                  {/* Tech Job Specific Fields (shown if tech category checked or toggle active) */}
-                  {(formIsTechJob || formCategories.includes('tech')) && (
-                    <div className="p-4 bg-blue-950/30 border border-blue-800/60 rounded-xl space-y-3">
+                  {/* Tech Job Specific Fields */}
+                  <div className="bg-slate-950/60 border border-blue-900/60 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between border-b border-blue-900/40 pb-2">
                       <div className="flex items-center gap-2 text-blue-400 font-black text-xs">
-                        <Briefcase className="w-4 h-4 text-blue-400" />
-                        <span>कंप्यूटर / IT व कॉर्पोरेट जॉब विवरण (Tech Job Metadata)</span>
+                        <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                        <span>IT, MNC व कॉर्पोरेट जॉब पैरामीटर (Tech Job Metadata)</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-slate-300 font-bold mb-1">
-                            कंपनी का नाम (Company Name)
-                          </label>
-                          <input
-                            type="text"
-                            value={formCompanyName}
-                            onChange={(e) => setFormCompanyName(e.target.value)}
-                            placeholder="उदा: Google India / TCS / Infosys"
-                            className="w-full bg-slate-950 border border-blue-700/60 rounded-lg px-2.5 py-1.5 text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-300 font-bold mb-1">
-                            पद / रोल (Role)
-                          </label>
-                          <input
-                            type="text"
-                            value={formRole}
-                            onChange={(e) => setFormRole(e.target.value)}
-                            placeholder="उदा: Software Engineer / QA Tester"
-                            className="w-full bg-slate-950 border border-blue-700/60 rounded-lg px-2.5 py-1.5 text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-300 font-bold mb-1">
-                            अनुभव (Experience)
-                          </label>
-                          <input
-                            type="text"
-                            value={formExperience}
-                            onChange={(e) => setFormExperience(e.target.value)}
-                            placeholder="उदा: Freshers (0 Yrs) / 0-2 Years"
-                            className="w-full bg-slate-950 border border-blue-700/60 rounded-lg px-2.5 py-1.5 text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-300 font-bold mb-1">
-                            स्थान (Job Location)
-                          </label>
-                          <input
-                            type="text"
-                            value={formLocation}
-                            onChange={(e) => setFormLocation(e.target.value)}
-                            placeholder="उदा: Indore / Pune / Bengaluru / Remote"
-                            className="w-full bg-slate-950 border border-blue-700/60 rounded-lg px-2.5 py-1.5 text-white"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-slate-300 font-bold mb-1">
-                            बैच पात्रता (Batch Eligibility)
-                          </label>
-                          <input
-                            type="text"
-                            value={formBatchEligibility}
-                            onChange={(e) => setFormBatchEligibility(e.target.value)}
-                            placeholder="उदा: 2024, 2025 & 2026 Batch Graduates"
-                            className="w-full bg-slate-950 border border-blue-700/60 rounded-lg px-2.5 py-1.5 text-white"
-                          />
-                        </div>
+                      <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-800">
+                        <input
+                          type="checkbox"
+                          checked={formIsTechJob || formCategories.includes('tech')}
+                          onChange={(e) => setFormIsTechJob(e.target.checked)}
+                          className="w-3.5 h-3.5 accent-blue-500 rounded"
+                        />
+                        <span className="text-[11px] font-bold text-blue-200">
+                          IT / Corporate Mode
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          कंपनी का नाम (Company Name)
+                        </label>
+                        <input
+                          type="text"
+                          value={formCompanyName}
+                          onChange={(e) => setFormCompanyName(e.target.value)}
+                          placeholder="उदा: TCS / Infosys / Google"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          पद / रोल (Role)
+                        </label>
+                        <input
+                          type="text"
+                          value={formRole}
+                          onChange={(e) => setFormRole(e.target.value)}
+                          placeholder="उदा: Software Engineer / Trainee"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          अनुभव (Experience)
+                        </label>
+                        <input
+                          type="text"
+                          value={formExperience}
+                          onChange={(e) => setFormExperience(e.target.value)}
+                          placeholder="उदा: Freshers (0 Yrs) / 0-2 Years"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          जॉब लोकेशन / वर्क मोड (Job Location / Work Mode)
+                        </label>
+                        <input
+                          type="text"
+                          value={formLocation}
+                          onChange={(e) => setFormLocation(e.target.value)}
+                          placeholder="उदा: Gurugram / Hybrid / WFH / Indore"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-blue-400"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                          बैच पात्रता (Batch Eligibility)
+                        </label>
+                        <input
+                          type="text"
+                          value={formBatchEligibility}
+                          onChange={(e) => setFormBatchEligibility(e.target.value)}
+                          placeholder="उदा: 2024, 2025 & 2026 Batch Graduates"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-blue-400"
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {/* Hyperlinks */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
@@ -1809,9 +2115,119 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Sub Tabs: Tab 1 (Govt Jobs) vs Tab 2 (Tech & IT) vs Tab 3 (Drafts Queue) */}
+            {/* 1. SINGLE WEB PAGE INSTANT SCRAPER (URL INPUT & GEMINI GROUNDING) */}
+            <div className="bg-gradient-to-br from-purple-950/40 via-slate-900 to-indigo-950/40 border-2 border-purple-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2.5 rounded-xl bg-purple-600 text-white shadow-lg shrink-0">
+                    <Sparkles className="w-5 h-5 animate-pulse" />
+                  </span>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      <span>सिंगल वेब पेज इंस्टेंट स्क्रैपर (Single URL Scraper)</span>
+                      <span className="text-[10px] bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Gemini 2.5 Flash Grounding
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      किसी भी आधिकारिक भर्ती सूचना या करियर पेज का URL दर्ज करें — जेमिनी AI तिथियां, फीस, पात्रता व पद स्वतः निष्कर्षित कर फॉर्म भरेगा।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-purple-300 font-mono bg-purple-950/60 border border-purple-800/60 px-3 py-1.5 rounded-xl self-start md:self-auto">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span>AI Grounding Engine Ready</span>
+                </div>
+              </div>
+
+              {/* URL Input Form */}
+              <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+                <div className="relative flex-1">
+                  <input
+                    type="url"
+                    value={scraperUrlInput}
+                    onChange={(e) => setScraperUrlInput(e.target.value)}
+                    placeholder="Enter any Official Notification or Recruitment URL (उदा: https://esb.mp.gov.in/... या https://ssc.gov.in/...)"
+                    className="w-full bg-slate-950/90 border-2 border-purple-500/40 focus:border-purple-400 text-white placeholder-slate-500 text-xs sm:text-sm rounded-xl px-4 py-3 focus:outline-hidden font-mono shadow-inner"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleExtractFromUrl();
+                      }
+                    }}
+                  />
+                  {scraperUrlInput && (
+                    <button
+                      type="button"
+                      onClick={() => setScraperUrlInput('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs bg-slate-800 px-2 py-0.5 rounded"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleExtractFromUrl}
+                  disabled={isGeminiExtracting || !scraperUrlInput.trim()}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-xl transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  {isGeminiExtracting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>जेमिनी AI सत्यापन जारी है...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>Auto-Fetch & Ground with Gemini</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Quick Sample Presets */}
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="text-slate-400 font-bold">त्वरित टेस्ट सैंपल्स:</span>
+                {[
+                  { label: '🏛️ MPESB व्यापम', url: 'https://esb.mp.gov.in/latest-rulebooks' },
+                  { label: '🏛️ SSC CGL/GD', url: 'https://ssc.gov.in/api/latest-notices' },
+                  { label: '🏛️ MPPSC राज्य सेवा', url: 'https://mppsc.mp.gov.in/notifications' },
+                  { label: '💼 Infosys Careers', url: 'https://career.infosys.com/joblist' },
+                  { label: '💼 TCS iON NQT', url: 'https://tcs.com/careers/india-freshers' },
+                ].map((sample) => (
+                  <button
+                    key={sample.label}
+                    type="button"
+                    onClick={() => setScraperUrlInput(sample.url)}
+                    className="px-2.5 py-1 rounded-lg bg-slate-950/80 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 hover:text-white transition-colors"
+                  >
+                    {sample.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sub Tabs: Registry Table vs Govt Jobs vs Tech & IT vs Drafts Queue */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setActiveScraperSubTab('registry')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
+                    activeScraperSubTab === 'registry'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span>बल्क स्रोत रजिस्ट्री (Registry Table)</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950 text-white font-mono">
+                    {scraperSources.length}
+                  </span>
+                </button>
+
                 <button
                   onClick={() => setActiveScraperSubTab('govt')}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
@@ -1821,7 +2237,7 @@ export default function AdminPage() {
                   }`}
                 >
                   <span>🏛️</span>
-                  <span>Govt Jobs Scrapers</span>
+                  <span>Govt Jobs Portals</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/80 font-mono">
                     {scraperSources.filter((s) => s.bucket !== 'tech_corporate').length}
                   </span>
@@ -1836,7 +2252,7 @@ export default function AdminPage() {
                   }`}
                 >
                   <span>💻</span>
-                  <span>Tech & IT Jobs Scrapers</span>
+                  <span>Tech & IT Jobs Portals</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/80 font-mono">
                     {scraperSources.filter((s) => s.bucket === 'tech_corporate').length}
                   </span>
@@ -1846,13 +2262,13 @@ export default function AdminPage() {
                   onClick={() => setActiveScraperSubTab('queue')}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
                     activeScraperSubTab === 'queue'
-                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      ? 'bg-rose-600 text-white shadow-md'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
                   <Layers className="w-4 h-4" />
                   <span>Draft Posts Queue</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950 text-amber-300 font-bold font-mono">
                     {scrapedDrafts.filter((d) => d.status === 'queued').length}
                   </span>
                 </button>
@@ -1870,6 +2286,137 @@ export default function AdminPage() {
                 </span>
               </div>
             </div>
+
+            {/* TAB 0: BULK SOURCE MANAGEMENT DASHBOARD TABLE */}
+            {activeScraperSubTab === 'registry' && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl">
+                  <div>
+                    <h4 className="text-sm font-black text-white flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-amber-400" />
+                      <span>केंद्रीय, म.प्र. राज्य एवं MNC करियर स्रोत तालिका (Standard Source Registry)</span>
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      MPESB, MPPSC, SSC, UPSC, Railway, TCS, Infosys, Wipro आदि के प्रत्यक्ष एंडपॉइंट्स व मॉनिटरिंग स्विच।
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewSourceBucket('govt_portals');
+                      setShowAddSourceModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-lg transition-transform active:scale-95 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ नया स्रोत पंजीकृत करें</span>
+                  </button>
+                </div>
+
+                {/* Full Sources Table */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black border-b border-slate-800">
+                        <tr>
+                          <th className="py-3 px-3">पोर्टल नाम (Portal Name)</th>
+                          <th className="py-3 px-3">श्रेणी (Type)</th>
+                          <th className="py-3 px-3">स्रोत URL (Source URL)</th>
+                          <th className="py-3 px-3">विधि (Fetch Mode)</th>
+                          <th className="py-3 px-3 text-center">सक्रिय स्विच (Active)</th>
+                          <th className="py-3 px-3">अंतिम जांच (Last Checked)</th>
+                          <th className="py-3 px-3 text-right">कार्रवाई (Action)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-sans">
+                        {scraperSources.map((source) => {
+                          const isFetching = isFetchingSourceId === source.id;
+                          return (
+                            <tr key={source.id} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                  <span>{source.name}</span>
+                                </div>
+                                {source.description && (
+                                  <span className="text-[10px] text-slate-400 font-normal block truncate max-w-xs">
+                                    {source.description}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                                    source.bucket === 'mp_special'
+                                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                      : source.bucket === 'tech_corporate'
+                                      ? 'bg-blue-950 text-blue-300 border border-blue-800'
+                                      : 'bg-amber-950 text-amber-300 border border-amber-800'
+                                  }`}
+                                >
+                                  {source.bucket === 'mp_special'
+                                    ? 'MP State'
+                                    : source.bucket === 'tech_corporate'
+                                    ? 'Tech / IT'
+                                    : 'Central Govt'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-mono text-[11px] max-w-[220px] truncate">
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1"
+                                >
+                                  <ExternalLink className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{source.url}</span>
+                                </a>
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                                  {source.feedType.toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <button
+                                  onClick={() => handleToggleSource(source.id)}
+                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                                    source.enabled
+                                      ? 'bg-emerald-950 text-emerald-400 border-emerald-700 hover:bg-emerald-900'
+                                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                                  }`}
+                                  title={source.enabled ? 'निष्क्रिय करें' : 'सक्रिय करें'}
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full ${
+                                      source.enabled ? 'bg-emerald-400' : 'bg-slate-500'
+                                    }`}
+                                  />
+                                  <span>{source.enabled ? 'Active' : 'Off'}</span>
+                                </button>
+                              </td>
+                              <td className="py-3 px-3 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                                {source.lastCheckedAt ? source.lastCheckedAt.split('T')[0] : 'Never'}
+                              </td>
+                              <td className="py-3 px-3 text-right whitespace-nowrap">
+                                <button
+                                  onClick={() => handleFetchSingleSource(source)}
+                                  disabled={isFetching || !source.enabled}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold text-[11px] rounded-lg transition-transform active:scale-95 cursor-pointer shadow"
+                                  title="इस पोर्टल को अभी स्कैन करें"
+                                >
+                                  <Play className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} />
+                                  <span>{isFetching ? 'स्कैनिंग...' : 'Scrape'}</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* TAB 1: GOVT JOBS SCRAPERS & TAB 2: TECH & IT JOBS SCRAPERS */}
             {(activeScraperSubTab === 'govt' || activeScraperSubTab === 'tech') && (

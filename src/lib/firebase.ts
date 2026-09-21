@@ -337,6 +337,20 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
     advtNo: jobData.advtNo || `ADV/${currentYear}/${nextBlogNo}`,
     minAge: jobData.minAge || '18 वर्ष',
     maxAge: jobData.maxAge || '33 वर्ष',
+    ageRelaxation: jobData.ageRelaxation || 'नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट',
+    examDate: jobData.examDate || jobData.dates?.exam || 'शीघ्र घोषित',
+    admitCardDate: jobData.admitCardDate || 'परीक्षा से 7 दिन पूर्व',
+    lastDateFee: jobData.lastDateFee || jobData.dates?.end || '15/10/2026',
+    paymentMode: jobData.paymentMode || 'Online Net Banking, Debit/Credit Card, UPI',
+    feeGeneral: jobData.feeGeneral || jobData.fee?.gen || '₹500/-',
+    feeReserved: jobData.feeReserved || jobData.fee?.reserved || '₹250/-',
+    feePortal: jobData.feePortal || '₹50/-',
+    showReservationSection: jobData.showReservationSection !== undefined ? jobData.showReservationSection : !jobData.isTechJob,
+    isTechJob: Boolean(jobData.isTechJob || category === 'tech-jobs'),
+    location: jobData.location || '',
+    batchEligibility: jobData.batchEligibility || '',
+    companyName: jobData.companyName || '',
+    role: jobData.role || '',
     requiredDocuments: jobData.requiredDocuments || [
       '10वीं / 12वीं की अंकसूची',
       'आधार कार्ड (मोबाइल लिंक)',
@@ -827,21 +841,10 @@ export async function simulateScraperRun(): Promise<ScrapedJobDraft[]> {
 const STORAGE_SOURCES_KEY = 'np_scraper_sources_v1';
 
 export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
-  // 1. Govt Jobs Scrapers (SSC, MPESB, UPSC, State Portals)
-  {
-    id: 'src-ssc-portal',
-    name: 'Staff Selection Commission (SSC Central)',
-    bucket: 'govt_portals',
-    url: 'https://ssc.gov.in/api/latest-notices',
-    feedType: 'api',
-    enabled: true,
-    lastScraped: 'आज 10:15 AM',
-    itemsFound: 4,
-    description: 'SSC CGL, CHSL, GD Constable, MTS एवं CPO भर्ती अधिसूचनाएं'
-  },
+  // 1. MP Government Portals
   {
     id: 'src-mpesb-rulebooks',
-    name: 'MPESB Bhopal Rulebooks & Exam Feed',
+    name: 'MPESB Bhopal (esb.mp.gov.in)',
     bucket: 'mp_special',
     url: 'https://esb.mp.gov.in/latest-rulebooks',
     feedType: 'html',
@@ -851,19 +854,8 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     description: 'MP Police, Sub Engineer, Patwari, Group 1/2/3/4/5 व्यापम भर्तियां'
   },
   {
-    id: 'src-upsc-rss',
-    name: 'UPSC Recruitment Notices Feed',
-    bucket: 'govt_portals',
-    url: 'https://upsc.gov.in/rss/recruitment.xml',
-    feedType: 'rss',
-    enabled: true,
-    lastScraped: 'आज 09:30 AM',
-    itemsFound: 2,
-    description: 'Civil Services, NDA, CDS, CMS व अन्य यूपीएससी विज्ञप्तियां'
-  },
-  {
     id: 'src-mppsc-portal',
-    name: 'MPPSC Indore Official Announcements',
+    name: 'MPPSC Indore (mppsc.mp.gov.in)',
     bucket: 'mp_special',
     url: 'https://mppsc.mp.gov.in/notifications',
     feedType: 'html',
@@ -873,8 +865,76 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     description: 'मध्य प्रदेश राज्य सेवा परीक्षा (State Service Exam & Forest)'
   },
   {
+    id: 'src-mponline-portal',
+    name: 'MP Online Portal (mponline.gov.in)',
+    bucket: 'mp_special',
+    url: 'https://mponline.gov.in/portal/services/recruitment',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 10:00 AM',
+    itemsFound: 4,
+    description: 'मध्य प्रदेश के सभी विभागों के ऑनलाइन भर्ती आवेदन'
+  },
+  {
+    id: 'src-mphc-jabalpur',
+    name: 'MP High Court Jabalpur (mphc.gov.in)',
+    bucket: 'mp_special',
+    url: 'https://mphc.gov.in/recruitment',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'कल शाम 06:45 PM',
+    itemsFound: 1,
+    description: 'MPHC Assistant Grade 3, Stenographer एवं जिला न्यायालय पद'
+  },
+
+  // 2. Central Government Portals
+  {
+    id: 'src-ssc-portal',
+    name: 'Staff Selection Commission (ssc.gov.in)',
+    bucket: 'govt_portals',
+    url: 'https://ssc.gov.in/api/latest-notices',
+    feedType: 'api',
+    enabled: true,
+    lastScraped: 'आज 10:15 AM',
+    itemsFound: 4,
+    description: 'SSC CGL, CHSL, GD Constable, MTS एवं CPO भर्ती अधिसूचनाएं'
+  },
+  {
+    id: 'src-upsc-rss',
+    name: 'Union Public Service Commission (upsc.gov.in)',
+    bucket: 'govt_portals',
+    url: 'https://upsc.gov.in/rss/recruitment.xml',
+    feedType: 'rss',
+    enabled: true,
+    lastScraped: 'आज 09:30 AM',
+    itemsFound: 2,
+    description: 'Civil Services, NDA, CDS, CMS व अन्य यूपीएससी विज्ञप्तियां'
+  },
+  {
+    id: 'src-ibps-portal',
+    name: 'IBPS Banking Recruitment (ibps.in)',
+    bucket: 'govt_portals',
+    url: 'https://ibps.in/crp-updates',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 09:00 AM',
+    itemsFound: 3,
+    description: 'IBPS PO, Clerk, SO, RRB Office Assistant एवं Scale I/II/III पद'
+  },
+  {
+    id: 'src-nta-portal',
+    name: 'National Testing Agency (nta.ac.in)',
+    bucket: 'govt_portals',
+    url: 'https://nta.ac.in/NoticeArchive',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 08:45 AM',
+    itemsFound: 2,
+    description: 'UGC NET, CSIR NET, CMAT एवं केंद्रीय भर्ती परीक्षाएं'
+  },
+  {
     id: 'src-rrb-railway',
-    name: 'Railway Recruitment Boards (RRB Central)',
+    name: 'Railway Recruitment Boards (rrbapply.gov.in)',
     bucket: 'govt_portals',
     url: 'https://rrbapply.gov.in/notifications',
     feedType: 'html',
@@ -884,60 +944,83 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     description: 'RRB NTPC, Group D, ALP, Technician एवं RPF रेलवे पुलिस भर्ती'
   },
   {
-    id: 'src-mphc-jabalpur',
-    name: 'MP High Court Jabalpur Official Recruitment',
-    bucket: 'mp_special',
-    url: 'https://mphc.gov.in/recruitment',
+    id: 'src-defence-army',
+    name: 'Indian Army Defence (joinindianarmy.nic.in)',
+    bucket: 'govt_portals',
+    url: 'https://joinindianarmy.nic.in/latest-rally',
     feedType: 'html',
     enabled: true,
-    lastScraped: 'कल शाम 06:45 PM',
-    itemsFound: 1,
-    description: 'MPHC Assistant Grade 3, Stenographer एवं जिला न्यायालय पद'
+    lastScraped: 'कल शाम 05:30 PM',
+    itemsFound: 2,
+    description: 'Agniveer GD, Technical, Clerk, Tradesman एवं TGC/TES भर्तियां'
   },
-  // 2. Tech & IT Jobs Scrapers (Google, Microsoft, IT Career Portals)
+
+  // 3. Tech & MNC Careers
   {
-    id: 'src-google-careers',
-    name: 'Google India Careers (Bengaluru/Hyderabad/Gurugram)',
+    id: 'src-tcs-careers',
+    name: 'TCS iON / Careers (tcs.com/careers)',
     bucket: 'tech_corporate',
-    url: 'https://careers.google.com/api/v3/jobs/search/?location=India',
+    url: 'https://tcs.com/careers/india-freshers',
     feedType: 'api',
     enabled: true,
-    lastScraped: 'आज 12:10 PM',
-    itemsFound: 8,
-    description: 'Software Engineering, Cloud, Data Analyst, Machine Learning एवं Technical Solutions'
+    lastScraped: 'आज 11:20 AM',
+    itemsFound: 5,
+    description: 'TCS NQT, Ninja, Digital, Prime Hiring एवं BPS ड्राइव'
   },
   {
-    id: 'src-microsoft-careers',
-    name: 'Microsoft India Careers (Hyderabad/Bengaluru)',
+    id: 'src-infosys-careers',
+    name: 'Infosys Springboard / Careers (career.infosys.com)',
     bucket: 'tech_corporate',
-    url: 'https://careers.microsoft.com/services/jobs/search?location=India',
+    url: 'https://career.infosys.com/joblist',
     feedType: 'api',
     enabled: true,
-    lastScraped: 'आज 11:35 AM',
+    lastScraped: 'आज 11:00 AM',
     itemsFound: 6,
-    description: 'Software Engineer, Azure Cloud Architect, Campus Graduate एवं Internships'
+    description: 'Systems Engineer, Specialist Programmer (SP) & DSE Campus Drive'
   },
   {
-    id: 'src-tech-freshers',
-    name: 'IT Career Portals & Campus RSS (TCS, Infosys, Wipro)',
+    id: 'src-wipro-careers',
+    name: 'Wipro Careers (careers.wipro.com)',
     bucket: 'tech_corporate',
-    url: 'https://freshersworld.com/rss/it-jobs.xml',
-    feedType: 'rss',
+    url: 'https://careers.wipro.com/elite-nlth',
+    feedType: 'html',
     enabled: true,
-    lastScraped: 'आज 10:20 AM',
-    itemsFound: 6,
-    description: 'IT Freshers, Software Engineer, B.Tech/BCA/MCA ऑफ-कैंपस ड्राइव 2025/2026'
-  },
-  {
-    id: 'src-tech-indore-pune',
-    name: 'MP & Pune Tech Hub (Indore Super Corridor & IT Park)',
-    bucket: 'tech_corporate',
-    url: 'https://naukri.com/tech-rss/indore-software',
-    feedType: 'rss',
-    enabled: true,
-    lastScraped: 'आज 11:10 AM',
+    lastScraped: 'आज 10:40 AM',
     itemsFound: 4,
-    description: 'TCS Indore, Infosys SEZ, Impetus, एवं इंदौर क्रिस्टल IT पार्क ओपनिंग्स'
+    description: 'Elite National Talent Hunt (NLTH), Project Engineer & Turbo Hiring'
+  },
+  {
+    id: 'src-cognizant-careers',
+    name: 'Cognizant Careers (careers.cognizant.com)',
+    bucket: 'tech_corporate',
+    url: 'https://careers.cognizant.com/global/en/campus-hiring',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 09:50 AM',
+    itemsFound: 4,
+    description: 'GenC, GenC Next, GenC Elevate एवं Programmer Analyst Trainee'
+  },
+  {
+    id: 'src-tech-mahindra',
+    name: 'Tech Mahindra Careers (techmahindra.com/careers)',
+    bucket: 'tech_corporate',
+    url: 'https://techmahindra.com/careers',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'कल 04:20 PM',
+    itemsFound: 3,
+    description: 'Associate Software Engineer & SuperCoder Hiring'
+  },
+  {
+    id: 'src-hcl-careers',
+    name: 'HCLTech Careers (hcltech.com/careers)',
+    bucket: 'tech_corporate',
+    url: 'https://hcltech.com/careers/first-careers',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'कल 03:15 PM',
+    itemsFound: 3,
+    description: 'HCL First Careers Graduate Program & Tech Associate Roles'
   }
 ];
 

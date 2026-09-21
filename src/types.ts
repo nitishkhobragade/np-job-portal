@@ -24,6 +24,7 @@ export interface JobPostDetail {
   maxAge: string;
   ageCalculationDate?: string;
   ageRelaxation: string;
+  showReservationSection?: boolean;
   state: 'MP' | 'Central' | 'All India';
   category: 'Police' | 'Teaching' | 'Defense' | 'SSC/UPSC' | 'Railway' | 'Banking' | 'Health' | 'Tech/IT' | 'Other';
   qualificationSummary: string;
@@ -76,6 +77,7 @@ export interface JobItem {
   ageLimit?: string;
   fee?: string;
   postDate?: string;
+  publishedDate?: string; // dd/mm/yyyy
   isNew?: boolean;
   isHot?: boolean;
   category: 'Police' | 'Teaching' | 'Defense' | 'SSC/UPSC' | 'Railway' | 'Banking' | 'Health' | 'Tech/IT' | 'Other';
@@ -96,6 +98,7 @@ export interface AdmitCardItem {
   department: string;
   examDate: string;
   releaseDate: string;
+  publishedDate?: string; // dd/mm/yyyy
   hallTicketStatus: 'Live Now' | 'Coming Soon' | 'Out';
   isNew?: boolean;
   downloadUrl?: string;
@@ -106,10 +109,14 @@ export interface ResultItem {
   title: string;
   department: string;
   declaredDate: string;
-  type: 'Result' | 'Answer Key' | 'Cutoff';
+  resultDate?: string;
+  publishedDate?: string; // dd/mm/yyyy
+  type: 'Result' | 'Answer Key' | 'Cutoff' | 'Final Result';
   isNew?: boolean;
   viewUrl?: string;
+  resultUrl?: string;
   scoreCardAvailable?: boolean;
+  status?: string;
 }
 
 export interface TrendingCard {
@@ -131,28 +138,49 @@ export interface TickerAlert {
   category?: string;
 }
 
-// Normalized Post Schema for Cloud Firestore optimization
+// Normalized Post Schema for Cloud Firestore - Single Source of Truth
 export interface PostRecord {
   id: string; // unique ID, e.g., 'mp-police-constable-2026'
-  slug?: string;
-  year?: string;
-  month?: string;
-  blogNo?: string;
+  blogNo?: string; // e.g. "01", "02"
+  year?: string; // e.g. "2026"
+  month?: string; // e.g. "09"
+  slug?: string; // e.g. "mp-police-constable-2026"
   title: string;
   shortTitle?: string;
+  dept: string;
   category?: string; // mp-special, results, admit-card, latest-jobs, tech-jobs, central
   categories?: string[]; // multi-category tags e.g. ['vacancy', 'mp_special']
-  dept: string;
+  status: 'published' | 'draft' | 'suspended'; // Single Source of Truth
+  publishedDate?: string; // Mandatory dd/mm/yyyy (Date of publication on portal)
+  publishedAt?: string; // dd/mm/yyyy alias
+  startDate?: string; // dd/mm/yyyy
+  lastDate?: string; // dd/mm/yyyy
+  examDate?: string; // dd/mm/yyyy or "शीघ्र घोषित"
+  admitCardDate?: string; // dd/mm/yyyy or "परीक्षा से 7 दिन पूर्व"
   totalPosts: string | number;
   qualification?: string;
   eligibility?: string; // compact summary
-  lastDate?: string;
-  detailsUrl?: string;
-  content?: string;
-  publishedAt?: string; // Strict dd/mm/yyyy
+  ageLimit?: {
+    min: string;
+    max: string;
+    relaxation: string;
+  };
+  applicationFees?: {
+    ur: string;
+    reserved: string;
+    portalFee: string;
+  };
+  isItMnc?: boolean; // If true, hide reservation badges & show location/batch
+  jobLocation?: string;
+  batch?: string;
+  applyLink?: string;
+  notificationPdf?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
-  status: 'draft' | 'pending_approval' | 'published' | 'suspended';
+
+  // Additional Sarkari display / backward compatibility fields
+  detailsUrl?: string;
+  content?: string;
   dates?: {
     start: string;
     end: string;
@@ -173,13 +201,17 @@ export interface PostRecord {
     keyPoints: string[];
     note: string;
   };
-  // Optional enrichments for full Sarkari detail presentation
   state?: 'MP' | 'Central' | 'All India';
   advtNo?: string;
   minAge?: string;
   maxAge?: string;
   ageRelaxation?: string;
+  lastDateFee?: string;
   paymentMode?: string;
+  feeGeneral?: string;
+  feeReserved?: string;
+  feePortal?: string;
+  showReservationSection?: boolean;
   vacanciesBreakdown?: Array<{
     postName: string;
     total: string;
@@ -199,6 +231,11 @@ export interface PostRecord {
   experience?: string;
   location?: string;
   batchEligibility?: string;
+  // Routing helper fields
+  routingYear?: string;
+  routingMonth?: string;
+  routingBlogNo?: string;
+  routingSlug?: string;
 }
 
 // Scraper Target Feeds & Sources
