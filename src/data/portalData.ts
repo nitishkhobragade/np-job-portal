@@ -2,13 +2,13 @@ import { JobItem, AdmitCardItem, ResultItem, TrendingCard, TickerAlert } from '.
 
 export const OWNER_INFO = {
   name: "Nitish Khobragade",
-  brandName: "NP ONLINE",
+  brandName: "NP Job Portal",
   portalName: "NP Job Portal",
   phone: "8982324497",
   whatsappUrl: "https://wa.me/918982324497?text=%E0%A4%A8%E0%A4%AE%E0%A4%B8%E0%A5%8D%E0%A4%A4%E0%A5%87%20Nitish%20Ji%2C%20%E0%A4%AE%E0%A5%81%E0%A4%9D%E0%A5%87%20NP%20Job%20Portal%20%E0%A4%B8%E0%A5%87%20%E0%A4%91%E0%A4%A8%E0%A4%B2%E0%A4%BE%E0%A4%87%E0%A4%A8%20%E0%A4%AB%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%AE%20%E0%A4%AD%E0%A4%B0%E0%A4%B5%E0%A4%BE%E0%A4%A8%E0%A4%BE%20%E0%A4%B9%E0%A5%88%E0%A5%A4",
   callUrl: "tel:8982324497",
-  tagline: "घर बैठे सुरक्षित फॉर्म भरने हेतु संपर्क करें: Nitish Khobragade - 8982324497",
-  address: "MP Online Kiosk & Cyber Services, Madhya Pradesh",
+  tagline: "घर बैठे सुरक्षित फॉर्म भरवाएं • Nitish Khobragade (8982324497)",
+  address: "Madhya Pradesh",
   hours: "सुबह 8:00 AM से रात 10:00 PM तक"
 };
 

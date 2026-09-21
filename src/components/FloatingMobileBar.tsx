@@ -8,7 +8,7 @@ export const FloatingMobileBar: React.FC = () => {
       <div className="flex items-center justify-between gap-2.5 max-w-md mx-auto">
         <div className="flex flex-col">
           <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3" /> NP ONLINE
+            <ShieldCheck className="w-3 h-3" /> NP Job Portal
           </span>
           <span className="text-xs font-black text-white truncate max-w-[140px]">
             Nitish: 8982324497

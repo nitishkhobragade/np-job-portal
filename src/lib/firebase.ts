@@ -10,10 +10,13 @@ import {
   deleteDoc,
   updateDoc,
   query,
-  orderBy
+  where,
+  onSnapshot,
+  serverTimestamp
 } from 'firebase/firestore';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource } from '../types';
-import { DETAILED_JOBS_LIST } from '../data/jobDetailsData';
+import { getNextBlogNumber, formatDateToDDMMYYYY } from './postRouting';
+import { getInitialSeedPosts, seedPostsIfEmpty } from './seedDatabase';
 
 // Safe environment variable retrieval with fallback for build-time safety
 const firebaseConfig = {
@@ -26,7 +29,7 @@ const firebaseConfig = {
 };
 
 // Check if real credentials exist (not placeholder)
-const isFirebaseProperlyConfigured = Boolean(
+export const isFirebaseProperlyConfigured = Boolean(
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
   process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'AIzaSyDemoDummyKeyForBuildSafety1234567'
@@ -43,62 +46,14 @@ if (!getApps().length) {
 // Export Firestore db instance
 export const db: Firestore = getFirestore(app);
 
-// Seed posts converted from detailedJobsList to ensure instant rich content
-const SEED_POSTS: PostRecord[] = DETAILED_JOBS_LIST.map((job) => ({
-  id: job.slug,
-  title: job.title,
-  shortTitle: job.shortTitle,
-  categories: [
-    'vacancy',
-    job.state === 'MP' ? 'mp_special' : 'central',
-    job.category.toLowerCase().replace(/[^a-z0-9]/g, '_')
-  ],
-  dept: job.department,
-  totalPosts: job.totalPosts,
-  dates: {
-    start: job.startDate,
-    end: job.lastDate,
-    exam: job.examDate || 'शीघ्र घोषित'
-  },
-  fee: {
-    gen: job.feeGeneral,
-    reserved: job.feeReserved
-  },
-  eligibility: job.qualificationSummary,
-  links: {
-    apply: job.applyUrl,
-    notificationPdf: job.notificationPdfUrl,
-    syllabusPdf: job.syllabusUrl,
-    officialSite: job.officialWebsiteUrl
-  },
-  posterConfig: {
-    headline: `★ ${job.shortTitle} भर्ती अलर्ट ★`,
-    keyPoints: [
-      `कुल पद: ${job.totalPosts}`,
-      `अंतिम तिथि: ${job.lastDate}`,
-      `शैक्षणिक योग्यता: ${job.qualificationSummary.slice(0, 90)}...`
-    ],
-    note: 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
-  },
-  status: 'published' as const,
-  updatedAt: Date.now(),
-  state: job.state,
-  advtNo: job.advtNo,
-  minAge: job.minAge,
-  maxAge: job.maxAge,
-  ageRelaxation: job.ageRelaxation,
-  paymentMode: job.paymentMode,
-  vacanciesBreakdown: job.vacanciesBreakdown,
-  requiredDocuments: job.requiredDocuments,
-  howToApplySteps: job.howToApplySteps,
-  physicalStandards: job.physicalStandards
-}));
+// Seed posts converted from seedDatabase to ensure instant rich content
+const SEED_POSTS: PostRecord[] = getInitialSeedPosts();
 
 // Default Popup Ad configuration
 export const DEFAULT_POPUP_AD: PopupAdSettings = {
   enabled: true,
   title: 'घर बैठे ऑनलाइन फॉर्म भरवाएं — 100% सही व सुरक्षित',
-  subtitle: 'Nitish Khobragade (NP ONLINE KIOSK) • 8982324497',
+  subtitle: 'Nitish Khobragade (8982324497) • घर बैठे सुरक्षित फॉर्म भरवाएं',
   badge: 'विशेष सेवा ऑफर',
   imageUrl: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
   redirectUrl: 'https://wa.me/918982324497?text=नमस्ते%20Nitish%20Ji,%20मुझे%20ऑनलाइन%20फॉर्म%20भरवाना%20है।',
@@ -111,12 +66,12 @@ export const DEFAULT_POPUP_AD: PopupAdSettings = {
 let memoryPosts: PostRecord[] = [...SEED_POSTS];
 let memoryPopupAd: PopupAdSettings = { ...DEFAULT_POPUP_AD };
 
-const STORAGE_POSTS_KEY = 'np_portal_firestore_posts_cache_v2';
-const STORAGE_POPUP_KEY = 'np_portal_popup_ad_settings_v2';
-const STORAGE_SCRAPER_KEY = 'np_portal_scraper_queue_v2';
+const STORAGE_POSTS_KEY = 'np_portal_firestore_posts_cache_v3';
+const STORAGE_POPUP_KEY = 'np_portal_popup_ad_settings_v3';
+const STORAGE_SCRAPER_KEY = 'np_portal_scraper_queue_v3';
 
 // Safe LocalStorage helpers
-const getStoredPosts = (): PostRecord[] => {
+export const getStoredPosts = (): PostRecord[] => {
   if (typeof window === 'undefined') return memoryPosts;
   try {
     const raw = localStorage.getItem(STORAGE_POSTS_KEY);
@@ -131,7 +86,7 @@ const getStoredPosts = (): PostRecord[] => {
   }
 };
 
-const persistStoredPosts = (posts: PostRecord[]) => {
+export const persistStoredPosts = (posts: PostRecord[]) => {
   memoryPosts = posts;
   if (typeof window !== 'undefined') {
     try {
@@ -142,28 +97,94 @@ const persistStoredPosts = (posts: PostRecord[]) => {
   }
 };
 
+let hasAttemptedSeed = false;
+
+/**
+ * Realtime Firestore subscriber that listens to collection("posts")
+ * Orders by createdAt desc and filters by status when specified.
+ */
+export function subscribeToPosts(
+  onUpdate: (posts: PostRecord[]) => void,
+  statusFilter?: 'published' | 'all'
+): () => void {
+  // Always emit cached/seed posts first for immediate rendering
+  const initial = getStoredPosts();
+  const filteredInitial = statusFilter === 'published'
+    ? initial.filter((p) => p.status === 'published')
+    : initial;
+  onUpdate(filteredInitial);
+
+  // Auto-seed if collection is empty on first mount
+  if (!hasAttemptedSeed && typeof window !== 'undefined') {
+    hasAttemptedSeed = true;
+    seedPostsIfEmpty(false).catch(() => {});
+  }
+
+  try {
+    const postsCol = collection(db, 'posts');
+    const q = statusFilter === 'published'
+      ? query(postsCol, where('status', '==', 'published'))
+      : postsCol;
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: PostRecord[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as PostRecord;
+            list.push({ ...data, id: docSnap.id });
+          });
+          // Sort latest first
+          list.sort((a, b) => {
+            const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : Date.now();
+            const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : Date.now();
+            return timeB - timeA;
+          });
+          persistStoredPosts(list);
+          onUpdate(statusFilter === 'published' ? list.filter((p) => p.status === 'published') : list);
+        }
+      },
+      (err) => {
+        console.warn('Firestore onSnapshot subscription warning:', err);
+      }
+    );
+
+    return unsubscribe;
+  } catch (err) {
+    console.warn('subscribeToPosts exception:', err);
+    return () => {};
+  }
+}
+
 /**
  * Fetch all posts from Firestore collection 'posts', falling back to cached seed
  */
-export async function getJobs(): Promise<PostRecord[]> {
-  if (isFirebaseProperlyConfigured) {
-    try {
-      const postsCol = collection(db, 'posts');
-      const q = query(postsCol, orderBy('updatedAt', 'desc'));
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        const firestoreList: PostRecord[] = [];
-        snapshot.forEach((docSnap) => {
-          firestoreList.push(docSnap.data() as PostRecord);
-        });
-        persistStoredPosts(firestoreList);
-        return firestoreList;
-      }
-    } catch (err) {
-      console.warn('Firestore fetch failed, using cached store:', err);
+export async function getJobs(statusFilter?: 'published' | 'all'): Promise<PostRecord[]> {
+  try {
+    const postsCol = collection(db, 'posts');
+    const q = statusFilter === 'published'
+      ? query(postsCol, where('status', '==', 'published'))
+      : postsCol;
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const firestoreList: PostRecord[] = [];
+      snapshot.forEach((docSnap) => {
+        firestoreList.push({ ...(docSnap.data() as PostRecord), id: docSnap.id });
+      });
+      firestoreList.sort((a, b) => {
+        const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : Date.now();
+        const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : Date.now();
+        return timeB - timeA;
+      });
+      persistStoredPosts(firestoreList);
+      return statusFilter === 'published' ? firestoreList.filter(p => p.status === 'published') : firestoreList;
     }
+  } catch (err) {
+    console.warn('Firestore fetch failed, using cached store:', err);
   }
-  return getStoredPosts();
+  const cached = getStoredPosts();
+  return statusFilter === 'published' ? cached.filter(p => p.status === 'published') : cached;
 }
 
 /**
@@ -172,22 +193,21 @@ export async function getJobs(): Promise<PostRecord[]> {
 export async function getJobBySlug(slugOrId: string): Promise<PostRecord | null> {
   const normalizedQuery = slugOrId.toLowerCase().trim();
 
-  if (isFirebaseProperlyConfigured) {
-    try {
-      const docRef = doc(db, 'posts', normalizedQuery);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return docSnap.data() as PostRecord;
-      }
-    } catch (err) {
-      console.warn('Firestore getJobBySlug failed, trying local fallback:', err);
+  try {
+    const docRef = doc(db, 'posts', normalizedQuery);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { ...(docSnap.data() as PostRecord), id: docSnap.id };
     }
+  } catch (err) {
+    console.warn('Firestore getJobBySlug failed, trying local fallback:', err);
   }
 
   const posts = getStoredPosts();
   const matched = posts.find(
     (p) =>
       p.id.toLowerCase() === normalizedQuery ||
+      (p.slug && p.slug.toLowerCase() === normalizedQuery) ||
       (p.shortTitle && p.shortTitle.toLowerCase() === normalizedQuery) ||
       p.title.toLowerCase().includes(normalizedQuery)
   );
@@ -196,10 +216,70 @@ export async function getJobBySlug(slugOrId: string): Promise<PostRecord | null>
 }
 
 /**
+ * Fetch document from Firestore by querying year, month, and blogNo (or slug fallback)
+ */
+export async function getPostByParams(
+  year: string,
+  month: string,
+  blogNo: string,
+  slug?: string
+): Promise<PostRecord | null> {
+  const normalizedSlug = slug?.toLowerCase().trim();
+  const paddedBlogNo = blogNo.padStart(2, '0');
+
+  // Try direct doc lookup by slug
+  if (normalizedSlug) {
+    try {
+      const docRef = doc(db, 'posts', normalizedSlug);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return { ...(snap.data() as PostRecord), id: snap.id };
+      }
+    } catch (e) {
+      console.warn('Direct doc lookup warning:', e);
+    }
+  }
+
+  // Try querying year, month, and blogNo in Firestore
+  try {
+    const postsCol = collection(db, 'posts');
+    const q = query(
+      postsCol,
+      where('year', '==', year),
+      where('month', '==', month),
+      where('blogNo', '==', paddedBlogNo)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const docData = snap.docs[0].data() as PostRecord;
+      return { ...docData, id: snap.docs[0].id };
+    }
+  } catch (e) {
+    console.warn('Query by params warning:', e);
+  }
+
+  // Local fallback
+  const posts = getStoredPosts();
+  const found = posts.find(
+    (p) =>
+      (normalizedSlug && (p.slug === normalizedSlug || p.id === normalizedSlug)) ||
+      (p.year === year && p.month === month && (p.blogNo === blogNo || p.blogNo === paddedBlogNo))
+  );
+
+  return found || null;
+}
+
+/**
  * Add a new Job/Post to Firestore 'posts' collection
  */
 export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
-  const generatedId =
+  const current = getStoredPosts();
+  const currentYear = jobData.year || String(new Date().getFullYear());
+  const currentMonth = jobData.month || String(new Date().getMonth() + 1).padStart(2, '0');
+  const nextBlogNo = jobData.blogNo || getNextBlogNumber(current, currentYear, currentMonth);
+
+  const generatedSlug =
+    jobData.slug ||
     jobData.id ||
     jobData.title
       ?.toLowerCase()
@@ -207,23 +287,35 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
       .replace(/^-|-$/g, '') ||
     `post-${Date.now()}`;
 
+  const category = jobData.category || (jobData.categories && jobData.categories[0]) || 'latest-jobs';
+
   const newPost: PostRecord = {
-    id: generatedId,
+    id: generatedSlug,
+    slug: generatedSlug,
+    year: currentYear,
+    month: currentMonth,
+    blogNo: nextBlogNo,
     title: jobData.title || 'नई सरकारी भर्ती 2026',
     shortTitle: jobData.shortTitle || jobData.title?.slice(0, 30) || 'भर्ती 2026',
-    categories: jobData.categories && jobData.categories.length > 0 ? jobData.categories : ['vacancy'],
+    category: category,
+    categories: jobData.categories && jobData.categories.length > 0 ? jobData.categories : [category],
     dept: jobData.dept || 'सरकारी विभाग',
     totalPosts: jobData.totalPosts || 'पदों की संख्या विज्ञप्ति देखें',
+    qualification: jobData.qualification || jobData.eligibility || '10वीं / 12th Pass',
+    eligibility: jobData.eligibility || jobData.qualification || '10वीं / 12th Pass',
+    lastDate: formatDateToDDMMYYYY(jobData.lastDate || jobData.dates?.end || '15/10/2026'),
+    detailsUrl: `/${currentYear}/${currentMonth}/${nextBlogNo}/${generatedSlug}`,
+    content: jobData.content || jobData.title || '',
+    publishedAt: jobData.publishedAt || formatDateToDDMMYYYY(new Date().toISOString()),
     dates: {
-      start: jobData.dates?.start || '15/09/2026',
-      end: jobData.dates?.end || '15/10/2026',
-      exam: jobData.dates?.exam || 'शीघ्र घोषित'
+      start: formatDateToDDMMYYYY(jobData.dates?.start || '15/09/2026'),
+      end: formatDateToDDMMYYYY(jobData.dates?.end || '15/10/2026'),
+      exam: formatDateToDDMMYYYY(jobData.dates?.exam || 'शीघ्र घोषित')
     },
     fee: {
       gen: jobData.fee?.gen || '₹500/-',
       reserved: jobData.fee?.reserved || '₹250/-'
     },
-    eligibility: jobData.eligibility || 'मान्यता प्राप्त बोर्ड से 10वीं/12वीं/स्नातक उत्तीर्ण',
     links: {
       apply: jobData.links?.apply || 'https://esb.mp.gov.in',
       notificationPdf: jobData.links?.notificationPdf || 'https://esb.mp.gov.in',
@@ -242,7 +334,7 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
     status: jobData.status || 'published',
     updatedAt: Date.now(),
     state: jobData.state || 'MP',
-    advtNo: jobData.advtNo || `ADV/${new Date().getFullYear()}/01`,
+    advtNo: jobData.advtNo || `ADV/${currentYear}/${nextBlogNo}`,
     minAge: jobData.minAge || '18 वर्ष',
     maxAge: jobData.maxAge || '33 वर्ष',
     requiredDocuments: jobData.requiredDocuments || [
@@ -259,67 +351,87 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
     ]
   };
 
-  if (isFirebaseProperlyConfigured) {
-    try {
-      const docRef = doc(db, 'posts', generatedId);
-      await setDoc(docRef, newPost);
-    } catch (err) {
-      console.warn('Firestore addJob failed, saving locally:', err);
-    }
+  try {
+    const docRef = doc(db, 'posts', generatedSlug);
+    await setDoc(docRef, {
+      ...newPost,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.warn('Firestore setDoc failed, saving locally:', err);
   }
 
   // Update local storage
-  const current = getStoredPosts();
-  const updated = [newPost, ...current.filter((p) => p.id !== generatedId)];
+  const currentList = getStoredPosts();
+  const updated = [newPost, ...currentList.filter((p) => p.id !== generatedSlug)];
   persistStoredPosts(updated);
 
-  return generatedId;
+  return generatedSlug;
 }
 
 /**
- * Update an existing job in Firestore
+ * Update an existing job in Firestore with real-time updateDoc
  */
 export async function updateJob(id: string, updates: Partial<PostRecord>): Promise<boolean> {
   const currentPosts = getStoredPosts();
-  const index = currentPosts.findIndex((p) => p.id === id);
-  if (index === -1) return false;
+  const index = currentPosts.findIndex((p) => p.id === id || p.slug === id);
+
+  const cleanedDates = updates.dates
+    ? {
+        start: formatDateToDDMMYYYY(updates.dates.start),
+        end: formatDateToDDMMYYYY(updates.dates.end),
+        exam: formatDateToDDMMYYYY(updates.dates.exam)
+      }
+    : (index >= 0 ? currentPosts[index].dates : undefined);
 
   const updatedRecord: PostRecord = {
-    ...currentPosts[index],
+    ...(index >= 0 ? currentPosts[index] : ({} as PostRecord)),
     ...updates,
+    dates: cleanedDates || { start: '15/09/2026', end: '15/10/2026', exam: 'शीघ्र घोषित' },
     id,
     updatedAt: Date.now()
   };
 
-  if (isFirebaseProperlyConfigured) {
+  try {
+    const docRef = doc(db, 'posts', id);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.warn('Firestore updateDoc failed, fallback to setDoc merge:', err);
     try {
       const docRef = doc(db, 'posts', id);
-      await updateDoc(docRef, updatedRecord as unknown as Record<string, unknown>);
-    } catch (err) {
-      console.warn('Firestore updateJob failed, applying locally:', err);
+      await setDoc(docRef, { ...updates, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (innerErr) {
+      console.warn('setDoc fallback warning:', innerErr);
     }
   }
 
-  currentPosts[index] = updatedRecord;
-  persistStoredPosts(currentPosts);
+  if (index >= 0) {
+    currentPosts[index] = updatedRecord;
+    persistStoredPosts([...currentPosts]);
+  } else {
+    persistStoredPosts([updatedRecord, ...currentPosts]);
+  }
+
   return true;
 }
 
 /**
- * Delete a job by its ID
+ * Delete a job by its ID with real-time deleteDoc
  */
 export async function deleteJob(id: string): Promise<boolean> {
-  if (isFirebaseProperlyConfigured) {
-    try {
-      const docRef = doc(db, 'posts', id);
-      await deleteDoc(docRef);
-    } catch (err) {
-      console.warn('Firestore deleteJob error:', err);
-    }
+  try {
+    const docRef = doc(db, 'posts', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('Firestore deleteJob error:', err);
   }
 
   const currentPosts = getStoredPosts();
-  const filtered = currentPosts.filter((p) => p.id !== id);
+  const filtered = currentPosts.filter((p) => p.id !== id && p.slug !== id);
   persistStoredPosts(filtered);
   return true;
 }
@@ -715,7 +827,7 @@ export async function simulateScraperRun(): Promise<ScrapedJobDraft[]> {
 const STORAGE_SOURCES_KEY = 'np_scraper_sources_v1';
 
 export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
-  // 1. Central Govt Buckets
+  // 1. Govt Jobs Scrapers (SSC, MPESB, UPSC, State Portals)
   {
     id: 'src-ssc-portal',
     name: 'Staff Selection Commission (SSC Central)',
@@ -726,6 +838,17 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     lastScraped: 'आज 10:15 AM',
     itemsFound: 4,
     description: 'SSC CGL, CHSL, GD Constable, MTS एवं CPO भर्ती अधिसूचनाएं'
+  },
+  {
+    id: 'src-mpesb-rulebooks',
+    name: 'MPESB Bhopal Rulebooks & Exam Feed',
+    bucket: 'mp_special',
+    url: 'https://esb.mp.gov.in/latest-rulebooks',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 11:45 AM',
+    itemsFound: 5,
+    description: 'MP Police, Sub Engineer, Patwari, Group 1/2/3/4/5 व्यापम भर्तियां'
   },
   {
     id: 'src-upsc-rss',
@@ -739,29 +862,6 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     description: 'Civil Services, NDA, CDS, CMS व अन्य यूपीएससी विज्ञप्तियां'
   },
   {
-    id: 'src-rrb-railway',
-    name: 'Railway Recruitment Boards (RRB Central)',
-    bucket: 'govt_portals',
-    url: 'https://rrbapply.gov.in/notifications',
-    feedType: 'html',
-    enabled: true,
-    lastScraped: 'आज 08:00 AM',
-    itemsFound: 3,
-    description: 'RRB NTPC, Group D, ALP, Technician एवं RPF पुलिस भर्ती'
-  },
-  // 2. MP Special Buckets
-  {
-    id: 'src-mpesb-rulebooks',
-    name: 'MPESB Bhopal Rulebooks & Exam Feed',
-    bucket: 'mp_special',
-    url: 'https://esb.mp.gov.in/latest-rulebooks',
-    feedType: 'html',
-    enabled: true,
-    lastScraped: 'आज 11:45 AM',
-    itemsFound: 5,
-    description: 'MP Police, Sub Engineer, Patwari, Group 1/2/3/4/5 भर्तियां'
-  },
-  {
     id: 'src-mppsc-portal',
     name: 'MPPSC Indore Official Announcements',
     bucket: 'mp_special',
@@ -771,6 +871,17 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     lastScraped: 'आज 07:30 AM',
     itemsFound: 2,
     description: 'मध्य प्रदेश राज्य सेवा परीक्षा (State Service Exam & Forest)'
+  },
+  {
+    id: 'src-rrb-railway',
+    name: 'Railway Recruitment Boards (RRB Central)',
+    bucket: 'govt_portals',
+    url: 'https://rrbapply.gov.in/notifications',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 08:00 AM',
+    itemsFound: 3,
+    description: 'RRB NTPC, Group D, ALP, Technician एवं RPF रेलवे पुलिस भर्ती'
   },
   {
     id: 'src-mphc-jabalpur',
@@ -783,28 +894,50 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     itemsFound: 1,
     description: 'MPHC Assistant Grade 3, Stenographer एवं जिला न्यायालय पद'
   },
-  // 3. Tech & Corporate Buckets
+  // 2. Tech & IT Jobs Scrapers (Google, Microsoft, IT Career Portals)
+  {
+    id: 'src-google-careers',
+    name: 'Google India Careers (Bengaluru/Hyderabad/Gurugram)',
+    bucket: 'tech_corporate',
+    url: 'https://careers.google.com/api/v3/jobs/search/?location=India',
+    feedType: 'api',
+    enabled: true,
+    lastScraped: 'आज 12:10 PM',
+    itemsFound: 8,
+    description: 'Software Engineering, Cloud, Data Analyst, Machine Learning एवं Technical Solutions'
+  },
+  {
+    id: 'src-microsoft-careers',
+    name: 'Microsoft India Careers (Hyderabad/Bengaluru)',
+    bucket: 'tech_corporate',
+    url: 'https://careers.microsoft.com/services/jobs/search?location=India',
+    feedType: 'api',
+    enabled: true,
+    lastScraped: 'आज 11:35 AM',
+    itemsFound: 6,
+    description: 'Software Engineer, Azure Cloud Architect, Campus Graduate एवं Internships'
+  },
   {
     id: 'src-tech-freshers',
-    name: 'FreshersWorld IT & Software Campus RSS',
+    name: 'IT Career Portals & Campus RSS (TCS, Infosys, Wipro)',
     bucket: 'tech_corporate',
     url: 'https://freshersworld.com/rss/it-jobs.xml',
     feedType: 'rss',
     enabled: true,
     lastScraped: 'आज 10:20 AM',
     itemsFound: 6,
-    description: 'IT Freshers, Software Engineer, B.Tech/BCA/MCA ऑफ-कैंपस ड्राइव'
+    description: 'IT Freshers, Software Engineer, B.Tech/BCA/MCA ऑफ-कैंपस ड्राइव 2025/2026'
   },
   {
     id: 'src-tech-indore-pune',
-    name: 'MP & Pune Tech Careers (Indore IT Park)',
+    name: 'MP & Pune Tech Hub (Indore Super Corridor & IT Park)',
     bucket: 'tech_corporate',
     url: 'https://naukri.com/tech-rss/indore-software',
     feedType: 'rss',
     enabled: true,
     lastScraped: 'आज 11:10 AM',
     itemsFound: 4,
-    description: 'TCS, Infosys, Wipro, Google India, एवं इंदौर सुपर कॉरिडोर IT ओपनिंग्स'
+    description: 'TCS Indore, Infosys SEZ, Impetus, एवं इंदौर क्रिस्टल IT पार्क ओपनिंग्स'
   }
 ];
 
@@ -957,7 +1090,7 @@ export async function triggerSourceTestFetch(sourceId: string): Promise<{
             'योग्यता: 10वीं / 12वीं पास',
             'आयु सीमा: 18 से 33 वर्ष (छूट नियमानुसार)'
           ],
-          note: 'घर बैठे MP Online फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
+          note: 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
         },
         status: 'pending_approval'
       }
@@ -1007,9 +1140,45 @@ export async function triggerSourceTestFetch(sourceId: string): Promise<{
     };
   }
 
-  // Push into drafts
+  // 2. AI Deduplication Check against existing Firestore 'posts'
+  const existingPosts = await getJobs();
+  const candidateTitle = sampleDraft.suggestedPost.title.toLowerCase().trim();
+  const candidateShortTitle = (sampleDraft.suggestedPost.shortTitle || '').toLowerCase().trim();
+  const candidateAdvt = sampleDraft.suggestedPost.advtNo || '';
+
+  const duplicateFound = existingPosts.find((p) => {
+    const existingTitle = p.title.toLowerCase().trim();
+    const existingShort = (p.shortTitle || '').toLowerCase().trim();
+    if (candidateAdvt && p.advtNo && p.advtNo.toLowerCase() === candidateAdvt.toLowerCase()) {
+      return true;
+    }
+    if (existingTitle === candidateTitle) return true;
+    if (candidateShortTitle && existingShort === candidateShortTitle) return true;
+    return false;
+  });
+
+  if (duplicateFound) {
+    return {
+      success: false,
+      message: `[AI Deduplication] भर्ती "${sampleDraft.suggestedPost.shortTitle || sampleDraft.suggestedPost.title}" पहले से Firestore में मौजूद है (ID: ${duplicateFound.id})। डुप्लिकेट पोस्ट नहीं बनाई गई।`,
+      newDraftCount: 0
+    };
+  }
+
+  // 3 & 4. Save to Firestore collection 'posts' with status: "draft" (Not Published)
+  sampleDraft.suggestedPost.status = 'draft';
+  try {
+    await addJob({
+      ...sampleDraft.suggestedPost,
+      status: 'draft'
+    });
+  } catch (saveErr) {
+    console.warn('Failed to auto-save draft post in Firestore:', saveErr);
+  }
+
+  // Push into drafts queue
   const existingDrafts = await getScrapedDrafts();
-  const updatedDrafts = [sampleDraft, ...existingDrafts];
+  const updatedDrafts = [sampleDraft, ...existingDrafts.filter((d) => d.suggestedPost.id !== sampleDraft.suggestedPost.id)];
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_SCRAPER_KEY, JSON.stringify(updatedDrafts));
   }
@@ -1029,7 +1198,7 @@ export async function triggerSourceTestFetch(sourceId: string): Promise<{
 
   return {
     success: true,
-    message: `${src.name} से डेटा सफलतापूर्वक फेच हुआ! 1 नया ड्राफ्ट इनजेशन कतार में जोड़ा गया।`,
+    message: `${src.name} से डेटा सफलतापूर्वक फेच हुआ! AI Deduplication पास। 1 नया ड्राफ्ट Firestore में 'Not Published' (status: "draft") के रूप में सहेजा गया।`,
     newDraftCount: 1
   };
 }

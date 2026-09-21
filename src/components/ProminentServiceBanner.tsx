@@ -16,7 +16,7 @@ export const ProminentServiceBanner: React.FC = () => {
           <div className="space-y-3 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-200 text-xs font-bold uppercase tracking-wider">
               <ShieldCheck className="w-4 h-4 text-emerald-300" />
-              NP ONLINE KIOSK • 100% सुरक्षित एवं प्रमाणित ऑनलाइन सेवा
+              NP Job Portal • 100% सुरक्षित एवं प्रमाणित ऑनलाइन सेवा • Nitish Khobragade (8982324497)
             </div>
 
             <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-tight">
@@ -24,7 +24,7 @@ export const ProminentServiceBanner: React.FC = () => {
             </h2>
 
             <p className="text-sm sm:text-base text-emerald-100/90 max-w-2xl leading-relaxed">
-              दुकान या कियोस्क के चक्कर लगाने की जरूरत नहीं! अपने दस्तावेज व्हाट्सएप पर भेजें और घर बैठे किसी भी सरकारी भर्ती, एमपी टेट, पुलिस, एसएससी, रेलवे व कॉलेज काउंसलिंग का फॉर्म सही-सही भरवाएं।
+              कहीं भी लाइन में लगने की जरूरत नहीं! अपने दस्तावेज व्हाट्सएप पर भेजें और घर बैठे सुरक्षित रूप से किसी भी सरकारी भर्ती, एमपी टेट, पुलिस, एसएससी, रेलवे व कॉलेज काउंसलिंग का फॉर्म सही-सही भरवाएं।
             </p>
 
             {/* Quick Trust Highlights */}

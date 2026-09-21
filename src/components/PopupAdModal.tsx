@@ -122,7 +122,7 @@ export const PopupAdModal: React.FC<PopupAdModalProps> = ({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex items-end p-4">
               <span className="text-white font-black text-lg drop-shadow-md">
-                NP ONLINE KIOSK
+                NP Job Portal • Nitish Khobragade (8982324497)
               </span>
             </div>
           </div>
@@ -142,7 +142,7 @@ export const PopupAdModal: React.FC<PopupAdModalProps> = ({
 
           <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-neutral-700 flex items-center justify-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>दुकान या कियोस्क जाने की जरूरत नहीं — दस्तावेज भेजें और घर बैठे रसीद पाएं!</span>
+            <span>घर बैठे सुरक्षित फॉर्म भरवाएं — दस्तावेज भेजें और तुरंत कम्प्यूटर रसीद पाएं!</span>
           </div>
 
           {/* Action CTA Buttons */}

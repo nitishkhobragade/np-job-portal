@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { X, ExternalLink, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
+import { getPostUrl } from '../lib/postRouting';
 
 interface DetailModalProps {
   item: JobItem | AdmitCardItem | ResultItem | null;
@@ -60,7 +61,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div className="text-xs">
               <p className="font-bold text-emerald-900">
-                घर बैठे सुरक्षित ऑनलाइन फॉर्म सेवा (NP ONLINE)
+                घर बैठे सुरक्षित फॉर्म भरवाएं • NP Job Portal
               </p>
               <p className="text-emerald-800 mt-0.5">
                 दस्तावेज़ व्हाट्सएप पर भेजें और बिना किसी गलती के अपना फॉर्म भरवाएं। संचालक: Nitish Khobragade (8982324497)
@@ -87,7 +88,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
                   <strong>नया:</strong> इस भर्ती का 1080×1350 WhatsApp पोस्टर एवं सरकारी रिजल्ट टेबल उपलब्ध है।
                 </div>
                 <Link
-                  href={`/jobs/${job.slug || job.id}`}
+                  href={getPostUrl(job)}
                   className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-md shadow-xs transition-colors"
                 >
                   पूरा पेज व पोस्टर देखें →

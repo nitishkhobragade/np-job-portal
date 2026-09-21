@@ -11,73 +11,159 @@ import { DetailModal } from '../components/DetailModal';
 import { FloatingMobileBar } from '../components/FloatingMobileBar';
 import { Footer } from '../components/Footer';
 import { PopupAdModal } from '../components/PopupAdModal';
-import {
-  LATEST_JOBS_DATA,
-  ADMIT_CARD_DATA,
-  RESULTS_DATA
-} from '../data/portalData';
-import { JobItem, AdmitCardItem, ResultItem, TrendingCard } from '../types';
-import { getJobs } from '../lib/firebase';
+import { JobItem, AdmitCardItem, ResultItem, TrendingCard, PostRecord } from '../types';
+import { subscribeToPosts } from '../lib/firebase';
+import { seedPostsIfEmpty, getInitialSeedPosts } from '../lib/seedDatabase';
+
+// Helper to convert PostRecord to JobItem
+function mapPostToJob(p: PostRecord): JobItem {
+  return {
+    id: p.id,
+    slug: p.slug || p.id,
+    year: p.year,
+    month: p.month,
+    blogNo: p.blogNo,
+    title: p.title,
+    department: p.dept,
+    totalPosts: String(p.totalPosts || 'विज्ञप्ति अनुसार'),
+    lastDate: p.dates?.end || p.lastDate || 'विज्ञप्ति देखें',
+    state: p.state || (p.categories?.includes('mp_special') ? 'MP' : 'Central'),
+    qualification: p.qualification || p.eligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
+    category: (p.isTechJob || p.categories?.includes('tech'))
+      ? 'Tech/IT'
+      : p.categories?.includes('police')
+      ? 'Police'
+      : p.categories?.includes('railway')
+      ? 'Railway'
+      : p.categories?.includes('banking')
+      ? 'Banking'
+      : p.categories?.includes('teaching')
+      ? 'Teaching'
+      : p.categories?.includes('central')
+      ? 'SSC/UPSC'
+      : 'Other',
+    fee: `सामान्य: ${p.fee?.gen || '₹500/-'} | आरक्षित: ${p.fee?.reserved || '₹250/-'}`,
+    isNew: true,
+    applyUrl: p.links?.apply,
+    notificationUrl: p.links?.notificationPdf,
+    isTechJob: p.isTechJob || p.categories?.includes('tech'),
+    companyName: p.companyName,
+    role: p.role,
+    experience: p.experience,
+    location: p.location,
+    batchEligibility: p.batchEligibility
+  };
+}
+
+// Helper to convert PostRecord to AdmitCardItem
+function mapPostToAdmitCard(p: PostRecord): AdmitCardItem {
+  return {
+    id: p.id,
+    title: p.title,
+    department: p.dept,
+    examDate: p.dates?.exam || 'शीघ्र घोषित',
+    releaseDate: p.dates?.start || p.publishedAt || 'जारी',
+    hallTicketStatus: 'Live Now',
+    isNew: true,
+    downloadUrl: p.links?.apply || p.links?.notificationPdf
+  };
+}
+
+// Helper to convert PostRecord to ResultItem
+function mapPostToResult(p: PostRecord): ResultItem {
+  return {
+    id: p.id,
+    title: p.title,
+    department: p.dept,
+    resultDate: p.publishedAt || p.dates?.start || 'जारी',
+    type: p.title.toLowerCase().includes('answer key') ? 'Answer Key' : 'Final Result',
+    isNew: true,
+    status: 'Declared',
+    resultUrl: p.links?.apply || p.links?.notificationPdf
+  };
+}
 
 export default function NPJobPortalPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Updates');
 
-  // Dynamic Jobs from Firestore / Local Cache merged with baseline
-  const [liveJobs, setLiveJobs] = useState<JobItem[]>(LATEST_JOBS_DATA);
+  // Initial seed posts baseline to guarantee zero blank flash
+  const initialRecords = getInitialSeedPosts();
+
+  const [liveJobs, setLiveJobs] = useState<JobItem[]>(() =>
+    initialRecords
+      .filter((p) => p.status === 'published' && !p.categories?.includes('admit-card') && !p.categories?.includes('result'))
+      .map(mapPostToJob)
+  );
+
+  const [liveAdmitCards, setLiveAdmitCards] = useState<AdmitCardItem[]>(() =>
+    initialRecords
+      .filter((p) => p.status === 'published' && (p.category === 'admit-card' || p.categories?.includes('admit-card') || p.title.toLowerCase().includes('admit')))
+      .map(mapPostToAdmitCard)
+  );
+
+  const [liveResults, setLiveResults] = useState<ResultItem[]>(() =>
+    initialRecords
+      .filter((p) => p.status === 'published' && (p.category === 'results' || p.categories?.includes('result') || p.title.toLowerCase().includes('result') || p.title.toLowerCase().includes('answer key')))
+      .map(mapPostToResult)
+  );
 
   // Modal State for Viewing Detailed Notification
   const [selectedItem, setSelectedItem] = useState<JobItem | AdmitCardItem | ResultItem | null>(null);
   const [selectedItemType, setSelectedItemType] = useState<'job' | 'admit' | 'result' | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    getJobs().then((fetched) => {
-      if (!isMounted || !fetched || fetched.length === 0) return;
-      const mapped: JobItem[] = fetched
-        .filter((p) => p.status === 'published')
-        .map((p) => ({
-          id: p.id,
-          slug: p.id,
-          title: p.title,
-          department: p.dept,
-          totalPosts: String(p.totalPosts),
-          lastDate: p.dates?.end || 'विज्ञप्ति देखें',
-          state: p.state || (p.categories?.includes('mp_special') ? 'MP' : 'Central'),
-          qualification: p.eligibility,
-          category: (p.isTechJob || p.categories?.includes('tech'))
-            ? 'Tech/IT'
-            : p.categories?.includes('police')
-            ? 'Police'
-            : p.categories?.includes('railway')
-            ? 'Railway'
-            : p.categories?.includes('banking')
-            ? 'Banking'
-            : p.categories?.includes('teaching')
-            ? 'Teaching'
-            : p.categories?.includes('central')
-            ? 'SSC/UPSC'
-            : 'Other',
-          fee: `सामान्य: ${p.fee?.gen || '₹500'} | आरक्षित: ${p.fee?.reserved || '₹250'}`,
-          isNew: true,
-          applyUrl: p.links?.apply,
-          notificationUrl: p.links?.notificationPdf,
-          isTechJob: p.isTechJob || p.categories?.includes('tech'),
-          companyName: p.companyName,
-          role: p.role,
-          experience: p.experience,
-          location: p.location,
-          batchEligibility: p.batchEligibility
-        }));
+    // 1. Ensure Firestore is seeded if empty
+    seedPostsIfEmpty().catch((err) => console.warn('Seeding check:', err));
 
-      // Deduplicate by ID
-      const existingIds = new Set(mapped.map((m) => m.id));
-      const rest = LATEST_JOBS_DATA.filter((j) => !existingIds.has(j.id) && !existingIds.has(j.slug || ''));
-      setLiveJobs([...mapped, ...rest]);
-    });
+    // 2. Realtime listener for Firestore posts
+    const unsubscribe = subscribeToPosts((allPosts) => {
+      if (!allPosts || allPosts.length === 0) return;
+
+      const published = allPosts.filter((p) => p.status === 'published');
+
+      // Separate into Jobs, Admit Cards, and Results
+      const jobsList = published
+        .filter(
+          (p) =>
+            p.category === 'latest-jobs' ||
+            p.category === 'mp-special' ||
+            p.category === 'tech-jobs' ||
+            p.category === 'central' ||
+            p.categories?.includes('vacancy') ||
+            (!p.categories?.includes('admit-card') && !p.categories?.includes('result'))
+        )
+        .map(mapPostToJob);
+
+      const admitList = published
+        .filter(
+          (p) =>
+            p.category === 'admit-card' ||
+            p.categories?.includes('admit-card') ||
+            p.categories?.includes('admit_card') ||
+            p.title.toLowerCase().includes('admit')
+        )
+        .map(mapPostToAdmitCard);
+
+      const resultsList = published
+        .filter(
+          (p) =>
+            p.category === 'results' ||
+            p.category === 'result' ||
+            p.categories?.includes('result') ||
+            p.categories?.includes('results') ||
+            p.title.toLowerCase().includes('result') ||
+            p.title.toLowerCase().includes('answer key')
+        )
+        .map(mapPostToResult);
+
+      if (jobsList.length > 0) setLiveJobs(jobsList);
+      if (admitList.length > 0) setLiveAdmitCards(admitList);
+      if (resultsList.length > 0) setLiveResults(resultsList);
+    }, 'all');
 
     return () => {
-      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -151,8 +237,8 @@ export default function NPJobPortalPage() {
         {/* SarkariResult Style 3-Column Layout (Jobs, Admit Card, Results/Keys) */}
         <ThreeColumnLayout
           jobs={liveJobs}
-          admitCards={ADMIT_CARD_DATA}
-          results={RESULTS_DATA}
+          admitCards={liveAdmitCards}
+          results={liveResults}
           searchQuery={searchQuery}
           selectedCategory={selectedCategory}
           onSelectJob={handleSelectJob}

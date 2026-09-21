@@ -1,6 +1,9 @@
 export interface JobPostDetail {
   slug: string;
   id: string;
+  year?: string;
+  month?: string;
+  blogNo?: string;
   title: string;
   shortTitle: string;
   department: string;
@@ -61,6 +64,9 @@ export interface JobPostDetail {
 export interface JobItem {
   id: string;
   slug?: string;
+  year?: string;
+  month?: string;
+  blogNo?: string;
   title: string;
   department: string;
   totalPosts: string;
@@ -127,35 +133,46 @@ export interface TickerAlert {
 
 // Normalized Post Schema for Cloud Firestore optimization
 export interface PostRecord {
-  id: string; // slug / unique ID, e.g., 'mp-police-constable-2026'
+  id: string; // unique ID, e.g., 'mp-police-constable-2026'
+  slug?: string;
+  year?: string;
+  month?: string;
+  blogNo?: string;
   title: string;
   shortTitle?: string;
-  categories: string[]; // e.g. ['vacancy', 'mp_special']
+  category?: string; // mp-special, results, admit-card, latest-jobs, tech-jobs, central
+  categories?: string[]; // multi-category tags e.g. ['vacancy', 'mp_special']
   dept: string;
   totalPosts: string | number;
-  dates: {
+  qualification?: string;
+  eligibility?: string; // compact summary
+  lastDate?: string;
+  detailsUrl?: string;
+  content?: string;
+  publishedAt?: string; // Strict dd/mm/yyyy
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  status: 'draft' | 'pending_approval' | 'published' | 'suspended';
+  dates?: {
     start: string;
     end: string;
     exam: string;
   };
-  fee: {
+  fee?: {
     gen: string;
     reserved: string;
   };
-  eligibility: string; // compact summary
-  links: {
+  links?: {
     apply: string;
     notificationPdf: string;
     syllabusPdf?: string;
     officialSite: string;
   };
-  posterConfig: {
+  posterConfig?: {
     headline: string;
     keyPoints: string[];
     note: string;
   };
-  status: 'draft' | 'pending_approval' | 'published';
-  updatedAt: string | number;
   // Optional enrichments for full Sarkari detail presentation
   state?: 'MP' | 'Central' | 'All India';
   advtNo?: string;

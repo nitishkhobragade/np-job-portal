@@ -19,8 +19,8 @@ export const DETAILED_JOBS_LIST: JobPostDetail[] = [
     admitCardDate: "December 1st Week 2026",
     feeGeneral: "₹500/- (General & Other State)",
     feeReserved: "₹250/- (SC / ST / OBC / EWS of MP Domicile)",
-    feePortal: "₹60/- (MP Online Kiosk Portal Fee)",
-    paymentMode: "Online via MP Online Kiosk, Debit/Credit Card, Net Banking or UPI",
+    feePortal: "₹60/- (Portal Fee)",
+    paymentMode: "Online via Debit/Credit Card, Net Banking or UPI",
     minAge: "18 Years",
     maxAge: "36 Years (Plus 3 Years Relaxation for Reserved Categories)",
     ageCalculationDate: "01/01/2026",
@@ -53,11 +53,11 @@ export const DETAILED_JOBS_LIST: JobPostDetail[] = [
     ],
     howToApplySteps: [
       "Step 1: Check eligibility criteria carefully from the official notification PDF.",
-      "Step 2: Have active MP Rojgar Panjiyan (रोजगार पंजीयन) & Updated MP Online Profile ready.",
+      "Step 2: Have active MP Rojgar Panjiyan (रोजगार पंजीयन) & Updated Candidate Profile ready.",
       "Step 3: Keep Aadhar linked with Mobile OTP, Samagra ID, 10th Marksheet, Domicile & Caste Certificate ready.",
       "Step 4: Send your documents on WhatsApp to Nitish Khobragade (8982324497) for secure, error-free form filling from home.",
       "Step 5: Review the form preview and pay the application fee.",
-      "Step 6: Receive official MP Online computer acknowledgment receipt immediately on WhatsApp."
+      "Step 6: Receive official computer acknowledgment receipt immediately on WhatsApp."
     ],
     requiredDocuments: [
       "आधार कार्ड (Aadhar Card)",
@@ -79,7 +79,7 @@ export const DETAILED_JOBS_LIST: JobPostDetail[] = [
     id: "job-2",
     title: "MP AYUSH UG (BAMS / BHMS / BUMS) Online Counselling 2026",
     shortTitle: "MP AYUSH UG Counselling 2026",
-    department: "Directorate of AYUSH, Madhya Pradesh & MP Online",
+    department: "Directorate of AYUSH, Madhya Pradesh",
     advtNo: "AYUSH/Counselling/2026/UG",
     totalPosts: "State Quota AYUSH Seats",
     postDate: "18 September 2026",
@@ -92,7 +92,7 @@ export const DETAILED_JOBS_LIST: JobPostDetail[] = [
     feeGeneral: "₹2,000/- (Counselling Registration Fee)",
     feeReserved: "₹2,000/- (Same for all categories)",
     feePortal: "₹150/- (Portal & Choice Filling Fee)",
-    paymentMode: "Net Banking, Debit/Credit Card, UPI or MP Online Kiosk",
+    paymentMode: "Net Banking, Debit/Credit Card or UPI",
     minAge: "17 Years (as on 31 December 2026)",
     maxAge: "No Upper Age Limit (As per Supreme Court / NMC / NCISM orders)",
     ageCalculationDate: "31/12/2026",
@@ -118,7 +118,7 @@ export const DETAILED_JOBS_LIST: JobPostDetail[] = [
       }
     ],
     howToApplySteps: [
-      "Step 1: Register on MP Online AYUSH portal with NEET Roll No. and Application No.",
+      "Step 1: Register on official AYUSH portal with NEET Roll No. and Application No.",
       "Step 2: Upload high-resolution scanned documents (NEET score card, 10th/12th marksheets, domicile, caste).",
       "Step 3: Pay the non-refundable registration fee of ₹2,000.",
       "Step 4: Complete Choice Filling and Locking for Preferred Ayurveda & Homeopathy colleges.",

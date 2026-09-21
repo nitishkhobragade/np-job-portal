@@ -66,8 +66,8 @@ export default function JobDetailPage({ params }: JobPageProps) {
             admitCardDate: 'परीक्षा से 10 दिन पूर्व',
             feeGeneral: record.fee?.gen || '₹500/-',
             feeReserved: record.fee?.reserved || '₹250/-',
-            feePortal: '₹60/- (कियोस्क पोर्टल शुल्क)',
-            paymentMode: 'MP Online Kiosk, UPI, Net Banking',
+            feePortal: '₹60/- (पोर्टल शुल्क)',
+            paymentMode: 'Online Net Banking, Debit/Credit Card, UPI',
             minAge: '18 वर्ष',
             maxAge: '40 वर्ष',
             ageCalculationDate: '01/01/2026',
@@ -88,8 +88,8 @@ export default function JobDetailPage({ params }: JobPageProps) {
             howToApplySteps: [
               'चरण 1: ऑफिशियल नोटिफिकेशन PDF डाउनलोड कर पात्रता एवं नियमों को ध्यानपूर्वक पढ़ें।',
               'चरण 2: ऑनलाइन फॉर्म घर बैठे सुरक्षित भरवाने के लिए आवश्यक दस्तावेज (आधार कार्ड, 10वीं/12वीं अंकसूची, जाति व निवास प्रमाण पत्र) तैयार रखें।',
-              'चरण 3: Nitish Khobragade (NP ONLINE KIOSK - 8982324497) से व्हाट्सएप पर संपर्क करें।',
-              'चरण 4: फॉर्म का प्रीव्यू जांचें एवं आधिकारिक एमपी ऑनलाइन रसीद प्राप्त करें।'
+              'चरण 3: Nitish Khobragade (8982324497) से व्हाट्सएप पर संपर्क कर घर बैठे सुरक्षित फॉर्म भरवाएं।',
+              'चरण 4: फॉर्म का प्रीव्यू जांचें एवं आधिकारिक ऑनलाइन रसीद प्राप्त करें।'
             ],
             requiredDocuments: [
               'आधार कार्ड (मोबाइल नंबर लिंक)',
@@ -211,13 +211,13 @@ export default function JobDetailPage({ params }: JobPageProps) {
             <div className="space-y-1 text-center md:text-left">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 text-xs font-black uppercase tracking-wider">
                 <ShieldCheck className="w-4 h-4 text-emerald-300" />
-                ऑनलाइन सहायता केंद्र • NP ONLINE
+                घर बैठे सुरक्षित फॉर्म भरवाएं • NP Job Portal
               </span>
               <h2 className="text-lg sm:text-xl md:text-2xl font-black text-amber-300 tracking-tight leading-snug">
-                घर बैठे सुरक्षित फॉर्म भरने के लिए संपर्क करें: {OWNER_INFO.name} - {OWNER_INFO.phone}
+                घर बैठे सुरक्षित फॉर्म भरवाएं: {OWNER_INFO.name} - {OWNER_INFO.phone}
               </h2>
               <p className="text-xs sm:text-sm text-emerald-100 max-w-2xl">
-                कियोस्क या दुकान की लाइन में लगने की जरूरत नहीं! व्हाट्सएप पर अपने जरूरी दस्तावेज भेजें और 100% सही विवरण के साथ रसीद प्राप्त करें।
+                कहीं भी लाइन में लगने की जरूरत नहीं! व्हाट्सएप पर अपने जरूरी दस्तावेज भेजें और 100% सही विवरण के साथ रसीद प्राप्त करें।
               </p>
             </div>
 
@@ -336,7 +336,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
                 </li>
                 {job.feePortal && (
                   <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                    <span className="text-neutral-600 font-medium">कियोस्क पोर्टल शुल्क (Portal Fee):</span>
+                    <span className="text-neutral-600 font-medium">पोर्टल शुल्क (Portal Fee):</span>
                     <span className="font-bold text-neutral-700">{job.feePortal}</span>
                   </li>
                 )}

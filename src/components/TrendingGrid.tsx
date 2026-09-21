@@ -99,7 +99,7 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard }) => {
                   {/* Direct Poster & Sarkari Table Link */}
                   {card.id === 'trend-1' && (
                     <Link
-                      href="/jobs/mp-police-constable-2026"
+                      href="/2026/09/02/mp-police-constable-2026"
                       className="mt-2 text-center text-[10px] font-bold text-red-700 hover:underline block"
                     >
                       ★ सरकारी रिजल्ट टेबल व WhatsApp पोस्टर →
@@ -107,7 +107,7 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard }) => {
                   )}
                   {card.id === 'trend-2' && (
                     <Link
-                      href="/jobs/mp-ayush-ug-counselling"
+                      href="/2026/09/03/mp-ayush-ug-counselling"
                       className="mt-2 text-center text-[10px] font-bold text-emerald-700 hover:underline block"
                     >
                       ★ काउंसलिंग दिशानिर्देश व WhatsApp पोस्टर →
@@ -115,7 +115,7 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard }) => {
                   )}
                   {card.id === 'trend-3' && (
                     <Link
-                      href="/jobs/ssc-chsl-2026"
+                      href="/2026/09/04/ssc-chsl-2026"
                       className="mt-2 text-center text-[10px] font-bold text-amber-800 hover:underline block"
                     >
                       ★ SSC CHSL टेबल व WhatsApp पोस्टर →
@@ -123,7 +123,7 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard }) => {
                   )}
                   {card.id === 'trend-4' && (
                     <Link
-                      href="/jobs/railway-rrc-group-d"
+                      href="/2026/09/05/railway-rrc-group-d"
                       className="mt-2 text-center text-[10px] font-bold text-rose-700 hover:underline block"
                     >
                       ★ रेलवे भर्ती टेबल व WhatsApp पोस्टर →

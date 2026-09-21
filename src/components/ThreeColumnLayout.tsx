@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
+import { getPostUrl } from '../lib/postRouting';
 
 interface ThreeColumnLayoutProps {
   jobs: JobItem[];
@@ -216,7 +217,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                         </button>
                         <span className="text-neutral-300">|</span>
                         <Link
-                          href={`/jobs/${job.slug || job.id}`}
+                          href={getPostUrl(job)}
                           className="text-red-700 hover:text-red-800 font-bold text-[11px] flex items-center gap-0.5"
                         >
                           पेज व पोस्टर <ChevronRight className="w-3 h-3" />

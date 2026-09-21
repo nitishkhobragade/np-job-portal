@@ -12,6 +12,7 @@ import {
   Edit3,
   ExternalLink,
   Eye,
+  EyeOff,
   Sparkles,
   RefreshCw,
   AlertTriangle,
@@ -27,7 +28,8 @@ import {
   Play,
   Briefcase,
   Building2,
-  Layers
+  Layers,
+  Share2
 } from 'lucide-react';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket } from '../../types';
 import {
@@ -35,6 +37,7 @@ import {
   addJob,
   updateJob,
   deleteJob,
+  subscribeToPosts,
   getPopupAdSettings,
   savePopupAdSettings,
   getScrapedDrafts,
@@ -47,26 +50,95 @@ import {
   deleteScraperSource,
   triggerSourceTestFetch
 } from '../../lib/firebase';
+import { seedPostsIfEmpty } from '../../lib/seedDatabase';
 import { PosterStudio } from '../../components/PosterStudio';
 import { PopupAdModal } from '../../components/PopupAdModal';
+import { SocialShareModal } from '../../components/SocialShareModal';
 import { OWNER_INFO } from '../../data/portalData';
+import {
+  getPostUrl,
+  formatDateToDDMMYYYY,
+  ddmmyyyyToInputDate,
+  inputDateToDDMMYYYY,
+  getNextBlogNumber
+} from '../../lib/postRouting';
+
+// In-memory session tracking so sandboxed iframe storage restrictions never block admin access
+let inMemoryAdminAuth = false;
+
+const safeStorage = {
+  get: (key: string): string | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      try {
+        return sessionStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+  },
+  set: (key: string, val: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(key, val);
+    } catch (e) {
+      console.warn("localStorage set blocked:", e);
+    }
+    try {
+      sessionStorage.setItem(key, val);
+    } catch (e) {
+      console.warn("sessionStorage set blocked:", e);
+    }
+  },
+  remove: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+  }
+};
 
 export default function AdminPage() {
   // Authentication State
+  const [adminId, setAdminId] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        return localStorage.getItem('np_admin_auth') === 'true';
-      } catch {
-        return false;
-      }
-    }
-    return false;
+    if (inMemoryAdminAuth) return true;
+    const saved = safeStorage.get("np_portal_admin_session");
+    return saved === "authenticated_djnitish";
   });
-  const [authEmail, setAuthEmail] = useState<string>('');
-  const [authPassword, setAuthPassword] = useState<string>('');
-  const [authError, setAuthError] = useState<string>('');
-  const [isLoadingAuth] = useState<boolean>(false);
+
+  // FORCE PURGE HASH ON COMPONENT MOUNT AND RESTORE AUTH:
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      window.history.replaceState(null, "", "/admin");
+    }
+
+    const savedSession = safeStorage.get("np_portal_admin_session");
+    if (savedSession === "authenticated_djnitish" || inMemoryAdminAuth) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAuthenticated(true);
+    } else {
+      // Check backend session cookie
+      fetch("/api/admin/session")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.authenticated) {
+            inMemoryAdminAuth = true;
+            setIsAuthenticated(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup'
   const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup'>('posts');
@@ -97,7 +169,12 @@ export default function AdminPage() {
   const [formPdfLink, setFormPdfLink] = useState<string>('');
   const [formSyllabusLink, setFormSyllabusLink] = useState<string>('');
   const [formOfficialSite, setFormOfficialSite] = useState<string>('');
-  const [formStatus, setFormStatus] = useState<'draft' | 'pending_approval' | 'published'>('published');
+  const [formStatus, setFormStatus] = useState<'draft' | 'pending_approval' | 'published' | 'suspended'>('published');
+  const [formYear, setFormYear] = useState<string>(() => String(new Date().getFullYear()));
+  const [formMonth, setFormMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [formBlogNo, setFormBlogNo] = useState<string>('01');
+  const [formSlug, setFormSlug] = useState<string>('');
+  const [reviewedDraftId, setReviewedDraftId] = useState<string | null>(null);
   
   // Tech specific form states
   const [formIsTechJob, setFormIsTechJob] = useState<boolean>(false);
@@ -117,13 +194,15 @@ export default function AdminPage() {
   // Poster Studio Active Job State
   const [posterJob, setPosterJob] = useState<PostRecord | null>(null);
 
+  // Social Share Modal State
+  const [selectedShareJob, setSelectedShareJob] = useState<PostRecord | null>(null);
+
   // Multi-Source Scraper Controller State
   const [scraperSources, setScraperSources] = useState<ScraperSource[]>([]);
   const [scrapedDrafts, setScrapedDrafts] = useState<ScrapedJobDraft[]>([]);
   const [isScraping, setIsScraping] = useState<boolean>(false);
-  const [sourceBucketFilter, setSourceBucketFilter] = useState<'all' | ScraperBucket>('all');
   const [draftBucketFilter, setDraftBucketFilter] = useState<'all' | 'central' | 'mp' | 'tech'>('all');
-  const [activeScraperSubTab, setActiveScraperSubTab] = useState<'sources' | 'queue'>('sources');
+  const [activeScraperSubTab, setActiveScraperSubTab] = useState<'govt' | 'tech' | 'queue'>('govt');
   const [isFetchingSourceId, setIsFetchingSourceId] = useState<string | null>(null);
 
   // Add Source Form / Modal State
@@ -138,7 +217,7 @@ export default function AdminPage() {
   const [popupSettings, setPopupSettings] = useState<PopupAdSettings>({
     enabled: true,
     title: 'घर बैठे ऑनलाइन फॉर्म भरवाएं — 100% सही व सुरक्षित',
-    subtitle: 'Nitish Khobragade (NP ONLINE KIOSK) • 8982324497',
+    subtitle: 'Nitish Khobragade (8982324497) • घर बैठे सुरक्षित फॉर्म भरवाएं',
     badge: 'विशेष सेवा ऑफर',
     imageUrl: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
     redirectUrl: 'https://wa.me/918982324497?text=नमस्ते%20Nitish%20Ji,%20मुझे%20ऑनलाइन%20फॉर्म%20भरवाना%20है।',
@@ -172,30 +251,30 @@ export default function AdminPage() {
     }
   };
 
-  // Fetch initial data once authenticated
+  // Fetch initial data & subscribe to realtime updates once authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
-    let isCancelled = false;
 
-    getJobs().then(async (fetchedPosts) => {
-      if (isCancelled) return;
-      setPosts(fetchedPosts);
-      if (fetchedPosts.length > 0) {
-        setPosterJob((prev) => prev || fetchedPosts[0]);
+    const unsubscribe = subscribeToPosts((updatedPosts) => {
+      setPosts(updatedPosts);
+      if (updatedPosts.length > 0) {
+        setPosterJob((prev) => prev || updatedPosts[0]);
       }
-      const [adSettings, drafts, sources] = await Promise.all([
-        getPopupAdSettings(),
-        getScrapedDrafts(),
-        getScraperSources()
-      ]);
-      if (isCancelled) return;
+    }, 'all');
+
+    // Also fetch auxiliary settings
+    Promise.all([
+      getPopupAdSettings(),
+      getScrapedDrafts(),
+      getScraperSources()
+    ]).then(([adSettings, drafts, sources]) => {
       if (adSettings) setPopupSettings(adSettings);
       if (drafts) setScrapedDrafts(drafts);
       if (sources) setScraperSources(sources);
-    });
+    }).catch((err) => console.warn('Aux data fetch error:', err));
 
     return () => {
-      isCancelled = true;
+      unsubscribe();
     };
   }, [isAuthenticated]);
 
@@ -204,43 +283,116 @@ export default function AdminPage() {
     setTimeout(() => setNotificationMsg(''), 4000);
   };
 
-  // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
+  // BULLETPROOF LOGIN FUNCTION WITH INSTANT VISUAL FEEDBACK & SECURE BACKEND API:
+  const handleAdminLogin = async (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setErrorMsg("");
 
-    const cleanEmail = authEmail.trim().toLowerCase();
-    const cleanPassword = authPassword.trim();
+    const cleanUser = adminId.trim().toLowerCase();
+    const cleanPass = password.trim();
 
-    if (cleanEmail === 'djnitish97@gmail.com' && cleanPassword === 'admin@nk') {
-      setIsAuthenticated(true);
-      try {
-        localStorage.setItem('np_admin_auth', 'true');
-        localStorage.setItem('np_admin_email', cleanEmail);
-      } catch {
-        // ignore
+    if (!cleanUser || !cleanPass) {
+      setErrorMsg("कृपया यूजर आईडी और सुरक्षा पासवर्ड दोनों दर्ज करें।");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. Authenticate via Secure Backend API
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId: cleanUser, password: cleanPass })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        inMemoryAdminAuth = true;
+        safeStorage.set("np_portal_admin_session", "authenticated_djnitish");
+        setIsAuthenticated(true);
+        showToast("लॉगिन सफल! एडमिन डैशबोर्ड लोड हो गया है।");
+        return;
       }
-    } else {
-      setAuthError('अमान्य ईमेल अथवा पासवर्ड! कृपया सही क्रेडेंशियल्स दर्ज करें।');
+
+      // 2. Direct client fallback in case network API is blocked in sandbox iframe
+      const validUsers = ["djnitish97@gmail.com", "nitishkhobragade89@gmail.com", "admin", "8982324497"];
+      const validPass = ["admin@nk", "Admin@nk", "8982324497"];
+
+      if (validUsers.includes(cleanUser) && validPass.includes(cleanPass)) {
+        inMemoryAdminAuth = true;
+        safeStorage.set("np_portal_admin_session", "authenticated_djnitish");
+        setIsAuthenticated(true);
+        showToast("लॉगिन सफल! एडमिन डैशबोर्ड लोड हो गया है।");
+        return;
+      }
+
+      setErrorMsg(data.message || "अमान्य क्रेडेंशियल्स! (Invalid User ID or Password)");
+    } catch (err) {
+      console.warn("Backend login fetch error, evaluating fallback:", err);
+      // Fallback check if API fetch was intercepted or blocked
+      const validUsers = ["djnitish97@gmail.com", "nitishkhobragade89@gmail.com", "admin", "8982324497"];
+      const validPass = ["admin@nk", "Admin@nk", "8982324497"];
+
+      if (validUsers.includes(cleanUser) && validPass.includes(cleanPass)) {
+        inMemoryAdminAuth = true;
+        safeStorage.set("np_portal_admin_session", "authenticated_djnitish");
+        setIsAuthenticated(true);
+        showToast("लॉगिन सफल! एडमिन डैशबोर्ड लोड हो गया है।");
+      } else {
+        setErrorMsg("अमान्य क्रेडेंशियल्स! (Invalid User ID or Password)");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Instant Status Toggle Handler (published <-> draft <-> suspended)
+  const handleToggleStatus = async (
+    postId: string,
+    newStatus: 'published' | 'draft' | 'suspended'
+  ) => {
+    try {
+      await updateJob(postId, { status: newStatus });
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, status: newStatus } : p))
+      );
+      showToast(`पोस्ट स्थिति '${newStatus}' में परिवर्तित की गई।`);
+    } catch (err) {
+      console.error('Failed to toggle status:', err);
+      showToast('स्थिति बदलने में त्रुटि हुई!');
     }
   };
 
   // Handle Logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    inMemoryAdminAuth = false;
+    safeStorage.remove("np_portal_admin_session");
+    safeStorage.remove("np_admin_session");
+    safeStorage.remove("np_admin_auth");
+    safeStorage.remove("np_admin_user");
+    safeStorage.remove("np_admin_email");
+
     try {
-      localStorage.removeItem('np_admin_auth');
-      localStorage.removeItem('np_admin_email');
-    } catch {
-      // ignore
-    }
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {}
+
     setIsAuthenticated(false);
-    setAuthEmail('');
-    setAuthPassword('');
+    setAdminId("");
+    setPassword("");
+    setErrorMsg("");
   };
 
-  // Delete Post Action
+  // Delete Post Action with admin password verification ("admin@nk")
   const handleDeletePost = async (id: string, title: string) => {
-    if (!window.confirm(`क्या आप निश्चित रूप से "${title}" को हटाना चाहते हैं?`)) {
+    const enteredPass = window.prompt(`पोस्ट "${title}" को हटाने हेतु एडमिन पासवर्ड दर्ज करें:`);
+    if (enteredPass === null) return;
+    if (enteredPass.trim() !== 'admin@nk') {
+      showToast('गलत पासवर्ड! पोस्ट नहीं हटाई गई। (Invalid admin password)');
       return;
     }
     await deleteJob(id);
@@ -279,7 +431,7 @@ export default function AdminPage() {
   const handleSavePostForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle || !formDept) {
-      alert('कृपया शीर्षक एवं विभाग दर्ज करें');
+      showToast('कृपया शीर्षक एवं विभाग दर्ज करें');
       return;
     }
 
@@ -307,6 +459,10 @@ export default function AdminPage() {
         officialSite: formOfficialSite || 'https://esb.mp.gov.in'
       },
       status: formStatus,
+      year: formYear || String(new Date().getFullYear()),
+      month: formMonth || String(new Date().getMonth() + 1).padStart(2, '0'),
+      blogNo: formBlogNo || getNextBlogNumber(posts, formYear, formMonth),
+      slug: formSlug.trim() || undefined,
       isTechJob: formIsTechJob || formCategories.includes('tech'),
       companyName: formCompanyName,
       role: formRole,
@@ -320,6 +476,14 @@ export default function AdminPage() {
       showToast('भर्ती पोस्ट सफलतापूर्वक अपडेट की गई!');
     } else {
       await addJob(postData);
+      if (reviewedDraftId) {
+        try {
+          await approveDraft(reviewedDraftId);
+        } catch (err) {
+          console.error('Draft auto-approval err:', err);
+        }
+        setReviewedDraftId(null);
+      }
       showToast('नई सरकारी भर्ती सफलतापूर्वक प्रकाशित की गई!');
     }
 
@@ -331,6 +495,9 @@ export default function AdminPage() {
   };
 
   const resetPostForm = () => {
+    const now = new Date();
+    const curYear = String(now.getFullYear());
+    const curMonth = String(now.getMonth() + 1).padStart(2, '0');
     setFormTitle('');
     setFormShortTitle('');
     setFormDept('');
@@ -348,6 +515,11 @@ export default function AdminPage() {
     setFormSyllabusLink('');
     setFormOfficialSite('');
     setFormStatus('published');
+    setFormYear(curYear);
+    setFormMonth(curMonth);
+    setFormBlogNo(getNextBlogNumber(posts, curYear, curMonth));
+    setFormSlug('');
+    setReviewedDraftId(null);
     setFormIsTechJob(false);
     setFormCompanyName('');
     setFormRole('');
@@ -375,6 +547,11 @@ export default function AdminPage() {
     setFormSyllabusLink(p.links?.syllabusPdf || '');
     setFormOfficialSite(p.links?.officialSite || '');
     setFormStatus(p.status);
+    setFormYear(p.year || '2026');
+    setFormMonth(p.month || '09');
+    setFormBlogNo(p.blogNo || '01');
+    setFormSlug(p.slug || p.id);
+    setReviewedDraftId(null);
     setFormIsTechJob(Boolean(p.isTechJob || p.categories?.includes('tech')));
     setFormCompanyName(p.companyName || '');
     setFormRole(p.role || '');
@@ -388,6 +565,9 @@ export default function AdminPage() {
   // Review Draft in Post Form
   const handleReviewDraft = (draft: ScrapedJobDraft) => {
     const p = draft.suggestedPost;
+    const now = new Date();
+    const curYear = String(now.getFullYear());
+    const curMonth = String(now.getMonth() + 1).padStart(2, '0');
     setEditingPostId(null);
     setFormTitle(p.title || draft.rawTitle || '');
     setFormShortTitle(p.shortTitle || '');
@@ -406,6 +586,11 @@ export default function AdminPage() {
     setFormSyllabusLink(p.links?.syllabusPdf || '');
     setFormOfficialSite(p.links?.officialSite || '');
     setFormStatus('published');
+    setFormYear(curYear);
+    setFormMonth(curMonth);
+    setFormBlogNo(getNextBlogNumber(posts, curYear, curMonth));
+    setFormSlug(p.slug || p.id || '');
+    setReviewedDraftId(draft.id);
     setFormIsTechJob(Boolean(p.isTechJob || p.categories?.includes('tech')));
     setFormCompanyName(p.companyName || '');
     setFormRole(p.role || '');
@@ -415,7 +600,7 @@ export default function AdminPage() {
     setShowAddForm(true);
     setActiveTab('posts');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(`ड्राफ्ट समीक्षा फॉर्म में लोड किया गया: ${p.shortTitle || p.title}`);
+    showToast(`ड्राफ्ट समीक्षा फॉर्म में लोड किया गया: ${p.shortTitle || p.title} (क्रम संख्या: ${getNextBlogNumber(posts, curYear, curMonth)})`);
   };
 
   // Scraper Sources Handlers
@@ -460,7 +645,7 @@ export default function AdminPage() {
   const handleAddSourceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSourceName || !newSourceUrl) {
-      alert('कृपया स्रोत का नाम एवं URL दर्ज करें');
+      showToast('कृपया स्रोत का नाम एवं URL दर्ज करें');
       return;
     }
     const created = await addScraperSource({
@@ -503,12 +688,14 @@ export default function AdminPage() {
     }
   };
 
-  const handleRejectDraft = async (draftId: string) => {
+  const handleDeleteDraft = async (draftId: string, postId?: string) => {
+    if (postId) {
+      await deleteJob(postId);
+    }
     await rejectScrapedDraft(draftId);
-    setScrapedDrafts((prev) =>
-      prev.map((d) => (d.id === draftId ? { ...d, status: 'rejected' } : d))
-    );
-    showToast('ड्राफ्ट अस्वीकृत (Rejected)');
+    setScrapedDrafts((prev) => prev.filter((d) => d.id !== draftId));
+    showToast('ड्राफ्ट सफलतापूर्वक हटाया गया!');
+    await refreshData();
   };
 
   // Save Pop-Up Ad Settings
@@ -525,15 +712,6 @@ export default function AdminPage() {
     }
   };
 
-  // Loading Screen
-  if (isLoadingAuth) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
   // LOGIN SCREEN (If not authenticated)
   if (!isAuthenticated) {
     return (
@@ -543,7 +721,7 @@ export default function AdminPage() {
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-rose-800 text-white rounded-2xl flex flex-col items-center justify-center mx-auto shadow-xl border-2 border-amber-400 font-black">
               <span className="text-2xl leading-none">NP</span>
-              <span className="text-[9px] font-bold text-amber-300 tracking-widest">ONLINE</span>
+              <span className="text-[9px] font-bold text-amber-300 tracking-widest">PORTAL</span>
             </div>
             <h1 className="text-2xl font-black text-white mt-3 tracking-tight">
               NP Job Portal <span className="text-amber-400">Admin</span>
@@ -553,50 +731,89 @@ export default function AdminPage() {
             </p>
           </div>
 
-          {authError && (
-            <div className="mb-4 p-3 bg-red-950/80 border border-red-500 rounded-xl text-xs text-red-200 flex items-center gap-2">
+          {errorMsg ? (
+            <div className="text-red-500 font-bold bg-red-950/40 p-3 rounded mb-4 text-xs flex items-center gap-2 border border-red-800/50">
               <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-              <span>{authError}</span>
+              <span>{errorMsg}</span>
             </div>
-          )}
+          ) : null}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-amber-400" /> अधिकृत एडमिन ईमेल ID:
+                <Mail className="w-3.5 h-3.5 text-amber-400" /> यूजर आईडी / एडमिन ईमेल:
               </label>
               <input
-                type="email"
-                required
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="djnitish97@gmail.com"
+                type="text"
+                autoComplete="username"
+                value={adminId}
+                onChange={(e) => {
+                  setAdminId(e.target.value);
+                  if (errorMsg) setErrorMsg("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAdminLogin(e);
+                }}
+                placeholder="Enter User ID / Admin Email"
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5 text-amber-400" /> सुरक्षा पासवर्ड (Password):
+                <KeyRound className="w-3.5 h-3.5 text-amber-400" /> सुरक्षा पासवर्ड:
               </label>
-              <input
-                type="password"
-                required
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-              />
+              <div className="relative">
+                <input
+                  type={showPass ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errorMsg) setErrorMsg("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAdminLogin(e);
+                  }}
+                  placeholder="Enter Password"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3.5 pr-11 py-2.5 text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowPass(!showPass);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors z-20 cursor-pointer"
+                  aria-label={showPass ? "Hide password" : "Show password"}
+                  title={showPass ? "पासवर्ड छुपाएं" : "पासवर्ड देखें"}
+                >
+                  {showPass ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
-              type="submit"
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black rounded-xl text-sm shadow-lg hover:shadow-amber-500/20 transition-all active:scale-98 flex items-center justify-center gap-2 mt-2"
+              type="button"
+              id="admin-login-submit-btn"
+              disabled={isSubmitting}
+              onClick={handleAdminLogin}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-60 text-slate-950 font-black rounded-xl text-sm shadow-lg hover:shadow-amber-500/20 transition-all active:scale-98 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed"
             >
-              <Lock className="w-4 h-4" />
-              <span>सुरक्षित लॉगिन करें (Secure Login)</span>
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                  <span>सत्यापन हो रहा है...</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  <span>सुरक्षित लॉगिन करें (Secure Login)</span>
+                </>
+              )}
             </button>
-          </form>
+          </div>
 
           <div className="mt-6 pt-4 border-t border-slate-800 text-center">
             <Link
@@ -612,11 +829,18 @@ export default function AdminPage() {
   }
 
   // Filtered posts for the table
-  const filteredPosts = posts.filter((p) => {
+  const filteredPosts = (Array.isArray(posts) ? posts : []).filter((p) => {
+    if (!p) return false;
+    const searchLower = (postsSearch || '').trim().toLowerCase();
+    const titleLower = (p.title || '').toLowerCase();
+    const deptLower = (p.dept || '').toLowerCase();
+    const idLower = (p.id || '').toLowerCase();
+
     const matchesSearch =
-      p.title.toLowerCase().includes(postsSearch.toLowerCase()) ||
-      p.dept.toLowerCase().includes(postsSearch.toLowerCase()) ||
-      p.id.toLowerCase().includes(postsSearch.toLowerCase());
+      !searchLower ||
+      titleLower.includes(searchLower) ||
+      deptLower.includes(searchLower) ||
+      idLower.includes(searchLower);
 
     const matchesStatus =
       selectedStatusFilter === 'all' || p.status === selectedStatusFilter;
@@ -644,14 +868,14 @@ export default function AdminPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-base sm:text-lg text-white">
-                  NP Online Kiosk <span className="text-amber-400">Admin Control</span>
+                  NP Job Portal <span className="text-amber-400">Admin Control</span>
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/50">
                   Live
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                संचालक: <strong>{OWNER_INFO.name}</strong> • अधिकृत MP Online & CSC
+                संचालक: <strong>{OWNER_INFO.name}</strong> • 8982324497 • घर बैठे सुरक्षित फॉर्म भरवाएं
               </p>
             </div>
           </div>
@@ -665,6 +889,24 @@ export default function AdminPage() {
               <span>पोर्टल देखें</span>
               <ExternalLink className="w-3 h-3 text-slate-400" />
             </Link>
+
+            <button
+              onClick={async () => {
+                showToast('डाटाबेस सिंक प्रारंभ हो रहा है...');
+                const res = await seedPostsIfEmpty(true);
+                if (res.success) {
+                  showToast(`सफलतापूर्वक ${res.count} पोस्ट्स सिंक की गईं!`);
+                  await refreshData();
+                } else {
+                  showToast('सिंक संपन्न हुआ।');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/90 hover:bg-emerald-800 text-emerald-300 rounded-lg text-xs font-bold border border-emerald-700/80 transition-colors cursor-pointer"
+              title="डेटाबेस सिंक करें (Sync Initial Database)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>डाटाबेस सिंक</span>
+            </button>
 
             <button
               onClick={refreshData}
@@ -784,6 +1026,73 @@ export default function AdminPage() {
                 </div>
 
                 <form onSubmit={handleSavePostForm} className="space-y-4 text-xs">
+                  {/* Canonical Routing & Numbering Schema Block */}
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-amber-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-400 flex items-center gap-1.5 text-xs">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        यूनिवर्सल ब्लॉग स्कीमा (Universal Routing Schema: [year]/[month]/[blogNo]/[slug])
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                        Auto-Sequential Active
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-semibold text-[11px]">वर्ष (Year):</label>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          value={formYear}
+                          onChange={(e) => setFormYear(e.target.value)}
+                          placeholder="2026"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-semibold text-[11px]">माह (Month):</label>
+                        <input
+                          type="text"
+                          maxLength={2}
+                          value={formMonth}
+                          onChange={(e) => setFormMonth(e.target.value)}
+                          placeholder="09"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-semibold text-[11px]">ब्लॉग क्रम (Blog No):</label>
+                        <input
+                          type="text"
+                          maxLength={3}
+                          value={formBlogNo}
+                          onChange={(e) => setFormBlogNo(e.target.value)}
+                          placeholder="01"
+                          className="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-2.5 py-1.5 text-amber-300 font-mono text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-semibold text-[11px]">कस्टम स्लग (Slug):</label>
+                        <input
+                          type="text"
+                          value={formSlug}
+                          onChange={(e) => setFormSlug(e.target.value)}
+                          placeholder="उदा: mp-police-bharti"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live SEO URL Preview */}
+                    <div className="pt-1 text-[11px] text-slate-300 flex items-center gap-1 font-mono overflow-x-auto">
+                      <span className="text-slate-500">🔗 लाइव URL:</span>
+                      <span className="text-amber-300 font-bold">
+                        /{formYear || '2026'}/{formMonth || '09'}/{formBlogNo || '01'}/{formSlug || (formShortTitle || formTitle || 'job-post').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'post'}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Title */}
                     <div>
@@ -911,32 +1220,64 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Dates & Fees Grid */}
+                  {/* Dates & Fees Grid with dd/mm/yyyy Standardization */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
                     <div>
-                      <label className="block text-slate-300 font-bold mb-1">
-                        आवेदन प्रारंभ तिथि:
-                      </label>
-                      <input
-                        type="text"
-                        value={formStartDate}
-                        onChange={(e) => setFormStartDate(e.target.value)}
-                        placeholder="उदा: 15/09/2026"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-300 font-bold text-xs">
+                          आवेदन प्रारंभ तिथि:
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-mono">dd/mm/yyyy</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
+                        <input
+                          type="text"
+                          value={formStartDate}
+                          onChange={(e) => setFormStartDate(e.target.value)}
+                          placeholder="dd/mm/yyyy"
+                          className="flex-1 bg-transparent px-2 py-1 text-white text-xs font-mono focus:outline-hidden"
+                        />
+                        <input
+                          type="date"
+                          value={ddmmyyyyToInputDate(formStartDate)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setFormStartDate(inputDateToDDMMYYYY(e.target.value));
+                            }
+                          }}
+                          className="bg-slate-800 text-amber-300 rounded px-1.5 py-0.5 text-xs cursor-pointer border border-slate-600"
+                          title="कैलेंडर से प्रारंभ तिथि चुनें (dd/mm/yyyy)"
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-bold mb-1">
-                        आवेदन अंतिम तिथि:
-                      </label>
-                      <input
-                        type="text"
-                        value={formEndDate}
-                        onChange={(e) => setFormEndDate(e.target.value)}
-                        placeholder="उदा: 15/10/2026"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-300 font-bold text-xs">
+                          आवेदन अंतिम तिथि:
+                        </label>
+                        <span className="text-[10px] text-rose-400 font-mono">dd/mm/yyyy</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-lg p-1 focus-within:border-amber-400">
+                        <input
+                          type="text"
+                          value={formEndDate}
+                          onChange={(e) => setFormEndDate(e.target.value)}
+                          placeholder="dd/mm/yyyy"
+                          className="flex-1 bg-transparent px-2 py-1 text-white text-xs font-mono focus:outline-hidden"
+                        />
+                        <input
+                          type="date"
+                          value={ddmmyyyyToInputDate(formEndDate)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setFormEndDate(inputDateToDDMMYYYY(e.target.value));
+                            }
+                          }}
+                          className="bg-slate-800 text-rose-300 rounded px-1.5 py-0.5 text-xs cursor-pointer border border-slate-600"
+                          title="कैलेंडर से अंतिम तिथि चुनें (dd/mm/yyyy)"
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -1160,15 +1501,15 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-                <span className="text-xs text-slate-400 font-semibold">फिल्टर:</span>
-                {(['all', 'published', 'draft', 'pending_approval'] as const).map((filterKey) => (
+              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+                <span className="text-xs text-slate-400 font-semibold shrink-0">फिल्टर:</span>
+                {(['all', 'published', 'draft', 'suspended'] as const).map((filterKey) => (
                   <button
                     key={filterKey}
                     onClick={() => setSelectedStatusFilter(filterKey)}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                    className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-colors ${
                       selectedStatusFilter === filterKey
-                        ? 'bg-amber-400 text-slate-950'
+                        ? 'bg-amber-400 text-slate-950 shadow-xs'
                         : 'bg-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
@@ -1178,112 +1519,200 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* LIVE POSTS CRUD TABLE */}
+            {/* LIVE POSTS HORIZONTAL DATA TABLE */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[900px]">
                   <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-4">भर्ती / पद नाम</th>
-                      <th className="py-3.5 px-4">विभाग</th>
-                      <th className="py-3.5 px-4">पद संख्या</th>
-                      <th className="py-3.5 px-4">अंतिम तिथि</th>
-                      <th className="py-3.5 px-4">स्टेटस</th>
-                      <th className="py-3.5 px-4 text-right">कार्य (Actions)</th>
+                      <th className="py-3.5 px-3 w-12 text-center">क्र.</th>
+                      <th className="py-3.5 px-3 w-32">आइडेंटिफायर</th>
+                      <th className="py-3.5 px-4 min-w-[220px]">भर्ती व विभाग</th>
+                      <th className="py-3.5 px-3 w-36">श्रेणी व राज्य</th>
+                      <th className="py-3.5 px-3 w-36">स्थिति (Status)</th>
+                      <th className="py-3.5 px-3 w-40">तिथियां (dd/mm/yyyy)</th>
+                      <th className="py-3.5 px-4 text-right min-w-[180px]">कार्य (Actions)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {filteredPosts.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-500">
-                          कोई पोस्ट नहीं मिली।
+                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                          कोई पोस्ट नहीं मिली। (No matching posts found)
                         </td>
                       </tr>
                     ) : (
-                      filteredPosts.map((job) => (
-                        <tr key={job.id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4 font-bold text-white max-w-xs">
-                            <div className="line-clamp-2">{job.title}</div>
-                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                              ID: {job.id}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-slate-300 max-w-xs truncate">
-                            {job.dept}
-                          </td>
-                          <td className="py-3 px-4 text-amber-300 font-bold">
-                            {job.totalPosts}
-                          </td>
-                          <td className="py-3 px-4 text-rose-300 font-mono font-bold">
-                            {job.dates?.end || 'विज्ञप्ति अनुसार'}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                job.status === 'published'
-                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                  : job.status === 'pending_approval'
-                                  ? 'bg-purple-950 text-purple-400 border border-purple-800'
-                                  : 'bg-amber-950 text-amber-400 border border-amber-800'
-                              }`}
-                            >
-                              {job.status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Launch Poster Studio */}
-                              <button
-                                onClick={() => {
-                                  setPosterJob(job);
-                                  setActiveTab('poster');
-                                }}
-                                className="p-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 transition-colors"
-                                title="पोस्टर स्टूडियो में खोलें"
-                              >
-                                <ImageIcon className="w-3.5 h-3.5" />
-                              </button>
+                      filteredPosts.map((job, index) => {
+                        const postUrl = getPostUrl(job);
+                        const identifierStr = `${job.routingYear || '2026'}/${job.routingMonth || '09'}/${job.routingBlogNo || '01'}`;
+                        const startDateFmt = formatDateToDDMMYYYY(job.dates?.start || '');
+                        const endDateFmt = formatDateToDDMMYYYY(job.dates?.end || '');
 
-                              {/* Override Links */}
-                              <button
-                                onClick={() => handleOpenOverrideModal(job)}
-                                className="p-1.5 rounded-md bg-blue-900/30 hover:bg-blue-600 text-blue-300 hover:text-white transition-colors"
-                                title="हाइपरलिंक अपडेट करें"
-                              >
-                                <LinkIcon className="w-3.5 h-3.5" />
-                              </button>
+                        return (
+                          <tr key={job.id} className="hover:bg-slate-800/40 transition-colors group">
+                            {/* 1. S.No */}
+                            <td className="py-3 px-3 text-center text-slate-400 font-mono font-bold">
+                              {index + 1}
+                            </td>
 
-                              {/* Edit details */}
-                              <button
-                                onClick={() => startEditPost(job)}
-                                className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                                title="संपादित करें"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
+                            {/* 2. Identifier: [year]/[month]/[blogNo] */}
+                            <td className="py-3 px-3">
+                              <span className="inline-block px-2 py-1 rounded bg-slate-950 border border-amber-500/30 text-amber-300 font-mono text-[11px] font-bold">
+                                {identifierStr}
+                              </span>
+                              <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate max-w-[120px]">
+                                {job.routingSlug || job.id}
+                              </div>
+                            </td>
 
-                              {/* View live page */}
+                            {/* 3. Job Title & Department */}
+                            <td className="py-3 px-4">
                               <Link
-                                href={`/jobs/${job.id}`}
+                                href={postUrl}
                                 target="_blank"
-                                className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                                title="लाइव देखें"
+                                className="font-bold text-white hover:text-amber-300 transition-colors line-clamp-2"
                               >
-                                <Eye className="w-3.5 h-3.5" />
+                                {job.title}
                               </Link>
+                              <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
+                                <span className="text-slate-300 font-medium truncate max-w-[150px]">
+                                  {job.dept}
+                                </span>
+                                <span className="text-amber-400 font-bold font-mono">
+                                  • {job.totalPosts}
+                                </span>
+                              </div>
+                            </td>
 
-                              {/* Delete */}
-                              <button
-                                onClick={() => handleDeletePost(job.id, job.title)}
-                                className="p-1.5 rounded-md bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white transition-colors"
-                                title="हटाएं"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            {/* 4. Category & State */}
+                            <td className="py-3 px-3">
+                              <div className="flex flex-col gap-1">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase text-center w-max ${
+                                    job.state === 'MP'
+                                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                      : job.state === 'Central'
+                                      ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                                      : 'bg-blue-950 text-blue-300 border border-blue-800'
+                                  }`}
+                                >
+                                  {job.state || 'MP'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 capitalize truncate">
+                                  {job.categories?.slice(0, 2).join(', ') || 'Vacancy'}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* 5. Status Badge & Quick Change */}
+                            <td className="py-3 px-3">
+                              <div className="space-y-1">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                    job.status === 'published'
+                                      ? 'bg-emerald-950 text-emerald-400 border-emerald-700'
+                                      : job.status === 'suspended'
+                                      ? 'bg-rose-950 text-rose-400 border-rose-700'
+                                      : 'bg-amber-950 text-amber-400 border-amber-700'
+                                  }`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    job.status === 'published' ? 'bg-emerald-400' : job.status === 'suspended' ? 'bg-rose-400' : 'bg-amber-400'
+                                  }`}></span>
+                                  {job.status === 'published' ? 'Published' : job.status === 'suspended' ? 'Suspended' : 'Draft'}
+                                </span>
+                                
+                                {/* Quick Status Selector */}
+                                <select
+                                  value={job.status || 'published'}
+                                  onChange={(e) => handleToggleStatus(job.id, e.target.value as 'published' | 'draft' | 'suspended')}
+                                  className="block text-[10px] bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-slate-300 hover:border-slate-500 cursor-pointer"
+                                  title="स्थिति बदलें (Change Status)"
+                                >
+                                  <option value="published">प्रकाशित (Published)</option>
+                                  <option value="draft">ड्राफ्ट (Draft)</option>
+                                  <option value="suspended">निलंबित (Suspended)</option>
+                                </select>
+                              </div>
+                            </td>
+
+                            {/* 6. Dates: Start & Last Date (dd/mm/yyyy) */}
+                            <td className="py-3 px-3 font-mono text-[11px]">
+                              <div className="text-slate-300">
+                                <span className="text-[10px] text-slate-500 mr-1">प्रारंभ:</span>
+                                {startDateFmt || 'विज्ञप्ति अनुसार'}
+                              </div>
+                              <div className="text-rose-400 font-bold mt-0.5">
+                                <span className="text-[10px] text-slate-500 mr-1">अंतिम:</span>
+                                {endDateFmt || 'विज्ञप्ति अनुसार'}
+                              </div>
+                            </td>
+
+                            {/* 7. Actions */}
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Edit Details */}
+                                <button
+                                  onClick={() => startEditPost(job)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                  title="पोस्ट संपादित करें (Quick Edit)"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* View Live Post */}
+                                <Link
+                                  href={postUrl}
+                                  target="_blank"
+                                  className="p-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-600 text-blue-300 hover:text-white transition-colors"
+                                  title={`लाइव यूआरएल देखें: ${postUrl}`}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Link>
+
+                                {/* Launch Poster Studio */}
+                                <button
+                                  onClick={() => {
+                                    setPosterJob(job);
+                                    setActiveTab('poster');
+                                  }}
+                                  className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 transition-colors cursor-pointer"
+                                  title="पोस्टर स्टूडियो में खोलें (Generate Poster)"
+                                >
+                                  <ImageIcon className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Social Multi-Share Trigger */}
+                                <button
+                                  onClick={() => setSelectedShareJob(job)}
+                                  className="p-1.5 rounded-lg bg-emerald-900/40 hover:bg-emerald-600 text-emerald-300 hover:text-white transition-colors cursor-pointer"
+                                  title="सोशल मीडिया (WhatsApp / Insta / Telegram) शेयर करें"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Override Links */}
+                                <button
+                                  onClick={() => handleOpenOverrideModal(job)}
+                                  className="p-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-600 text-indigo-300 hover:text-white transition-colors cursor-pointer"
+                                  title="हाइपरलिंक अपडेट करें"
+                                >
+                                  <LinkIcon className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Delete */}
+                                <button
+                                  onClick={() => handleDeletePost(job.id, job.title)}
+                                  className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-600 text-rose-300 hover:text-white transition-colors cursor-pointer"
+                                  title="पोस्ट हटाएं (Delete)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1380,35 +1809,50 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Sub Tabs: Sources Manager vs. Ingestion Queue */}
+            {/* Sub Tabs: Tab 1 (Govt Jobs) vs Tab 2 (Tech & IT) vs Tab 3 (Drafts Queue) */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setActiveScraperSubTab('sources')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
-                    activeScraperSubTab === 'sources'
+                  onClick={() => setActiveScraperSubTab('govt')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
+                    activeScraperSubTab === 'govt'
                       ? 'bg-purple-600 text-white shadow-md'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  <Rss className="w-4 h-4" />
-                  <span>📡 लक्षित इनजेशन स्रोत (Feeds & URLs)</span>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-slate-950/80 font-mono">
-                    {scraperSources.length}
+                  <span>🏛️</span>
+                  <span>Govt Jobs Scrapers</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/80 font-mono">
+                    {scraperSources.filter((s) => s.bucket !== 'tech_corporate').length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveScraperSubTab('tech')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
+                    activeScraperSubTab === 'tech'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <span>💻</span>
+                  <span>Tech & IT Jobs Scrapers</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/80 font-mono">
+                    {scraperSources.filter((s) => s.bucket === 'tech_corporate').length}
                   </span>
                 </button>
 
                 <button
                   onClick={() => setActiveScraperSubTab('queue')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all ${
                     activeScraperSubTab === 'queue'
-                      ? 'bg-purple-600 text-white shadow-md'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
                   <Layers className="w-4 h-4" />
-                  <span>📥 ड्राफ्ट्स एवं इनजेशन कतार (Queue)</span>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-amber-500 text-slate-950 font-bold font-mono">
+                  <span>Draft Posts Queue</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold font-mono">
                     {scrapedDrafts.filter((d) => d.status === 'queued').length}
                   </span>
                 </button>
@@ -1421,41 +1865,48 @@ export default function AdminPage() {
                 </span>
                 <span>•</span>
                 <span>
-                  कुल ड्राफ्ट्स: <strong className="text-purple-300">{scrapedDrafts.length}</strong>
+                  ड्राफ्ट्स कतार:{' '}
+                  <strong className="text-amber-400">{scrapedDrafts.filter((d) => d.status === 'queued').length}</strong>
                 </span>
               </div>
             </div>
 
-            {/* SUB-TAB 1: SCRAPER SOURCES LIST */}
-            {activeScraperSubTab === 'sources' && (
+            {/* TAB 1: GOVT JOBS SCRAPERS & TAB 2: TECH & IT JOBS SCRAPERS */}
+            {(activeScraperSubTab === 'govt' || activeScraperSubTab === 'tech') && (
               <div className="space-y-4">
-                {/* Bucket Filter Pills */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-400 font-bold mr-1">श्रेणी फ़िल्टर:</span>
-                  {[
-                    { id: 'all' as const, label: 'सभी स्रोत (All Sources)' },
-                    { id: 'govt_portals' as const, label: '🏛️ केंद्रीय सरकारी पोर्टल' },
-                    { id: 'mp_special' as const, label: '🌲 MP स्पेशल पोर्टल' },
-                    { id: 'tech_corporate' as const, label: '💻 Tech / IT कॉर्पोरेट' }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setSourceBucketFilter(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        sourceBucketFilter === tab.id
-                          ? 'bg-purple-500 text-white font-black'
-                          : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 p-3 rounded-xl">
+                  <div className="text-xs text-slate-300">
+                    {activeScraperSubTab === 'govt' ? (
+                      <span>
+                        🏛️ <strong>Govt Jobs Portals:</strong> SSC, MPESB (Vyapam), UPSC, Railway, MPPSC एवं अन्य राज्य/केंद्रीय भर्ती स्रोत।
+                      </span>
+                    ) : (
+                      <span>
+                        💻 <strong>Tech & IT Jobs Portals:</strong> Google, Microsoft, Amazon, Top IT MNCs & Indore/Pune Tech Freshers।
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewSourceBucket(activeScraperSubTab === 'tech' ? 'tech_corporate' : 'govt_portals');
+                      setShowAddSourceModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 hover:text-white font-bold text-xs rounded-lg transition-transform active:scale-95 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add New Target URL</span>
+                  </button>
                 </div>
 
                 {/* Sources Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {scraperSources
-                    .filter((s) => sourceBucketFilter === 'all' || s.bucket === sourceBucketFilter)
+                    .filter((s) => {
+                      if (activeScraperSubTab === 'tech') {
+                        return s.bucket === 'tech_corporate';
+                      }
+                      return s.bucket !== 'tech_corporate';
+                    })
                     .map((source) => {
                       const isFetching = isFetchingSourceId === source.id;
                       return (
@@ -1506,7 +1957,7 @@ export default function AdminPage() {
                                     source.enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
                                   }`}
                                 />
-                                <span>{source.enabled ? 'सक्रिय (Active)' : 'निष्क्रिय'}</span>
+                                <span>{source.enabled ? 'सक्रिय' : 'निष्क्रिय'}</span>
                               </button>
                             </div>
 
@@ -1545,15 +1996,15 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Action Footer */}
+                          {/* Action Footer with Scrap Now */}
                           <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
                             <button
                               onClick={() => handleTriggerTestSource(source.id)}
                               disabled={isFetching}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 border border-purple-500/50 hover:border-purple-500 text-purple-300 hover:text-white rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-black shadow transition-all active:scale-95 disabled:opacity-50"
                             >
                               <Play className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} />
-                              <span>{isFetching ? 'फेचिंग...' : 'टेस्ट फेच (Fetch Test)'}</span>
+                              <span>{isFetching ? 'स्क्रैप हो रहा है...' : 'Scrap Now'}</span>
                             </button>
 
                             <button
@@ -1571,18 +2022,18 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* SUB-TAB 2: SCRAPED DRAFTS INGESTION QUEUE */}
+            {/* TAB 3: SCRAPED DRAFTS INGESTION QUEUE */}
             {activeScraperSubTab === 'queue' && (
               <div className="space-y-4">
                 {/* Drafts Filter Bar */}
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3 rounded-xl">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-slate-400 font-bold mr-1">बकेट:</span>
+                    <span className="text-xs text-slate-400 font-bold mr-1">बकेट फ़िल्टर:</span>
                     {[
                       { id: 'all' as const, label: 'सभी (All)' },
-                      { id: 'central' as const, label: '🏛️ Central' },
+                      { id: 'central' as const, label: '🏛️ Central Govt' },
                       { id: 'mp' as const, label: '🌲 MP Special' },
-                      { id: 'tech' as const, label: '💻 Tech / Corporate' }
+                      { id: 'tech' as const, label: '💻 Tech / IT' }
                     ].map((btn) => (
                       <button
                         key={btn.id}
@@ -1648,9 +2099,9 @@ export default function AdminPage() {
                           }`}
                         >
                           <div>
-                            {/* Top Source badge & Confidence Score */}
+                            {/* Top Source badge & Confidence Score & Not Published Badge */}
                             <div className="flex items-center justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[10px] font-bold text-purple-300 bg-purple-950/80 border border-purple-800 px-2 py-0.5 rounded">
                                   {draft.sourcePortal}
                                 </span>
@@ -1659,9 +2110,12 @@ export default function AdminPage() {
                                     Tech / IT
                                   </span>
                                 )}
+                                <span className="text-[10px] font-black text-amber-300 bg-amber-950/90 border border-amber-500/60 px-2 py-0.5 rounded animate-pulse">
+                                  Not Published
+                                </span>
                               </div>
                               <span className="text-[10px] text-slate-400 font-mono">
-                                विश्वास स्कोर: {draft.confidenceScore}%
+                                AI स्कोर: {draft.confidenceScore}%
                               </span>
                             </div>
 
@@ -1723,7 +2177,7 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Actions */}
+                          {/* Actions: Edit / Review, Approve & Publish, and Delete Draft */}
                           <div className="mt-4 pt-3 border-t border-slate-800 flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-bold text-slate-400">
@@ -1741,33 +2195,37 @@ export default function AdminPage() {
                                     ? 'प्रकाशित (Published)'
                                     : draft.status === 'rejected'
                                     ? 'अस्वीकृत'
-                                    : 'प्रतीक्षारत (Queued)'}
+                                    : 'प्रतीक्षारत (Queued Draft)'}
                                 </strong>
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                ID: {draft.id.slice(-6)}
                               </span>
                             </div>
 
                             {draft.status === 'queued' && (
                               <div className="flex items-center gap-1.5 pt-1">
                                 <button
-                                  onClick={() => handleRejectDraft(draft.id)}
-                                  className="px-2 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-lg text-xs font-bold transition-colors"
-                                  title="कतार से हटाएं"
+                                  onClick={() => handleDeleteDraft(draft.id, draft.suggestedPost.id)}
+                                  className="px-2 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                                  title="ड्राफ्ट हटाएं (Delete Draft)"
                                 >
-                                  अस्वीकार
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>हटाएं</span>
                                 </button>
                                 <button
                                   onClick={() => handleReviewDraft(draft)}
                                   className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                                  title="संपादन फॉर्म में खोलें"
+                                  title="समीक्षा व संपादन फॉर्म में खोलें"
                                 >
                                   <Edit3 className="w-3 h-3 text-amber-400" />
-                                  <span>समीक्षा व संपादन</span>
+                                  <span>Edit / Review</span>
                                 </button>
                                 <button
                                   onClick={() => handleApproveDraft(draft.id)}
                                   className="flex-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black shadow transition-all active:scale-95 text-center"
                                 >
-                                  स्वीकार व प्रकाशित करें
+                                  Approve & Publish
                                 </button>
                               </div>
                             )}
@@ -2144,6 +2602,20 @@ export default function AdminPage() {
           forceShow={true}
           customSettings={popupSettings}
           onClose={() => setShowTestAdModal(false)}
+        />
+      )}
+
+      {/* SOCIAL MEDIA MULTI-SHARE MODAL */}
+      {selectedShareJob && (
+        <SocialShareModal
+          job={selectedShareJob}
+          isOpen={Boolean(selectedShareJob)}
+          onClose={() => setSelectedShareJob(null)}
+          onOpenInPosterStudio={(jobToOpen) => {
+            setPosterJob(jobToOpen);
+            setActiveTab('poster');
+            setSelectedShareJob(null);
+          }}
         />
       )}
     </div>

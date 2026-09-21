@@ -7,14 +7,75 @@ import { CompactCategoryView, CategorySlug } from '../../../components/CompactCa
 import { DetailModal } from '../../../components/DetailModal';
 import { Footer } from '../../../components/Footer';
 import { FloatingMobileBar } from '../../../components/FloatingMobileBar';
-import {
-  LATEST_JOBS_DATA,
-  ADMIT_CARD_DATA,
-  RESULTS_DATA
-} from '../../../data/portalData';
-import { JobItem, AdmitCardItem, ResultItem } from '../../../types';
-import { getJobs } from '../../../lib/firebase';
+import { JobItem, AdmitCardItem, ResultItem, PostRecord } from '../../../types';
+import { subscribeToPosts } from '../../../lib/firebase';
+import { getInitialSeedPosts } from '../../../lib/seedDatabase';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
+
+function mapPostToJob(p: PostRecord): JobItem {
+  return {
+    id: p.id,
+    slug: p.slug || p.id,
+    year: p.year,
+    month: p.month,
+    blogNo: p.blogNo,
+    title: p.title,
+    department: p.dept,
+    totalPosts: String(p.totalPosts || 'विज्ञप्ति अनुसार'),
+    lastDate: p.dates?.end || p.lastDate || 'विज्ञप्ति देखें',
+    state: p.state || (p.categories?.includes('mp_special') ? 'MP' : 'Central'),
+    qualification: p.qualification || p.eligibility || '10वीं / 12वीं / स्नातक',
+    category: (p.isTechJob || p.categories?.includes('tech'))
+      ? 'Tech/IT'
+      : p.categories?.includes('police')
+      ? 'Police'
+      : p.categories?.includes('railway')
+      ? 'Railway'
+      : p.categories?.includes('banking')
+      ? 'Banking'
+      : p.categories?.includes('teaching')
+      ? 'Teaching'
+      : p.categories?.includes('central')
+      ? 'SSC/UPSC'
+      : 'Other',
+    fee: `सामान्य: ${p.fee?.gen || '₹500'} | आरक्षित: ${p.fee?.reserved || '₹250'}`,
+    isNew: true,
+    applyUrl: p.links?.apply,
+    notificationUrl: p.links?.notificationPdf,
+    isTechJob: p.isTechJob || p.categories?.includes('tech'),
+    companyName: p.companyName,
+    role: p.role,
+    experience: p.experience,
+    location: p.location,
+    batchEligibility: p.batchEligibility
+  };
+}
+
+function mapPostToAdmitCard(p: PostRecord): AdmitCardItem {
+  return {
+    id: p.id,
+    title: p.title,
+    department: p.dept,
+    examDate: p.dates?.exam || 'शीघ्र घोषित',
+    releaseDate: p.dates?.start || p.publishedAt || 'जारी',
+    hallTicketStatus: 'Live Now',
+    isNew: true,
+    downloadUrl: p.links?.apply || p.links?.notificationPdf
+  };
+}
+
+function mapPostToResult(p: PostRecord): ResultItem {
+  return {
+    id: p.id,
+    title: p.title,
+    department: p.dept,
+    resultDate: p.publishedAt || p.dates?.start || 'जारी',
+    type: p.title.toLowerCase().includes('answer key') ? 'Answer Key' : 'Final Result',
+    isNew: true,
+    status: 'Declared',
+    resultUrl: p.links?.apply || p.links?.notificationPdf
+  };
+}
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -68,59 +129,48 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       : 'All Updates'
   );
 
-  const [liveJobs, setLiveJobs] = useState<JobItem[]>(LATEST_JOBS_DATA);
+  const initialPosts = getInitialSeedPosts();
+  const [liveJobs, setLiveJobs] = useState<JobItem[]>(() =>
+    initialPosts.map(mapPostToJob)
+  );
+
+  const [liveAdmitCards, setLiveAdmitCards] = useState<AdmitCardItem[]>(() =>
+    initialPosts
+      .filter((p) => p.category === 'admit-card' || p.categories?.includes('admit-card') || p.title.toLowerCase().includes('admit'))
+      .map(mapPostToAdmitCard)
+  );
+
+  const [liveResults, setLiveResults] = useState<ResultItem[]>(() =>
+    initialPosts
+      .filter((p) => p.category === 'results' || p.categories?.includes('result') || p.title.toLowerCase().includes('result') || p.title.toLowerCase().includes('answer key'))
+      .map(mapPostToResult)
+  );
 
   // Detail Modal state
   const [selectedItem, setSelectedItem] = useState<JobItem | AdmitCardItem | ResultItem | null>(null);
   const [selectedItemType, setSelectedItemType] = useState<'job' | 'admit' | 'result' | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    getJobs().then((fetched) => {
-      if (!isMounted || !fetched || fetched.length === 0) return;
-      const mapped: JobItem[] = fetched
-        .filter((p) => p.status === 'published')
-        .map((p) => ({
-          id: p.id,
-          slug: p.id,
-          title: p.title,
-          department: p.dept,
-          totalPosts: String(p.totalPosts),
-          lastDate: p.dates?.end || 'विज्ञप्ति देखें',
-          state: p.state || (p.categories?.includes('mp_special') ? 'MP' : 'Central'),
-          qualification: p.eligibility,
-          category: (p.isTechJob || p.categories?.includes('tech'))
-            ? 'Tech/IT'
-            : p.categories?.includes('police')
-            ? 'Police'
-            : p.categories?.includes('railway')
-            ? 'Railway'
-            : p.categories?.includes('banking')
-            ? 'Banking'
-            : p.categories?.includes('teaching')
-            ? 'Teaching'
-            : p.categories?.includes('central')
-            ? 'SSC/UPSC'
-            : 'Other',
-          fee: `सामान्य: ${p.fee?.gen || '₹500'} | आरक्षित: ${p.fee?.reserved || '₹250'}`,
-          isNew: true,
-          applyUrl: p.links?.apply,
-          notificationUrl: p.links?.notificationPdf,
-          isTechJob: p.isTechJob || p.categories?.includes('tech'),
-          companyName: p.companyName,
-          role: p.role,
-          experience: p.experience,
-          location: p.location,
-          batchEligibility: p.batchEligibility
-        }));
+    const unsubscribe = subscribeToPosts((fetched) => {
+      if (!fetched || fetched.length === 0) return;
+      const published = fetched.filter((p) => p.status === 'published');
+      
+      const mapped = published.map(mapPostToJob);
+      if (mapped.length > 0) setLiveJobs(mapped);
 
-      const existingIds = new Set(mapped.map((m) => m.id));
-      const rest = LATEST_JOBS_DATA.filter((j) => !existingIds.has(j.id) && !existingIds.has(j.slug || ''));
-      setLiveJobs([...mapped, ...rest]);
-    });
+      const admits = published
+        .filter((p) => p.category === 'admit-card' || p.categories?.includes('admit-card') || p.title.toLowerCase().includes('admit'))
+        .map(mapPostToAdmitCard);
+      if (admits.length > 0) setLiveAdmitCards(admits);
+
+      const results = published
+        .filter((p) => p.category === 'results' || p.categories?.includes('result') || p.title.toLowerCase().includes('result') || p.title.toLowerCase().includes('answer key'))
+        .map(mapPostToResult);
+      if (results.length > 0) setLiveResults(results);
+    }, 'all');
 
     return () => {
-      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -174,8 +224,8 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         <CompactCategoryView
           initialCategory={currentCategorySlug}
           jobs={liveJobs}
-          admitCards={ADMIT_CARD_DATA}
-          results={RESULTS_DATA}
+          admitCards={liveAdmitCards}
+          results={liveResults}
           onSelectJob={handleSelectJob}
           onSelectAdmit={handleSelectAdmit}
           onSelectResult={handleSelectResult}

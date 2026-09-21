@@ -1,6 +1,6 @@
 {
   "name": "NP Job Portal",
-  "description": "Government recruitment portal by NP ONLINE for latest MP and Central Government jobs, admit cards, results, and online form filling service by Nitish Khobragade.",
+  "description": "NP Job Portal - Latest MP and Central Government jobs, admit cards, results, and online form filling service by Nitish Khobragade (8982324497). घर बैठे सुरक्षित फॉर्म भरवाएं.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

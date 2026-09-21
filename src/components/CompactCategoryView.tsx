@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
+import { getPostUrl } from '../lib/postRouting';
 
 export type CategorySlug =
   | 'latest-jobs'
@@ -253,7 +254,7 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
               {filteredJobs.length + filteredAdmitCards.length + filteredResults.length} रिक्तियां
             </span>
             <span className="hidden sm:inline-block text-[11px] text-white/80">
-              • NP ONLINE Nitish Khobragade
+              • Nitish Khobragade (8982324497)
             </span>
           </div>
         </div>
@@ -322,7 +323,7 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
 
                     {/* Full Page Link */}
                     <Link
-                      href={`/jobs/${job.slug || job.id}`}
+                      href={getPostUrl(job)}
                       className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black rounded shadow-2xs transition-colors shrink-0"
                     >
                       Apply / पोस्टर
@@ -489,7 +490,7 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
                           विवरण
                         </button>
                         <Link
-                          href={`/jobs/${job.slug || job.id}`}
+                          href={getPostUrl(job)}
                           className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] rounded shadow-2xs"
                         >
                           Apply
@@ -584,10 +585,10 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
           <div>
             <div className="text-xs font-black text-amber-300 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>घर बैठे सुरक्षित फॉर्म भरने हेतु संपर्क करें:</span>
+              <span>घर बैठे सुरक्षित फॉर्म भरवाएं:</span>
             </div>
             <p className="text-xs text-slate-300 font-medium mt-0.5">
-              {OWNER_INFO.name} • 8982324497 (MP Online Kiosk अधिकृत सेवा)
+              {OWNER_INFO.name} • 8982324497 (100% सही व सुरक्षित सेवा)
             </p>
           </div>
         </div>

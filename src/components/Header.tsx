@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   Phone,
   MessageCircle,
@@ -17,20 +18,78 @@ import {
 import { OWNER_INFO } from '../data/portalData';
 
 interface HeaderProps {
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  selectedCategory: string;
-  setSelectedCategory: (cat: string) => void;
+  searchQuery?: string;
+  setSearchQuery?: (query: string) => void;
+  selectedCategory?: string;
+  setSelectedCategory?: (cat: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  searchQuery,
+const HeaderInner: React.FC<HeaderProps> = ({
+  searchQuery = '',
   setSearchQuery,
-  selectedCategory,
+  selectedCategory = 'All Updates',
   setSelectedCategory
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
+
+  const pathname = usePathname() || '/';
+  const searchParams = useSearchParams();
+  const categoryParam = (searchParams?.get('category') || '').toLowerCase();
+
+  // Dynamic Navigation Highlight Calculation
+  const getActiveTab = (): 'home' | 'latest-jobs' | 'admit-card' | 'results' | 'mp-special' | 'tech-jobs' | 'central-ssc' => {
+    // 1. URL Pathname takes primary precedence
+    if (pathname.includes('/category/results') || categoryParam === 'results' || categoryParam === 'result') {
+      return 'results';
+    }
+    if (pathname.includes('/category/admit-card') || categoryParam === 'admit-card' || categoryParam === 'admit') {
+      return 'admit-card';
+    }
+    if (pathname.includes('/category/latest-jobs') || categoryParam === 'latest-jobs' || categoryParam === 'latest') {
+      return 'latest-jobs';
+    }
+    if (pathname.includes('/category/mp-special') || categoryParam === 'mp-special' || categoryParam === 'mp') {
+      return 'mp-special';
+    }
+    if (pathname.includes('/category/tech-jobs') || categoryParam === 'tech-jobs' || categoryParam === 'tech') {
+      return 'tech-jobs';
+    }
+    if (
+      pathname.includes('/category/ssc-upsc') ||
+      pathname.includes('/category/police') ||
+      pathname.includes('/category/railway') ||
+      categoryParam === 'ssc' ||
+      categoryParam === 'ssc-upsc' ||
+      categoryParam === 'central'
+    ) {
+      return 'central-ssc';
+    }
+
+    // 2. On Home page (/), check selectedCategory state
+    if (pathname === '/') {
+      if (selectedCategory === 'Results') return 'results';
+      if (selectedCategory === 'Admit Card') return 'admit-card';
+      if (selectedCategory === 'Latest Jobs') return 'latest-jobs';
+      if (selectedCategory === 'MP Special') return 'mp-special';
+      if (selectedCategory === 'Tech Jobs') return 'tech-jobs';
+      if (selectedCategory === 'SSC/UPSC' || selectedCategory === 'Police' || selectedCategory === 'Railway') {
+        return 'central-ssc';
+      }
+      return 'home';
+    }
+
+    return 'home';
+  };
+
+  const activeTab = getActiveTab();
+
+  const handleHomeClick = () => {
+    if (setSelectedCategory) {
+      setSelectedCategory('All Updates');
+    }
+    setMobileMenuOpen(false);
+  };
 
   const categories = [
     'All Updates',
@@ -45,8 +104,10 @@ export const Header: React.FC<HeaderProps> = ({
     'Health'
   ];
 
-  const handleCategoryClick = (cat: string) => {
-    setSelectedCategory(cat);
+  const handleCategoryPillClick = (cat: string) => {
+    if (setSelectedCategory) {
+      setSelectedCategory(cat);
+    }
     setMobileMenuOpen(false);
   };
 
@@ -56,19 +117,19 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600"></div>
 
       {/* Main Brand & Contact Bar */}
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="max-w-7xl mx-auto px-4 py-2.5">
         <div className="flex items-center justify-between gap-3">
           
-          {/* Logo & Portal Identity */}
-          <Link href="/" className="flex items-center gap-3 shrink-0">
-            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-rose-900 text-white flex flex-col items-center justify-center font-black shadow-md border border-red-500/30 shrink-0">
-              <span className="text-xl sm:text-2xl leading-none tracking-tight">NP</span>
-              <span className="text-[8px] sm:text-[9px] uppercase tracking-wider font-semibold text-amber-300">ONLINE</span>
+          {/* Logo & Portal Identity - Clicking Logo routes to / and immediately resets to HOME */}
+          <Link href="/" onClick={handleHomeClick} className="flex items-center gap-2.5 sm:gap-3 shrink-0 cursor-pointer group">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-rose-900 text-white flex flex-col items-center justify-center font-black shadow-md border border-red-500/30 shrink-0 group-hover:scale-102 transition-transform">
+              <span className="text-lg sm:text-2xl leading-none tracking-tight">NP</span>
+              <span className="text-[7.5px] sm:text-[9px] uppercase tracking-wider font-semibold text-amber-300">PORTAL</span>
             </div>
 
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight leading-none">
+                <span className="text-lg sm:text-2xl font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-red-700 transition-colors">
                   NP <span className="text-red-600">Job Portal</span>
                 </span>
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
@@ -77,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-neutral-600 font-medium line-clamp-1 mt-0.5">
-                सरकारी भर्ती, एडमिट कार्ड, रिजल्ट एवं ऑनलाइन फॉर्म सेवा
+                घर बैठे सुरक्षित फॉर्म भरवाएं • Nitish Khobragade (8982324497)
               </p>
             </div>
           </Link>
@@ -93,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({
               href={OWNER_INFO.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
             >
               <MessageCircle className="w-4 h-4 fill-white" />
               <span>WhatsApp: 8982324497</span>
@@ -101,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <a
               href={OWNER_INFO.callUrl}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
             >
               <Phone className="w-4 h-4" />
               <span>कॉल</span>
@@ -122,7 +183,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 transition-colors"
+              className="p-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 transition-colors cursor-pointer"
               aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -134,13 +195,15 @@ export const Header: React.FC<HeaderProps> = ({
       {/* CLASSIC BLACK/DARK-SLATE NAVIGATION BAR */}
       <nav className="bg-slate-950 text-white border-y border-slate-800 shadow-inner">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
-          {/* Desktop Menu Links */}
+          {/* Desktop Menu Links with Dynamic Route Synchronization */}
           <div className="hidden md:flex items-center text-xs font-bold tracking-wide">
             <Link
               href="/"
-              onClick={() => setSelectedCategory('All Updates')}
-              className={`px-4 py-3 hover:bg-red-700 transition-colors uppercase flex items-center gap-1.5 ${
-                selectedCategory === 'All Updates' ? 'bg-red-700 text-white' : 'text-slate-200'
+              onClick={handleHomeClick}
+              className={`px-4 py-3 transition-colors uppercase flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'home'
+                  ? 'bg-red-700 text-white shadow-sm'
+                  : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
               }`}
             >
               होम (Home)
@@ -148,29 +211,55 @@ export const Header: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/latest-jobs"
-              className="px-3.5 py-3 hover:bg-red-700 text-slate-200 hover:text-white transition-colors uppercase"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Latest Jobs');
+              }}
+              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+                activeTab === 'latest-jobs'
+                  ? 'bg-red-700 text-white shadow-sm'
+                  : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
+              }`}
             >
               Latest Jobs
             </Link>
 
             <Link
               href="/category/admit-card"
-              className="px-3.5 py-3 hover:bg-red-700 text-slate-200 hover:text-white transition-colors uppercase"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Admit Card');
+              }}
+              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+                activeTab === 'admit-card'
+                  ? 'bg-red-700 text-white shadow-sm'
+                  : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
+              }`}
             >
               Admit Card
             </Link>
 
             <Link
               href="/category/results"
-              className="px-3.5 py-3 hover:bg-red-700 text-slate-200 hover:text-white transition-colors uppercase"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Results');
+              }}
+              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+                activeTab === 'results'
+                  ? 'bg-red-700 text-white shadow-sm'
+                  : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
+              }`}
             >
               Results
             </Link>
 
             <Link
               href="/category/mp-special"
-              className={`px-3.5 py-3 hover:bg-amber-600 hover:text-slate-950 transition-colors uppercase font-black flex items-center gap-1 ${
-                selectedCategory === 'MP Special' ? 'bg-amber-500 text-slate-950' : 'text-amber-400'
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('MP Special');
+              }}
+              className={`px-3.5 py-3 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
+                activeTab === 'mp-special'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-amber-400 hover:bg-amber-600 hover:text-slate-950'
               }`}
             >
               <span>★ MP Special</span>
@@ -178,24 +267,38 @@ export const Header: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/tech-jobs"
-              className="px-3.5 py-3 hover:bg-blue-600 text-blue-300 hover:text-white transition-colors uppercase font-bold flex items-center gap-1.5"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Tech Jobs');
+              }}
+              className={`px-3.5 py-3 transition-colors uppercase font-bold flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'tech-jobs'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-blue-300 hover:bg-blue-600 hover:text-white'
+              }`}
             >
               <span>Tech Jobs</span>
               <span className="bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">IT/MNC</span>
             </Link>
 
-            <button
-              onClick={() => handleCategoryClick('SSC/UPSC')}
-              className="px-3.5 py-3 hover:bg-red-700 text-slate-200 hover:text-white transition-colors uppercase"
+            <Link
+              href="/category/ssc-upsc"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('SSC/UPSC');
+              }}
+              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+                activeTab === 'central-ssc'
+                  ? 'bg-red-700 text-white shadow-sm'
+                  : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
+              }`}
             >
               Central / SSC
-            </button>
+            </Link>
 
             {/* More Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
-                className="px-4 py-3 hover:bg-slate-800 text-slate-200 flex items-center gap-1 transition-colors uppercase"
+                className="px-4 py-3 hover:bg-slate-800 text-slate-200 flex items-center gap-1 transition-colors uppercase cursor-pointer"
               >
                 <span>More</span>
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -203,17 +306,22 @@ export const Header: React.FC<HeaderProps> = ({
 
               {moreDropdownOpen && (
                 <div
-                  className="absolute left-0 top-full mt-0.5 w-52 bg-slate-900 border border-slate-700 rounded-b-xl shadow-2xl z-50 py-2 text-xs"
+                  className="absolute left-0 top-full mt-0.5 w-56 bg-slate-900 border border-slate-700 rounded-b-xl shadow-2xl z-50 py-2 text-xs"
                   onMouseLeave={() => setMoreDropdownOpen(false)}
                 >
-                  <a
-                    href="#kiosk-services"
-                    onClick={() => setMoreDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreDropdownOpen(false);
+                      if (typeof window !== 'undefined') {
+                        document.getElementById('footer-services')?.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="w-full text-left flex items-center gap-2 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white cursor-pointer"
                   >
                     <Award className="w-4 h-4 text-emerald-400" />
-                    <span>कियोस्क सेवाएं (About Us)</span>
-                  </a>
+                    <span>ऑनलाइन फॉर्म सेवाएं (About Us)</span>
+                  </button>
 
                   <a
                     href={OWNER_INFO.whatsappUrl}
@@ -227,7 +335,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </a>
 
                   <Link
-                    href="/jobs/mp-police-constable-2026"
+                    href="/2026/09/02/mp-police-constable-2026"
                     onClick={() => setMoreDropdownOpen(false)}
                     className="flex items-center gap-2 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white"
                   >
@@ -235,14 +343,19 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>सिलेबस व नियम पुस्तिका</span>
                   </Link>
 
-                  <a
-                    href="#footer-disclaimer"
-                    onClick={() => setMoreDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-slate-300 hover:bg-red-700 hover:text-white"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreDropdownOpen(false);
+                      if (typeof window !== 'undefined') {
+                        document.getElementById('footer-disclaimer')?.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="w-full text-left flex items-center gap-2 px-4 py-2 text-slate-300 hover:bg-red-700 hover:text-white cursor-pointer"
                   >
                     <FileText className="w-4 h-4 text-slate-400" />
                     <span>डिस्क्लेमर (Disclaimer)</span>
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
@@ -255,14 +368,14 @@ export const Header: React.FC<HeaderProps> = ({
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery?.(e.target.value)}
                 placeholder="सर्च करें: MP Police, SSC, Admit Card..."
                 className="w-full pl-8 pr-7 py-1 text-xs bg-slate-900 border border-slate-700 rounded-md text-white placeholder:text-slate-400 focus:outline-hidden focus:border-red-500 focus:ring-1 focus:ring-red-500"
               />
-              {searchQuery && (
+              {searchQuery && setSearchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white cursor-pointer"
                 >
                   ✕
                 </button>
@@ -283,8 +396,8 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all ${
+                onClick={() => handleCategoryPillClick(cat)}
+                className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-red-700 text-white shadow-2xs'
                     : 'bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-300'
@@ -303,66 +416,96 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex flex-col space-y-2 text-sm font-bold">
             <Link
               href="/"
-              onClick={() => {
-                setSelectedCategory('All Updates');
-                setMobileMenuOpen(false);
-              }}
-              className="px-3 py-2 rounded-lg bg-red-700 text-white flex items-center justify-between"
+              onClick={handleHomeClick}
+              className={`px-3 py-2 rounded-lg flex items-center justify-between cursor-pointer ${
+                activeTab === 'home' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
+              }`}
             >
               <span>मुख्य पृष्ठ (Home)</span>
-              <span className="text-xs bg-red-800 px-2 py-0.5 rounded">All</span>
+              <span className="text-xs bg-red-850 px-2 py-0.5 rounded">All</span>
             </Link>
 
-            <button
-              onClick={() => handleCategoryClick('MP Special')}
-              className="text-left px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black flex items-center justify-between"
+            <Link
+              href="/category/latest-jobs"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Latest Jobs');
+                setMobileMenuOpen(false);
+              }}
+              className={`px-3 py-2 rounded-lg flex items-center justify-between cursor-pointer ${
+                activeTab === 'latest-jobs' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
+              }`}
+            >
+              <span>लेटेस्ट सरकारी नौकरियां (Latest Jobs)</span>
+              <span className="text-xs bg-slate-800 px-2 py-0.5 rounded">New</span>
+            </Link>
+
+            <Link
+              href="/category/mp-special"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('MP Special');
+                setMobileMenuOpen(false);
+              }}
+              className={`text-left px-3 py-2 rounded-lg border font-black flex items-center justify-between cursor-pointer ${
+                activeTab === 'mp-special'
+                  ? 'bg-amber-500 text-slate-950 border-amber-400'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+              }`}
             >
               <span>★ मध्य प्रदेश स्पेशल (MP Special)</span>
               <span className="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded font-black">Top</span>
-            </button>
+            </Link>
 
             <Link
               href="/category/tech-jobs"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-left px-3 py-2 rounded-lg bg-blue-900/30 text-blue-300 border border-blue-500/40 font-bold flex items-center justify-between"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Tech Jobs');
+                setMobileMenuOpen(false);
+              }}
+              className={`text-left px-3 py-2 rounded-lg border font-bold flex items-center justify-between cursor-pointer ${
+                activeTab === 'tech-jobs'
+                  ? 'bg-blue-600 text-white border-blue-500'
+                  : 'bg-blue-900/30 text-blue-300 border-blue-500/40 hover:bg-blue-900/50'
+              }`}
             >
               <span>💻 Tech & Corporate Jobs (IT / MNC)</span>
               <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded font-black">MNC</span>
             </Link>
 
-            <button
-              onClick={() => handleCategoryClick('Police')}
-              className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200"
+            <Link
+              href="/category/ssc-upsc"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('SSC/UPSC');
+                setMobileMenuOpen(false);
+              }}
+              className={`text-left px-3 py-2 rounded-lg cursor-pointer ${
+                activeTab === 'central-ssc' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
+              }`}
             >
-              Police Recruitment (MP Police & Central)
-            </button>
-
-            <button
-              onClick={() => handleCategoryClick('SSC/UPSC')}
-              className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200"
-            >
-              SSC & Central Govt Jobs
-            </button>
-
-            <button
-              onClick={() => handleCategoryClick('Railway')}
-              className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200"
-            >
-              Railway RRC / RRB Jobs
-            </button>
+              Central & SSC Govt Jobs
+            </Link>
 
             <Link
               href="/category/admit-card"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Admit Card');
+                setMobileMenuOpen(false);
+              }}
+              className={`px-3 py-2 rounded-lg cursor-pointer ${
+                activeTab === 'admit-card' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
+              }`}
             >
               एडमिट कार्ड (Admit Card)
             </Link>
 
             <Link
               href="/category/results"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200"
+              onClick={() => {
+                if (setSelectedCategory) setSelectedCategory('Results');
+                setMobileMenuOpen(false);
+              }}
+              className={`px-3 py-2 rounded-lg cursor-pointer ${
+                activeTab === 'results' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
+              }`}
             >
               रिजल्ट एवं उत्तर कुंजी (Results)
             </Link>
@@ -372,7 +515,7 @@ export const Header: React.FC<HeaderProps> = ({
                 href={OWNER_INFO.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-black text-xs"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-black text-xs cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4 fill-white" />
                 <span>WhatsApp: {OWNER_INFO.phone}</span>
@@ -382,5 +525,23 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
     </header>
+  );
+};
+
+export const Header: React.FC<HeaderProps> = (props) => {
+  return (
+    <Suspense fallback={
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-40 h-24">
+        <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600"></div>
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-red-700 text-white flex items-center justify-center font-black">NP</div>
+            <span className="text-xl font-bold text-neutral-900">NP <span className="text-red-600">Job Portal</span></span>
+          </div>
+        </div>
+      </header>
+    }>
+      <HeaderInner {...props} />
+    </Suspense>
   );
 };
