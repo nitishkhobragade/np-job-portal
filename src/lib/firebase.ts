@@ -14,7 +14,8 @@ import {
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
-import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource } from '../types';
+import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, TickerAlert } from '../types';
+import { TICKER_ALERTS } from '../data/portalData';
 import { getNextBlogNumber, formatDateToDDMMYYYY } from './postRouting';
 import { getInitialSeedPosts, seedPostsIfEmpty } from './seedDatabase';
 
@@ -574,6 +575,105 @@ export async function savePopupAdSettings(settings: PopupAdSettings): Promise<bo
   }
 
   return true;
+}
+
+/**
+ * TICKER / BREAKING NEWS CONTROLLER
+ * Supports real-time Firestore synchronization and local fallback
+ */
+const STORAGE_TICKER_KEY = 'np_portal_ticker_alerts_v3';
+let memoryTickers: TickerAlert[] = TICKER_ALERTS.map((t) => ({ ...t, active: t.active !== false }));
+
+export async function getTickers(): Promise<TickerAlert[]> {
+  if (isFirebaseProperlyConfigured) {
+    try {
+      const docRef = doc(db, 'settings', 'ticker_news');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data?.items && Array.isArray(data.items)) {
+          memoryTickers = data.items;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_TICKER_KEY, JSON.stringify(data.items));
+          }
+          return data.items;
+        }
+      }
+    } catch (err) {
+      console.warn('Firestore getTickers failed:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(STORAGE_TICKER_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return memoryTickers;
+}
+
+export async function saveTickers(items: TickerAlert[]): Promise<boolean> {
+  memoryTickers = items;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_TICKER_KEY, JSON.stringify(items));
+    } catch (e) {
+      console.warn('LocalStorage ticker save error:', e);
+    }
+  }
+
+  if (isFirebaseProperlyConfigured) {
+    try {
+      const docRef = doc(db, 'settings', 'ticker_news');
+      await setDoc(docRef, { items, updatedAt: Date.now() });
+      return true;
+    } catch (err) {
+      console.warn('Firestore saveTickers failed:', err);
+    }
+  }
+
+  return true;
+}
+
+export function subscribeToTickers(onUpdate: (tickers: TickerAlert[]) => void): () => void {
+  // Emit initial memory/cached tickers immediately
+  getTickers().then(onUpdate).catch(() => onUpdate(memoryTickers));
+
+  if (!isFirebaseProperlyConfigured) {
+    return () => {};
+  }
+
+  try {
+    const docRef = doc(db, 'settings', 'ticker_news');
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data?.items && Array.isArray(data.items)) {
+          memoryTickers = data.items;
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(STORAGE_TICKER_KEY, JSON.stringify(data.items));
+            } catch {}
+          }
+          onUpdate(data.items);
+        }
+      }
+    }, (err) => {
+      console.warn('subscribeToTickers warning:', err);
+    });
+
+    return unsubscribe;
+  } catch (err) {
+    console.warn('subscribeToTickers exception:', err);
+    return () => {};
+  }
 }
 
 // Initial Simulated Scraper Drafts

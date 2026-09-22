@@ -33,7 +33,7 @@ import {
   Calendar,
   CheckCircle2
 } from 'lucide-react';
-import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket } from '../../types';
+import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket, TickerAlert } from '../../types';
 import {
   getJobs,
   addJob,
@@ -50,7 +50,10 @@ import {
   addScraperSource,
   toggleScraperSource,
   deleteScraperSource,
-  triggerSourceTestFetch
+  triggerSourceTestFetch,
+  getTickers,
+  saveTickers,
+  subscribeToTickers
 } from '../../lib/firebase';
 import { seedPostsIfEmpty } from '../../lib/seedDatabase';
 import { PosterStudio } from '../../components/PosterStudio';
@@ -142,8 +145,8 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup'
-  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup'>('posts');
+  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker'
+  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker'>('posts');
 
   // Posts State
   const [posts, setPosts] = useState<PostRecord[]>([]);
@@ -168,6 +171,10 @@ export default function AdminPage() {
   const [formAdmitCardDate, setFormAdmitCardDate] = useState<string>('परीक्षा से 7 दिन पूर्व');
   const [formFeeGen, setFormFeeGen] = useState<string>('₹500/-');
   const [formFeeRes, setFormFeeRes] = useState<string>('₹250/-');
+  const [formFeeOBC, setFormFeeOBC] = useState<string>('₹500/-');
+  const [formFeeSCST, setFormFeeSCST] = useState<string>('₹250/-');
+  const [formFeeEWS, setFormFeeEWS] = useState<string>('₹500/-');
+  const [formShowEWS, setFormShowEWS] = useState<boolean>(true);
   const [formFeePortal, setFormFeePortal] = useState<string>('₹50/-');
   const [formPaymentMode, setFormPaymentMode] = useState<string>('Online Net Banking, Debit/Credit Card, UPI');
   const [formMinAge, setFormMinAge] = useState<string>('18 वर्ष');
@@ -248,19 +255,29 @@ export default function AdminPage() {
   const [isSavingPopup, setIsSavingPopup] = useState<boolean>(false);
   const [showTestAdModal, setShowTestAdModal] = useState<boolean>(false);
 
+  // Live Running Ticker Controller State
+  const [tickersList, setTickersList] = useState<TickerAlert[]>([]);
+  const [isSavingTickers, setIsSavingTickers] = useState<boolean>(false);
+  const [newTickerText, setNewTickerText] = useState<string>('');
+  const [newTickerLink, setNewTickerLink] = useState<string>('');
+  const [newTickerDate, setNewTickerDate] = useState<string>('');
+  const [newTickerIsBreaking, setNewTickerIsBreaking] = useState<boolean>(false);
+
   const refreshData = async () => {
     setIsLoadingPosts(true);
     try {
-      const [fetchedPosts, adSettings, drafts, sources] = await Promise.all([
+      const [fetchedPosts, adSettings, drafts, sources, fetchedTickers] = await Promise.all([
         getJobs(),
         getPopupAdSettings(),
         getScrapedDrafts(),
-        getScraperSources()
+        getScraperSources(),
+        getTickers()
       ]);
       setPosts(fetchedPosts);
       if (adSettings) setPopupSettings(adSettings);
       if (drafts) setScrapedDrafts(drafts);
       if (sources) setScraperSources(sources);
+      if (fetchedTickers) setTickersList(fetchedTickers);
       if (!posterJob && fetchedPosts.length > 0) {
         setPosterJob(fetchedPosts[0]);
       }
@@ -282,19 +299,28 @@ export default function AdminPage() {
       }
     }, 'all');
 
+    const unsubTickers = subscribeToTickers((updatedTickers) => {
+      if (updatedTickers && updatedTickers.length > 0) {
+        setTickersList(updatedTickers);
+      }
+    });
+
     // Also fetch auxiliary settings
     Promise.all([
       getPopupAdSettings(),
       getScrapedDrafts(),
-      getScraperSources()
-    ]).then(([adSettings, drafts, sources]) => {
+      getScraperSources(),
+      getTickers()
+    ]).then(([adSettings, drafts, sources, fetchedTickers]) => {
       if (adSettings) setPopupSettings(adSettings);
       if (drafts) setScrapedDrafts(drafts);
       if (sources) setScraperSources(sources);
+      if (fetchedTickers) setTickersList(fetchedTickers);
     }).catch((err) => console.warn('Aux data fetch error:', err));
 
     return () => {
       unsubscribe();
+      unsubTickers();
     };
   }, [isAuthenticated]);
 
@@ -521,6 +547,10 @@ export default function AdminPage() {
       },
       feeGeneral: formFeeGen,
       feeReserved: formFeeRes,
+      feeOBC: formFeeOBC,
+      feeSCST: formFeeSCST,
+      feeEWS: formFeeEWS,
+      showEWS: formShowEWS,
       feePortal: formFeePortal,
       paymentMode: formPaymentMode,
       minAge: formMinAge,
@@ -589,6 +619,10 @@ export default function AdminPage() {
     setFormAdmitCardDate('परीक्षा से 7 दिन पूर्व');
     setFormFeeGen('₹500/-');
     setFormFeeRes('₹250/-');
+    setFormFeeOBC('₹500/-');
+    setFormFeeSCST('₹250/-');
+    setFormFeeEWS('₹500/-');
+    setFormShowEWS(true);
     setFormFeePortal('₹50/-');
     setFormPaymentMode('Online Net Banking, Debit/Credit Card, UPI');
     setFormMinAge('18 वर्ष');
@@ -630,6 +664,10 @@ export default function AdminPage() {
     setFormAdmitCardDate(p.admitCardDate || 'परीक्षा से 7 दिन पूर्व');
     setFormFeeGen(p.feeGeneral || p.fee?.gen || '₹500/-');
     setFormFeeRes(p.feeReserved || p.fee?.reserved || '₹250/-');
+    setFormFeeOBC(p.feeOBC || p.feeReserved || p.fee?.reserved || '₹500/-');
+    setFormFeeSCST(p.feeSCST || p.feeReserved || p.fee?.reserved || '₹250/-');
+    setFormFeeEWS(p.feeEWS || p.feeGeneral || p.fee?.gen || '₹500/-');
+    setFormShowEWS(p.showEWS !== false);
     setFormFeePortal(p.feePortal || '₹50/-');
     setFormPaymentMode(p.paymentMode || 'Online Net Banking, Debit/Credit Card, UPI');
     setFormMinAge(p.minAge || '18 वर्ष');
@@ -1154,6 +1192,18 @@ export default function AdminPage() {
             <Megaphone className="w-4 h-4 text-rose-400" />
             <span>पॉप-अप विज्ञापन कैंपेन {popupSettings.enabled && '🟢'}</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('ticker')}
+            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+              activeTab === 'ticker'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Radio className="w-4 h-4 text-red-500 animate-pulse" />
+            <span>लाइव रनिंग टिकर कंट्रोल ({tickersList.filter(t => t.active !== false).length})</span>
+          </button>
         </div>
       </header>
 
@@ -1516,77 +1566,129 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Section: Application Fees & Reservation Switch */}
-                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    {/* Section: Application Fees & Reservation Switch */}
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
                       <span className="text-xs font-black text-emerald-400">
-                        आवेदन शुल्क विवरण (Application Fees Breakdown)
+                        आवेदन शुल्क विवरण (4-Tier Application Fees Breakdown)
                       </span>
-                      <label className="inline-flex items-center gap-2 cursor-pointer bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-emerald-500 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={formShowReservation}
-                          onChange={(e) => setFormShowReservation(e.target.checked)}
-                          className="w-3.5 h-3.5 accent-emerald-500 rounded"
-                        />
-                        <span className="text-[11px] font-bold text-slate-200">
-                          आरक्षण व श्रेणी-वार फीस दिखाएं (Show Reservation Section)
-                        </span>
-                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-emerald-500 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={formShowEWS}
+                            onChange={(e) => setFormShowEWS(e.target.checked)}
+                            className="w-3.5 h-3.5 accent-emerald-500 rounded"
+                          />
+                          <span className="text-[11px] font-bold text-emerald-300">
+                            EWS आरक्षण लागू करें (Show EWS)
+                          </span>
+                        </label>
+                        <label className="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-emerald-500 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={formShowReservation}
+                            onChange={(e) => setFormShowReservation(e.target.checked)}
+                            className="w-3.5 h-3.5 accent-emerald-500 rounded"
+                          />
+                          <span className="text-[11px] font-bold text-slate-200">
+                            श्रेणी-वार आरक्षण फीस
+                          </span>
+                        </label>
+                      </div>
                     </div>
 
                     {formShowReservation ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                        <div>
-                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
-                            सामान्य / OBC / EWS फीस:
-                          </label>
-                          <input
-                            type="text"
-                            value={formFeeGen}
-                            onChange={(e) => setFormFeeGen(e.target.value)}
-                            placeholder="उदा: ₹500/-"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
-                          />
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                          {/* 1. General (UR) */}
+                          <div>
+                            <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                              सामान्य वर्ग (UR / Other State):
+                            </label>
+                            <input
+                              type="text"
+                              value={formFeeGen}
+                              onChange={(e) => setFormFeeGen(e.target.value)}
+                              placeholder="उदा: ₹500/-"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                            />
+                          </div>
+
+                          {/* 2. OBC */}
+                          <div>
+                            <label className="block text-blue-300 font-bold text-[11px] mb-0.5">
+                              अन्य पिछड़ा वर्ग (OBC):
+                            </label>
+                            <input
+                              type="text"
+                              value={formFeeOBC}
+                              onChange={(e) => setFormFeeOBC(e.target.value)}
+                              placeholder="उदा: ₹500/- या ₹250/-"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-blue-400"
+                            />
+                          </div>
+
+                          {/* 3. SC / ST */}
+                          <div>
+                            <label className="block text-rose-300 font-bold text-[11px] mb-0.5">
+                              अ.जा. / अ.ज.जा. (SC / ST):
+                            </label>
+                            <input
+                              type="text"
+                              value={formFeeSCST}
+                              onChange={(e) => {
+                                setFormFeeSCST(e.target.value);
+                                setFormFeeRes(e.target.value);
+                              }}
+                              placeholder="उदा: ₹250/-"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-rose-400"
+                            />
+                          </div>
+
+                          {/* 4. EWS */}
+                          <div>
+                            <label className="block text-emerald-300 font-bold text-[11px] mb-0.5 flex items-center justify-between">
+                              <span>आर्थिक कमजोर (EWS):</span>
+                              <span className="text-[10px] text-slate-400">{formShowEWS ? 'सक्रिय' : 'बंद'}</span>
+                            </label>
+                            <input
+                              type="text"
+                              disabled={!formShowEWS}
+                              value={formFeeEWS}
+                              onChange={(e) => setFormFeeEWS(e.target.value)}
+                              placeholder="उदा: ₹500/-"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                            />
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
-                            आरक्षित (SC / ST / Divyang) फीस:
-                          </label>
-                          <input
-                            type="text"
-                            value={formFeeRes}
-                            onChange={(e) => setFormFeeRes(e.target.value)}
-                            placeholder="उदा: ₹250/- (SC/ST/महिला)"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
-                          />
-                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-800/60">
+                          <div>
+                            <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                              पोर्टल / कियोस्क शुल्क (Portal Charge):
+                            </label>
+                            <input
+                              type="text"
+                              value={formFeePortal}
+                              onChange={(e) => setFormFeePortal(e.target.value)}
+                              placeholder="उदा: ₹50/- MP Online / पोर्टल"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                            />
+                          </div>
 
-                        <div>
-                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
-                            पोर्टल / कियोस्क शुल्क (Portal Charge):
-                          </label>
-                          <input
-                            type="text"
-                            value={formFeePortal}
-                            onChange={(e) => setFormFeePortal(e.target.value)}
-                            placeholder="उदा: ₹50/- MP Online / पोर्टल"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
-                            भुगतान का माध्यम (Payment Mode):
-                          </label>
-                          <input
-                            type="text"
-                            value={formPaymentMode}
-                            onChange={(e) => setFormPaymentMode(e.target.value)}
-                            placeholder="उदा: Net Banking / Debit Card / UPI"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
-                          />
+                          <div>
+                            <label className="block text-slate-300 font-bold text-[11px] mb-0.5">
+                              भुगतान का माध्यम (Payment Mode):
+                            </label>
+                            <input
+                              type="text"
+                              value={formPaymentMode}
+                              onChange={(e) => setFormPaymentMode(e.target.value)}
+                              placeholder="उदा: Online Net Banking / Debit Card / UPI"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-emerald-400"
+                            />
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1600,6 +1702,9 @@ export default function AdminPage() {
                           onChange={(e) => {
                             setFormFeeGen(e.target.value);
                             setFormFeeRes(e.target.value);
+                            setFormFeeOBC(e.target.value);
+                            setFormFeeSCST(e.target.value);
+                            setFormFeeEWS(e.target.value);
                           }}
                           placeholder="उदा: ₹0/- (Free Registration)"
                           className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs"
@@ -3239,6 +3344,296 @@ export default function AdminPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: LIVE RUNNING TICKER CONTROLLER */}
+        {activeTab === 'ticker' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
+              <div>
+                <h2 className="text-lg font-black text-white flex items-center gap-2">
+                  <Radio className="w-5 h-5 text-red-500 animate-pulse" />
+                  लाइव रनिंग टिकर कंट्रोल (Live Running Ticker Manager)
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  होमपेज के शीर्ष पर स्क्रॉल होने वाले मुख्य ब्रेकिंग अलर्ट्स, नई भर्तियां और लिंक प्रबंधित करें
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSavingTickers}
+                onClick={async () => {
+                  setIsSavingTickers(true);
+                  try {
+                    const success = await saveTickers(tickersList);
+                    if (success) {
+                      showToast('टिकर अलर्ट्स सफलतापूर्वक क्लाउड पर सेव हो गए!');
+                    } else {
+                      showToast('टिकर अलर्ट्स स्थानीय रूप से सेव हुए।');
+                    }
+                  } catch (e) {
+                    console.error('Save tickers error:', e);
+                    showToast('टिकर सेव करने में त्रुटि हुई।');
+                  } finally {
+                    setIsSavingTickers(false);
+                  }
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black rounded-xl text-xs shadow-lg transition-all active:scale-98 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                <span>{isSavingTickers ? 'सहेजा जा रहा है...' : 'सभी टिकर बदलाव सुरक्षित करें'}</span>
+              </button>
+            </div>
+
+            {/* Live Ticker Preview */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
+              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5" />
+                लाइव टिकर पूर्वावलोकन (Preview):
+              </span>
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 text-xs text-white overflow-x-auto whitespace-nowrap flex items-center gap-4">
+                <span className="px-2 py-0.5 rounded bg-red-600 text-[10px] font-black tracking-wide text-white uppercase animate-pulse shrink-0">
+                  NEW UPDATE
+                </span>
+                {tickersList.filter((t) => t.active !== false).length === 0 ? (
+                  <span className="text-slate-500 italic">वर्तमान में कोई सक्रिय टिकर अलर्ट नहीं है।</span>
+                ) : (
+                  tickersList
+                    .filter((t) => t.active !== false)
+                    .map((item, idx) => (
+                      <span key={item.id || idx} className="inline-flex items-center gap-1.5 text-slate-200">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          item.isBreaking ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
+                        }`}>
+                          {item.date || (item.isBreaking ? 'BREAKING' : 'NEW')}
+                        </span>
+                        <span>{item.text}</span>
+                        {idx < tickersList.filter((t) => t.active !== false).length - 1 && (
+                          <span className="text-slate-600 ml-2">●</span>
+                        )}
+                      </span>
+                    ))
+                )}
+              </div>
+            </div>
+
+            {/* Add New Ticker Alert Box */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <Plus className="w-4 h-4 text-emerald-400" />
+                <span>नया टिकर अलर्ट जोड़ें (Add New Ticker Alert)</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                <div className="sm:col-span-5">
+                  <label className="block text-slate-300 font-bold mb-1">
+                    अलर्ट टेक्स्ट (Headline / Message):
+                  </label>
+                  <input
+                    type="text"
+                    value={newTickerText}
+                    onChange={(e) => setNewTickerText(e.target.value)}
+                    placeholder="उदा: MP ESB सब इंजीनियर 1280 पद ऑनलाइन फॉर्म प्रारंभ..."
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className="block text-slate-300 font-bold mb-1">
+                    टारगेट लिंक (Route URL or WhatsApp):
+                  </label>
+                  <input
+                    type="text"
+                    value={newTickerLink}
+                    onChange={(e) => setNewTickerLink(e.target.value)}
+                    placeholder="उदा: /2026/09/01/mpesb-sub-engineer या URL"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="block text-slate-300 font-bold mb-1">
+                    तिथि / बैज (Badge Text):
+                  </label>
+                  <input
+                    type="text"
+                    value={newTickerDate}
+                    onChange={(e) => setNewTickerDate(e.target.value)}
+                    placeholder="उदा: 23 सितंबर / आज"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+                <label className="inline-flex items-center gap-2 cursor-pointer bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={newTickerIsBreaking}
+                    onChange={(e) => setNewTickerIsBreaking(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-red-500 rounded"
+                  />
+                  <span className="text-xs font-bold text-red-300">
+                    🔴 ब्रेकिंग न्यूज़ के रूप में हाइलाइट करें (Is Breaking News)
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newTickerText.trim()) {
+                      showToast('कृपया टिकर टेक्स्ट दर्ज करें।');
+                      return;
+                    }
+                    const newItem: TickerAlert = {
+                      id: `ticker-${Date.now()}`,
+                      text: newTickerText.trim(),
+                      link: newTickerLink.trim() || OWNER_INFO.whatsappUrl,
+                      date: newTickerDate.trim() || 'NEW',
+                      isBreaking: newTickerIsBreaking,
+                      active: true
+                    };
+                    const updated = [newItem, ...tickersList];
+                    setTickersList(updated);
+                    saveTickers(updated);
+                    setNewTickerText('');
+                    setNewTickerLink('');
+                    setNewTickerDate('');
+                    setNewTickerIsBreaking(false);
+                    showToast('नया टिकर अलर्ट सफलतापूर्वक जुड़ गया!');
+                  }}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-xs shadow transition-all active:scale-98 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>टिकर में जोड़ें</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Existing Ticker Alerts List */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-white">
+                  सक्रिय टिकर अलर्ट सूची ({tickersList.length} कुल)
+                </h3>
+                <span className="text-xs text-slate-400">
+                  क्रमबद्ध सूची (Reorder / Toggle / Remove)
+                </span>
+              </div>
+
+              {tickersList.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-xs">
+                  कोई टिकर अलर्ट मौजूद नहीं है। ऊपर से नया अलर्ट जोड़ें।
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {tickersList.map((t, idx) => (
+                    <div
+                      key={t.id || idx}
+                      className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all ${
+                        t.active !== false
+                          ? 'bg-slate-950 border-slate-800'
+                          : 'bg-slate-950/40 border-slate-900 opacity-60'
+                      }`}
+                    >
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                            t.isBreaking ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}>
+                            {t.date || (t.isBreaking ? 'BREAKING' : 'NEW')}
+                          </span>
+                          <span className="font-bold text-white">{t.text}</span>
+                        </div>
+                        {t.link && (
+                          <div className="text-[11px] text-blue-400 truncate max-w-xl">
+                            🔗 {t.link}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Toggle Active */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = tickersList.map((item, i) =>
+                              i === idx ? { ...item, active: item.active === false ? true : false } : item
+                            );
+                            setTickersList(updated);
+                            saveTickers(updated);
+                          }}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                            t.active !== false
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {t.active !== false ? '🟢 सक्रिय (Active)' : '⚪ निष्क्रिय (Disabled)'}
+                        </button>
+
+                        {/* Move Up */}
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            if (idx === 0) return;
+                            const updated = [...tickersList];
+                            const temp = updated[idx - 1];
+                            updated[idx - 1] = updated[idx];
+                            updated[idx] = temp;
+                            setTickersList(updated);
+                            saveTickers(updated);
+                          }}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 cursor-pointer"
+                          title="ऊपर ले जाएं"
+                        >
+                          ↑
+                        </button>
+
+                        {/* Move Down */}
+                        <button
+                          type="button"
+                          disabled={idx === tickersList.length - 1}
+                          onClick={() => {
+                            if (idx === tickersList.length - 1) return;
+                            const updated = [...tickersList];
+                            const temp = updated[idx + 1];
+                            updated[idx + 1] = updated[idx];
+                            updated[idx] = temp;
+                            setTickersList(updated);
+                            saveTickers(updated);
+                          }}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 cursor-pointer"
+                          title="नीचे ले जाएं"
+                        >
+                          ↓
+                        </button>
+
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`क्या आप इस टिकर अलर्ट को हटाना चाहते हैं?\n"${t.text}"`)) {
+                              const updated = tickersList.filter((_, i) => i !== idx);
+                              setTickersList(updated);
+                              saveTickers(updated);
+                              showToast('टिकर अलर्ट हटाया गया।');
+                            }
+                          }}
+                          className="p-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded border border-rose-800/80 cursor-pointer"
+                          title="हटाएं"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

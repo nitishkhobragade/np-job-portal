@@ -18,6 +18,7 @@ import {
   BellRing
 } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
+import { ContactModal } from './ContactModal';
 
 interface HeaderProps {
   searchQuery?: string;
@@ -34,6 +35,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const pathname = usePathname() || '/';
   const searchParams = useSearchParams();
@@ -330,56 +332,47 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
               {moreDropdownOpen && (
                 <div
-                  className="absolute left-0 top-full mt-0.5 w-56 bg-slate-900 border border-slate-700 rounded-b-xl shadow-2xl z-50 py-2 text-xs"
+                  className="absolute left-0 top-full mt-0.5 w-60 bg-slate-900 border border-slate-700 rounded-b-xl shadow-2xl z-50 py-2 text-xs"
                   onMouseLeave={() => setMoreDropdownOpen(false)}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMoreDropdownOpen(false);
-                      if (typeof window !== 'undefined') {
-                        document.getElementById('footer-services')?.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }}
-                    className="w-full text-left flex items-center gap-2 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white cursor-pointer"
+                  <Link
+                    href="/about-us"
+                    onClick={() => setMoreDropdownOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white"
                   >
                     <Award className="w-4 h-4 text-emerald-400" />
-                    <span>ऑनलाइन फॉर्म सेवाएं (About Us)</span>
-                  </button>
-
-                  <a
-                    href={OWNER_INFO.whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setMoreDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white"
-                  >
-                    <MessageCircle className="w-4 h-4 text-amber-400" />
-                    <span>संपर्क सूत्र (Contact Us)</span>
-                  </a>
-
-                  <Link
-                    href="/2026/09/02/mp-police-constable-2026"
-                    onClick={() => setMoreDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white"
-                  >
-                    <Briefcase className="w-4 h-4 text-blue-400" />
-                    <span>सिलेबस व नियम पुस्तिका</span>
+                    <span>ऑनलाइन फॉर्म व तकनीकी सेवाएं (About Us)</span>
                   </Link>
 
                   <button
                     type="button"
                     onClick={() => {
                       setMoreDropdownOpen(false);
-                      if (typeof window !== 'undefined') {
-                        document.getElementById('footer-disclaimer')?.scrollIntoView({ behavior: 'smooth' });
-                      }
+                      setContactModalOpen(true);
                     }}
-                    className="w-full text-left flex items-center gap-2 px-4 py-2 text-slate-300 hover:bg-red-700 hover:text-white cursor-pointer"
+                    className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white cursor-pointer"
+                  >
+                    <Phone className="w-4 h-4 text-amber-400" />
+                    <span>संपर्क सूत्र (Contact Us)</span>
+                  </button>
+
+                  <Link
+                    href="/category/syllabus"
+                    onClick={() => setMoreDropdownOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2 text-slate-200 hover:bg-red-700 hover:text-white"
+                  >
+                    <Briefcase className="w-4 h-4 text-blue-400" />
+                    <span>सिलेबस व नियम पुस्तिका (Syllabus)</span>
+                  </Link>
+
+                  <Link
+                    href="/disclaimer"
+                    onClick={() => setMoreDropdownOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-red-700 hover:text-white"
                   >
                     <FileText className="w-4 h-4 text-slate-400" />
                     <span>डिस्क्लेमर (Disclaimer)</span>
-                  </button>
+                  </Link>
                 </div>
               )}
             </div>
@@ -534,12 +527,62 @@ const HeaderInner: React.FC<HeaderProps> = ({
               रिजल्ट एवं उत्तर कुंजी (Results)
             </Link>
 
+            {/* अन्य सेवाएं एवं विकल्प (More Services Accordion) */}
+            <div className="pt-3 mt-2 border-t border-slate-800 space-y-1">
+              <div className="px-3 py-1 text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span>अन्य सेवाएं एवं विकल्प</span>
+              </div>
+
+              {/* 1. Online Forms & Tech Services -> /about-us */}
+              <Link
+                href="/about-us"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <Award className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>🌟 ऑनलाइन फॉर्म व तकनीकी सेवाएं (About Us)</span>
+              </Link>
+
+              {/* 2. Contact Popup Modal */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setContactModalOpen(true);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <Phone className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>📞 संपर्क सूत्र (Contact Us)</span>
+              </button>
+
+              {/* 3. Syllabus & Rulebooks -> /category/syllabus */}
+              <Link
+                href="/category/syllabus"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <Briefcase className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>📑 सिलेबस व नियम पुस्तिका (Syllabus)</span>
+              </Link>
+
+              {/* 4. Disclaimer -> /disclaimer */}
+              <Link
+                href="/disclaimer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>⚖️ डिस्क्लेमर (Disclaimer)</span>
+              </Link>
+            </div>
+
             <div className="pt-2 mt-2 border-t border-slate-800 flex flex-col space-y-2">
               <a
                 href={OWNER_INFO.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-black text-xs cursor-pointer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-black text-xs cursor-pointer shadow-md"
               >
                 <MessageCircle className="w-4 h-4 fill-white" />
                 <span>WhatsApp: {OWNER_INFO.phone}</span>
@@ -548,6 +591,9 @@ const HeaderInner: React.FC<HeaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Interactive Contact Popup Modal */}
+      <ContactModal isOpen={contactModalOpen} onClose={() => setContactModalOpen(false)} />
     </header>
   );
 };

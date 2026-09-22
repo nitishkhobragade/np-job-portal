@@ -1,9 +1,14 @@
-import React from 'react';
+"use client";
+
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Phone, MessageCircle, ShieldAlert, Award, ExternalLink, Lock, Send, BellRing } from 'lucide-react';
+import { Phone, MessageCircle, ShieldAlert, Award, ExternalLink, Lock, Send, BellRing, Sparkles } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
+import { ContactModal } from './ContactModal';
 
 export const Footer: React.FC = () => {
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+
   const quickLinks = [
     { name: 'MP ESB भोपाल पोर्टल', url: 'https://esb.mp.gov.in' },
     { name: 'आधिकारिक भर्ती एवं सेवा पोर्टल', url: 'https://esb.mp.gov.in' },
@@ -48,6 +53,15 @@ export const Footer: React.FC = () => {
                 घर बैठे सुरक्षित फॉर्म भरवाएं • {OWNER_INFO.address}
               </p>
             </div>
+            <div className="pt-1">
+              <Link
+                href="/about-us"
+                className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-bold hover:underline"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>हमारी ऑनलाइन एवं तकनीकी सेवाएं देखें &rarr;</span>
+              </Link>
+            </div>
           </div>
 
           {/* Col 2: Services Offered */}
@@ -63,6 +77,14 @@ export const Footer: React.FC = () => {
                 </li>
               ))}
             </ul>
+            <div className="pt-3">
+              <Link
+                href="/category/syllabus"
+                className="text-xs text-slate-300 hover:text-white font-semibold inline-flex items-center gap-1 hover:underline"
+              >
+                📑 परीक्षा सिलेबस एवं नियम पुस्तिकाएं &rarr;
+              </Link>
+            </div>
           </div>
 
           {/* Col 3: Official Govt Links */}
@@ -95,9 +117,13 @@ export const Footer: React.FC = () => {
             <div className="space-y-2 text-xs text-neutral-300">
               <p className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-blue-400 shrink-0" />
-                <a href={OWNER_INFO.callUrl} className="hover:text-white font-bold">
-                  +91 {OWNER_INFO.phone}
-                </a>
+                <button
+                  type="button"
+                  onClick={() => setContactModalOpen(true)}
+                  className="hover:text-white font-bold text-left cursor-pointer"
+                >
+                  +91 {OWNER_INFO.phone} (संपर्क सूत्र)
+                </button>
               </p>
               <p className="flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -116,6 +142,15 @@ export const Footer: React.FC = () => {
             </div>
 
             <div className="pt-2 space-y-2">
+              <button
+                type="button"
+                onClick={() => setContactModalOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs shadow-md transition-colors cursor-pointer"
+              >
+                <Phone className="w-3.5 h-3.5 text-white" />
+                <span>सीधे संपर्क सूत्र (Contact Popup)</span>
+              </button>
+
               <a
                 href="https://whatsapp.com/channel/0029Vb9N2gfGZNClzwFazG3L"
                 target="_blank"
@@ -135,43 +170,46 @@ export const Footer: React.FC = () => {
                 <Send className="w-3.5 h-3.5" />
                 <span>Join Telegram Channel</span>
               </a>
-
-              <a
-                href={OWNER_INFO.whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs border border-emerald-500/30 transition-colors"
-              >
-                <MessageCircle className="w-4 h-4 fill-emerald-400" />
-                <span>सीधे WhatsApp पर चैट करें</span>
-              </a>
             </div>
           </div>
 
         </div>
 
         {/* Disclaimer Note */}
-        <div className="border-t border-neutral-800 pt-5 text-[11px] text-neutral-500 space-y-2">
+        <div id="footer-disclaimer" className="border-t border-neutral-800 pt-5 text-[11px] text-neutral-500 space-y-2">
           <div className="flex items-start gap-2">
             <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <p>
-              <strong>अस्वीकरण (Disclaimer):</strong> NP Job Portal एक निजी सूचना प्रदाता एवं ऑनलाइन फॉर्म सेवा मंच है। हम किसी भी सरकारी एजेंसी से सीधे संबद्ध नहीं हैं। सभी अभ्यर्थियों से अनुरोध है कि आवेदन से पूर्व संबंधित विभाग (MPESB, SSC, UPSC आदि) की आधिकारिक विज्ञप्ति अवश्य पढ़ें।
+              <strong>अस्वीकरण (Disclaimer):</strong> NP Job Portal एक निजी सूचना प्रदाता एवं ऑनलाइन फॉर्म सेवा मंच है। हम किसी भी सरकारी एजेंसी से सीधे संबद्ध नहीं हैं। सभी अभ्यर्थियों से अनुरोध है कि आवेदन से पूर्व संबंधित विभाग (MPESB, SSC, UPSC आदि) की आधिकारिक विज्ञप्ति अवश्य पढ़ें।{' '}
+              <Link href="/disclaimer" className="text-amber-400 hover:underline">
+                विस्तृत डिस्क्लेमर नीति पढ़ें
+              </Link>
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 text-neutral-400">
             <p>
               © {new Date().getFullYear()} NP Job Portal. All Rights Reserved. Managed by <strong>Nitish Khobragade (8982324497)</strong> • घर बैठे सुरक्षित फॉर्म भरवाएं.
             </p>
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-amber-400 transition-colors px-2 py-1 rounded bg-neutral-800/80 hover:bg-neutral-800"
-            >
-              <Lock className="w-3 h-3" />
-              <span>पोर्टल एडमिन लॉगिन</span>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/disclaimer" className="text-[11px] text-neutral-400 hover:text-white">
+                डिस्क्लेमर
+              </Link>
+              <Link href="/about-us" className="text-[11px] text-neutral-400 hover:text-white">
+                सेवाएं
+              </Link>
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-amber-400 transition-colors px-2 py-1 rounded bg-neutral-800/80 hover:bg-neutral-800"
+              >
+                <Lock className="w-3 h-3" />
+                <span>पोर्टल एडमिन लॉगिन</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
+
+      <ContactModal isOpen={contactModalOpen} onClose={() => setContactModalOpen(false)} />
     </footer>
   );
 };

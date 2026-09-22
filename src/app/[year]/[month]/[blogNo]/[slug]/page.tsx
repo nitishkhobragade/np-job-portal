@@ -82,9 +82,13 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
           correctionDate: 'अंतिम तिथि के पश्चात',
           examDate: formatDateToDDMMYYYY(record.dates?.exam) || 'शीघ्र घोषित',
           admitCardDate: 'परीक्षा से 7 दिन पूर्व',
-          feeGeneral: record.fee?.gen || '₹500/-',
-          feeReserved: record.fee?.reserved || '₹250/-',
-          feePortal: '₹60/- (पोर्टल शुल्क)',
+          feeGeneral: record.feeGeneral || record.fee?.gen || '₹500/-',
+          feeReserved: record.feeReserved || record.fee?.reserved || '₹250/-',
+          feeOBC: record.feeOBC,
+          feeSCST: record.feeSCST,
+          feeEWS: record.feeEWS,
+          showEWS: record.showEWS,
+          feePortal: record.feePortal || '₹60/- (पोर्टल शुल्क)',
           paymentMode: record.paymentMode || 'Online Net Banking, Debit/Credit Card, UPI',
           minAge: record.minAge || '18 वर्ष',
           maxAge: record.maxAge || '40 वर्ष',
@@ -416,20 +420,65 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
 
             {/* 2. Application Fee Card */}
             <div className="bg-white rounded-xl border border-neutral-200 p-5 sm:p-6 shadow-xs">
-              <h3 className="text-lg font-black text-neutral-900 mb-4 flex items-center gap-2 pb-2 border-b border-neutral-100">
-                <CreditCard className="w-5 h-5 text-red-600" />
-                <span>आवेदन शुल्क (Application Fee)</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
-                <div className="p-3.5 bg-neutral-50 rounded-lg border border-neutral-100">
-                  <div className="text-xs text-neutral-500 font-semibold">सामान्य / अन्य राज्य (UR / Other State)</div>
-                  <div className="text-xl font-black text-neutral-900 mt-1">{job.feeGeneral}</div>
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-100 mb-4">
+                <h3 className="text-lg font-black text-neutral-900 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-red-600" />
+                  <span>आवेदन शुल्क (Application Fee Structure)</span>
+                </h3>
+                {job.showEWS && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    EWS आरक्षण मान्य
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                {/* General / UR */}
+                <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200/80">
+                  <div className="text-[11px] text-neutral-500 font-bold uppercase">सामान्य (General / UR)</div>
+                  <div className="text-lg sm:text-xl font-black text-neutral-900 mt-0.5">{job.feeGeneral}</div>
                 </div>
-                <div className="p-3.5 bg-neutral-50 rounded-lg border border-neutral-100">
-                  <div className="text-xs text-neutral-500 font-semibold">आरक्षित वर्ग (SC / ST / OBC / EWS)</div>
-                  <div className="text-xl font-black text-neutral-900 mt-1">{job.feeReserved}</div>
+
+                {/* OBC */}
+                <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200/80">
+                  <div className="text-[11px] text-blue-700 font-bold uppercase">अन्य पिछड़ा वर्ग (OBC)</div>
+                  <div className="text-lg sm:text-xl font-black text-neutral-900 mt-0.5">
+                    {job.feeOBC || job.feeReserved}
+                  </div>
+                </div>
+
+                {/* SC / ST */}
+                <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200/80">
+                  <div className="text-[11px] text-red-700 font-bold uppercase">अ.जा. / अ.ज.जा. (SC / ST)</div>
+                  <div className="text-lg sm:text-xl font-black text-neutral-900 mt-0.5">
+                    {job.feeSCST || job.feeReserved}
+                  </div>
+                </div>
+
+                {/* EWS */}
+                <div className={`p-3 rounded-lg border ${
+                  job.showEWS !== false
+                    ? 'bg-emerald-50/70 border-emerald-200'
+                    : 'bg-neutral-50 border-neutral-200/80'
+                }`}>
+                  <div className="text-[11px] text-emerald-800 font-bold uppercase flex items-center justify-between">
+                    <span>आर्थिक कमजोर (EWS)</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-black text-neutral-900 mt-0.5">
+                    {job.showEWS !== false
+                      ? (job.feeEWS || job.feeGeneral)
+                      : 'लागू नहीं / N/A'}
+                  </div>
                 </div>
               </div>
+
+              {job.feePortal && (
+                <div className="mb-3 px-3 py-1.5 bg-neutral-100/80 rounded-md text-xs text-neutral-600 flex items-center justify-between font-medium">
+                  <span>पोर्टल / सेवा प्रभार (Portal Fee):</span>
+                  <span className="font-bold text-neutral-900 font-mono">{job.feePortal}</span>
+                </div>
+              )}
+
               <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 font-medium">
                 <strong>भुगतान का माध्यम:</strong> {job.paymentMode}. नेट बैंकिंग, डेबिट/क्रेडिट कार्ड या UPI से ऑनलाइन शुल्क जमा किया जा सकता है।
               </div>

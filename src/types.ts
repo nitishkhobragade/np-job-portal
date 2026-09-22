@@ -20,6 +20,10 @@ export interface JobPostDetail {
   admitCardDate?: string;
   feeGeneral: string;
   feeReserved: string;
+  feeOBC?: string;
+  feeSCST?: string;
+  feeEWS?: string;
+  showEWS?: boolean;
   feePortal?: string;
   paymentMode: string;
   minAge: string;
@@ -137,9 +141,11 @@ export interface TrendingCard {
 export interface TickerAlert {
   id: string;
   text: string;
+  link?: string;
   isBreaking?: boolean;
   date?: string;
   category?: string;
+  active?: boolean;
 }
 
 // Normalized Post Schema for Cloud Firestore - Single Source of Truth
@@ -216,6 +222,10 @@ export interface PostRecord {
   paymentMode?: string;
   feeGeneral?: string;
   feeReserved?: string;
+  feeOBC?: string;
+  feeSCST?: string;
+  feeEWS?: string;
+  showEWS?: boolean;
   feePortal?: string;
   showReservationSection?: boolean;
   vacanciesBreakdown?: Array<{
