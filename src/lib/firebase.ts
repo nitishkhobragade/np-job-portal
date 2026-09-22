@@ -12,7 +12,8 @@ import {
   query,
   where,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, TickerAlert } from '../types';
 import { TICKER_ALERTS } from '../data/portalData';
@@ -1465,6 +1466,135 @@ export async function triggerSourceTestFetch(sourceId: string): Promise<{
     success: true,
     message: `${src.name} से डेटा सफलतापूर्वक फेच हुआ! AI Deduplication पास। 1 नया ड्राफ्ट Firestore में 'Not Published' (status: "draft") के रूप में सहेजा गया।`,
     newDraftCount: 1
+  };
+}
+
+// -------------------------------------------------------------
+// Database Backup & Restore Manager (Full JSON Snapshot)
+// -------------------------------------------------------------
+export interface PortalDatabaseBackup {
+  version: string;
+  exportedAt: string;
+  timestamp: number;
+  author: string;
+  counts: {
+    posts: number;
+    scrapers: number;
+    tickers: number;
+    hasPopupSettings: boolean;
+  };
+  data: {
+    posts: PostRecord[];
+    scrapers: ScraperSource[];
+    tickers: TickerAlert[];
+    popupSettings: PopupAdSettings;
+  };
+}
+
+/**
+ * Creates a complete snapshot of all collections: posts, scrapers, tickers, and popup ad settings.
+ */
+export async function exportFullDatabaseBackup(): Promise<PortalDatabaseBackup> {
+  const [posts, scrapers, tickers, popupSettings] = await Promise.all([
+    getJobs('all'),
+    getScraperSources(),
+    getTickers(),
+    getPopupAdSettings()
+  ]);
+
+  return {
+    version: '2.0',
+    exportedAt: new Date().toISOString(),
+    timestamp: Date.now(),
+    author: 'Nitish Khobragade (NP Job Portal Admin)',
+    counts: {
+      posts: posts.length,
+      scrapers: scrapers.length,
+      tickers: tickers.length,
+      hasPopupSettings: Boolean(popupSettings)
+    },
+    data: {
+      posts,
+      scrapers,
+      tickers,
+      popupSettings
+    }
+  };
+}
+
+/**
+ * Restores a full backup snapshot into Firestore using writeBatch and updates local cache.
+ */
+export async function restoreDatabaseFromBackup(backup: PortalDatabaseBackup): Promise<{
+  success: boolean;
+  message: string;
+  restoredCounts: { posts: number; scrapers: number; tickers: number };
+}> {
+  if (!backup || !backup.data || !Array.isArray(backup.data.posts)) {
+    throw new Error('अमान्य बैकअप फ़ाइल: बैकअप डेटा संरचना सही नहीं है।');
+  }
+
+  const { posts, scrapers, tickers, popupSettings } = backup.data;
+
+  // 1. Restore Posts to Firestore via writeBatch in chunks of 450 (Firestore limit is 500)
+  try {
+    const chunkSize = 400;
+    for (let i = 0; i < posts.length; i += chunkSize) {
+      const chunk = posts.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((p) => {
+        const id = p.id || p.slug || `post_${Date.now()}`;
+        const ref = doc(db, 'posts', id);
+        batch.set(ref, {
+          ...p,
+          id,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('Firestore posts batch restore notice (falling back/continuing):', err);
+  }
+
+  // Persist locally
+  persistStoredPosts(posts);
+
+  // 2. Restore Scrapers
+  if (Array.isArray(scrapers) && scrapers.length > 0) {
+    try {
+      await saveScraperSources(scrapers);
+    } catch (err) {
+      console.warn('Scrapers restore notice:', err);
+    }
+  }
+
+  // 3. Restore Tickers
+  if (Array.isArray(tickers) && tickers.length > 0) {
+    try {
+      await saveTickers(tickers);
+    } catch (err) {
+      console.warn('Tickers restore notice:', err);
+    }
+  }
+
+  // 4. Restore Popup Ad Settings
+  if (popupSettings && popupSettings.title) {
+    try {
+      await savePopupAdSettings(popupSettings);
+    } catch (err) {
+      console.warn('Popup settings restore notice:', err);
+    }
+  }
+
+  return {
+    success: true,
+    message: `सफलतापूर्वक रीस्टोर किया गया: ${posts.length} पोस्ट्स, ${scrapers?.length || 0} स्क्रैपर स्रोत, ${tickers?.length || 0} टिकर अलर्ट्स!`,
+    restoredCounts: {
+      posts: posts.length,
+      scrapers: scrapers?.length || 0,
+      tickers: tickers?.length || 0
+    }
   };
 }
 

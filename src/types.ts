@@ -66,6 +66,8 @@ export interface JobPostDetail {
   syllabusUrl?: string;
   officialWebsiteUrl: string;
   serviceTagline?: string;
+  customPosterUrl?: string;
+  useCustomPoster?: boolean;
 }
 
 export interface JobItem {
@@ -252,6 +254,9 @@ export interface PostRecord {
   routingMonth?: string;
   routingBlogNo?: string;
   routingSlug?: string;
+  // Custom Poster Engine
+  customPosterUrl?: string;
+  useCustomPoster?: boolean;
 }
 
 // Scraper Target Feeds & Sources

@@ -13,139 +13,249 @@ import {
   MessageCircle,
   Phone,
   CheckCircle2,
-  ShieldCheck,
   Sparkles,
-  ArrowRight,
-  Clock
+  Zap,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { ContactModal } from '../../components/ContactModal';
 import { OWNER_INFO } from '../../data/portalData';
 
-interface ServiceItem {
+interface VibrantServiceCard {
   id: string;
+  serviceKey: string;
   icon: React.ComponentType<{ className?: string }>;
   title: string;
-  badge: string;
-  badgeColor: string;
-  description: string;
-  highlights: string[];
-  whatsappPrompt: string;
+  tag: string;
+  theme: {
+    border: string;
+    borderHover: string;
+    cardBg: string;
+    iconBg: string;
+    iconColor: string;
+    tagBg: string;
+    tagColor: string;
+    tagBorder: string;
+    btnBg: string;
+    glowShadow: string;
+  };
+  bullets: string[];
+  btnText: string;
+  whatsappMessage: string;
 }
 
-const SERVICES_LIST: ServiceItem[] = [
+const SERVICES_DATA: VibrantServiceCard[] = [
   {
-    id: 'online-forms',
+    id: 'govt-private-forms',
+    serviceKey: 'सरकारी व निजी फॉर्म',
     icon: FileText,
-    title: 'ऑनलाइन फॉर्म सेवाएं',
-    badge: '100% त्रुटिरहित',
-    badgeColor: 'bg-red-100 text-red-800 border-red-200',
-    description: 'सभी सरकारी एवं निजी भर्तियों के 100% त्रुटिरहित ऑनलाइन आवेदन। MPESB, SSC, UPSC, Railway, Banking, Police, Teaching एवं Defence भर्तियों के अधिकृत फॉर्म घर बैठे भरवाएं।',
-    highlights: [
-      'दस्तावेज फोटो व हस्ताक्षर का मानक अनुसार सही रिसाइज़िंग',
-      'शुल्क भुगतान के पश्चात तत्काल आधिकारिक ऑनलाइन रसीद',
-      'फॉर्म सबमिट करने से पूर्व ग्राहक को प्रीव्यू सत्यापन'
+    title: 'सरकारी व निजी फॉर्म',
+    tag: '100% एरर-फ्री',
+    theme: {
+      border: 'border-blue-500/30',
+      borderHover: 'hover:border-blue-500',
+      cardBg: 'from-blue-50/50 via-white to-white',
+      iconBg: 'bg-blue-100 text-blue-600',
+      iconColor: 'text-blue-600',
+      tagBg: 'bg-blue-50',
+      tagColor: 'text-blue-700',
+      tagBorder: 'border-blue-200',
+      btnBg: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white',
+      glowShadow: 'hover:shadow-blue-500/10'
+    },
+    bullets: [
+      'MPESB, SSC, UPSC, Railway, Police, Teaching फॉर्म्स',
+      'मानक अनुसार फोटो-सिग्नेचर रिसाइज़िंग',
+      'सबमिशन से पूर्व प्रीव्यू सत्यापन एवं अधिकृत रसीद'
     ],
-    whatsappPrompt: 'ऑनलाइन%20फॉर्म%20सेवाएं%20(Govt%20Job%20Application)'
+    btnText: 'व्हाट्सएप पर फॉर्म भरवाएं →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se सरकारी व निजी फॉर्म (Govt Forms) ke liye sampark kiya hai.'
   },
   {
     id: 'scholarship-forms',
+    serviceKey: 'छात्रवृत्ति (Scholarship)',
     icon: GraduationCap,
-    title: 'छात्रवृत्ति फॉर्म (Scholarship)',
-    badge: 'स्कॉलरशिप विशेषज्ञ',
-    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    description: 'मध्य प्रदेश पोस्ट मैट्रिक स्कॉलरशिप (MP Post Matric), सेंट्रल सेक्टर स्कॉलरशिप, NSP नेशनल स्कॉलरशिप एवं अन्य शैक्षणिक छात्रवृत्ति के लिए पूर्ण त्रुटिरहित आवेदन।',
-    highlights: [
-      'आय, जाति व मूल निवासी प्रमाण पत्र लिंकिंग सत्यापन',
-      'कॉलेज/स्कूल प्रोफाइल मैपिंग व कोर्स चयन में सहायता',
-      'अंतिम तारीख से पूर्व सुरक्षित सबमिशन व रसीद'
+    title: 'छात्रवृत्ति (Scholarship)',
+    tag: 'गारंटीड सबमिशन',
+    theme: {
+      border: 'border-amber-500/30',
+      borderHover: 'hover:border-amber-500',
+      cardBg: 'from-amber-50/50 via-white to-white',
+      iconBg: 'bg-amber-100 text-amber-600',
+      iconColor: 'text-amber-600',
+      tagBg: 'bg-amber-50',
+      tagColor: 'text-amber-800',
+      tagBorder: 'border-amber-200',
+      btnBg: 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white',
+      glowShadow: 'hover:shadow-amber-500/10'
+    },
+    bullets: [
+      'MP Post Matric, NSP, मेधावी छात्र योजना',
+      'आय-जाति प्रमाण पत्र लिंकिंग',
+      'कॉलेज प्रोफाइल मैपिंग व कोर्स चयन सत्यापन'
     ],
-    whatsappPrompt: 'छात्रवृत्ति%20फॉर्म%20(Scholarship%20Application)'
+    btnText: 'स्कॉलरशिप फॉर्म भरवाएं →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se छात्रवृत्ति (Scholarship) ke liye sampark kiya hai.'
   },
   {
-    id: 'windows-installation',
+    id: 'windows-os-setup',
+    serviceKey: 'Windows 10/11 इंस्टॉलेशन',
     icon: Monitor,
-    title: 'विंडोज इंस्टॉलेशन / री-इंस्टॉलेशन',
-    badge: 'Hardware & OS',
-    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-    description: 'लैपटॉप एवं कंप्यूटर में Windows 10/11 सुरक्षित इंस्टॉलेशन व री-इंस्टॉलेशन। स्लो पीसी की स्पीड बूस्टिंग, वायरस व मैलवेयर क्लीनिंग के साथ सिस्टम ऑप्टिमाइजेशन।',
-    highlights: [
-      'Windows 10 एवं 11 Pro 64-bit फ्रेश एवं क्लीन सेटअप',
-      'सभी आवश्यक हार्डवेयर ड्राइवर्स (Audio, Display, WiFi) अपडेट',
-      'व्यक्तिगत डेटा (C/D/E Drive) का 100% सुरक्षित बैकअप'
+    title: 'Windows 10/11 इंस्टॉलेशन',
+    tag: 'Hardware & OS',
+    theme: {
+      border: 'border-indigo-500/30',
+      borderHover: 'hover:border-indigo-500',
+      cardBg: 'from-indigo-50/50 via-white to-white',
+      iconBg: 'bg-indigo-100 text-indigo-600',
+      iconColor: 'text-indigo-600',
+      tagBg: 'bg-indigo-50',
+      tagColor: 'text-indigo-700',
+      tagBorder: 'border-indigo-200',
+      btnBg: 'bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-700 hover:to-cyan-700 text-white',
+      glowShadow: 'hover:shadow-indigo-500/10'
+    },
+    bullets: [
+      'फ्रेश व क्लीन ओएस सेटअप (Win 10/11 Pro)',
+      'स्लो लैपटॉप स्पीड बूस्टिंग व ट्यून-अप',
+      'ऑडियो, डिस्प्ले व वाईफाई ड्राइवर्स अपडेट',
+      'पर्सनल डेटा 100% सुरक्षित'
     ],
-    whatsappPrompt: 'विंडोज%20इंस्टॉलेशन%20(Windows%2010/11%20Setup)'
+    btnText: 'विंडोज सेटअप करवाएं →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se Windows 10/11 इंस्टॉलेशन ke liye sampark kiya hai.'
   },
   {
-    id: 'ms-office-setup',
+    id: 'ms-office-suite',
+    serviceKey: 'MS Office एक्टिवेशन',
     icon: Cpu,
-    title: 'MS Office इंस्टॉलेशन एवं एक्टिवेशन',
-    badge: 'Full Suite Setup',
-    badgeColor: 'bg-amber-100 text-amber-900 border-amber-200',
-    description: 'Microsoft Office (Word, Excel, PowerPoint, Outlook) का पूर्ण सेटअप व लाइफटाइम एक्टिवेशन। कार्यालयीन एवं छात्र उपयोग के लिए संपूर्ण प्रोडक्टिविटी पैकेज।',
-    highlights: [
-      'Microsoft Office 2019 / 2021 / 365 कम्पलीट इंस्टॉलेशन',
-      'हिंदी टाइपिंग टूल्स (Hindi Mangal / Remington Gail) इंटीग्रेशन',
-      'PDF रीडर, ज़िप एक्सट्रैक्टर व आवश्यक उपयोगिता टूल्स सेटअप'
+    title: 'MS Office एक्टिवेशन',
+    tag: 'Full Productivity',
+    theme: {
+      border: 'border-rose-500/30',
+      borderHover: 'hover:border-rose-500',
+      cardBg: 'from-rose-50/50 via-white to-white',
+      iconBg: 'bg-rose-100 text-rose-600',
+      iconColor: 'text-rose-600',
+      tagBg: 'bg-rose-50',
+      tagColor: 'text-rose-700',
+      tagBorder: 'border-rose-200',
+      btnBg: 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white',
+      glowShadow: 'hover:shadow-rose-500/10'
+    },
+    bullets: [
+      'Word, Excel, PowerPoint पूर्ण पैकेज',
+      'लाइफटाइम जेनुइन एक्टिवेशन',
+      'ऑफिशियल व स्टूडेंट उपयोग हेतु रेडी',
+      'हिंदी टाइपिंग फॉन्ट व टूल्स इंस्टॉलेशन'
     ],
-    whatsappPrompt: 'MS%20Office%20इंस्टॉलेशन%20एवं%20एक्टिवेशन'
+    btnText: 'ऑफिस पैकेज एक्टिव करवाएं →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se MS Office एक्टिवेशन ke liye sampark kiya hai.'
   },
   {
     id: 'npci-dbt-mapping',
+    serviceKey: 'NPCI / DBT बैंक लिंकिंग',
     icon: Building2,
-    title: 'NPCI / DBT बैंक खाता मैपिंग व स्टेटस चेक',
-    badge: 'Direct Benefit Transfer',
-    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-    description: 'सरकारी योजनाओं, लाड़ली बहना, किसान सम्मान निधि व स्कॉलरशिप राशि सीधे बैंक खाते में प्राप्त करने हेतु आधार-NPCI-DBT मैपिंग व लाइव एक्टिव स्टेटस जांच सहायता।',
-    highlights: [
-      'NPCI Bharat Connect पोर्टल से आधार-सीडिंग स्टेटस सत्यापन',
-      'DBT इनएक्टिव होने पर त्वरित बैंक शाखा समाधान मार्गदर्शन',
-      'योजनाओं की रुकी हुई राशि पुनः चालू करवाने में विशेषज्ञ परामर्श'
+    title: 'NPCI / DBT बैंक लिंकिंग',
+    tag: 'Direct Benefit',
+    theme: {
+      border: 'border-emerald-500/30',
+      borderHover: 'hover:border-emerald-500',
+      cardBg: 'from-emerald-50/50 via-white to-white',
+      iconBg: 'bg-emerald-100 text-emerald-600',
+      iconColor: 'text-emerald-600',
+      tagBg: 'bg-emerald-50',
+      tagColor: 'text-emerald-700',
+      tagBorder: 'border-emerald-200',
+      btnBg: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white',
+      glowShadow: 'hover:shadow-emerald-500/10'
+    },
+    bullets: [
+      'लाड़ली बहना, पीएम किसान व स्कॉलरशिप राशि हेतु आधार-NPCI मैपिंग स्टेटस जांच',
+      'बैंक खाता डीबीटी एक्टिवेशन समाधान',
+      'रुकी हुई किश्त पुनः चालू कराने का मार्गदर्शन'
     ],
-    whatsappPrompt: 'NPCI%20/%20DBT%20बैंक%20खाता%20मैपिंग%20सहायता'
+    btnText: 'DBT स्टेटस चेक करवाएं →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se NPCI / DBT बैंक लिंकिंग ke liye sampark kiya hai.'
   },
   {
-    id: 'netbanking-passwords',
+    id: 'net-banking-recovery',
+    serviceKey: 'नेट बैंकिंग पासवर्ड रीसेट',
     icon: KeyRound,
-    title: 'नेट बैंकिंग पासवर्ड सेट एवं रीसेट',
-    badge: 'सुरक्षित सहायता',
-    badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-    description: 'सुरक्षित इंटरनेट बैंकिंग प्रोफाइल पासवर्ड, लॉगिन पासवर्ड व ट्रांजेक्शन पासवर्ड भूल जाने पर बैंक मानकों के अनुसार सुरक्षित रिकवरी एवं पासवर्ड रीसेट सहायता।',
-    highlights: [
-      'SBI, PNB, BoB, HDFC, ICICI समेत सभी प्रमुख बैंकों के पोर्टल',
-      'यूजर आईडी अनब्लॉक व ई-स्टेटमेंट एक्टिवेशन सहायता',
-      'गोपनीयता व पूर्ण सुरक्षा का 100% अनुपालन'
+    title: 'नेट बैंकिंग पासवर्ड रीसेट',
+    tag: '100% सुरक्षित',
+    theme: {
+      border: 'border-purple-500/30',
+      borderHover: 'hover:border-purple-500',
+      cardBg: 'from-purple-50/50 via-white to-white',
+      iconBg: 'bg-purple-100 text-purple-600',
+      iconColor: 'text-purple-600',
+      tagBg: 'bg-purple-50',
+      tagColor: 'text-purple-700',
+      tagBorder: 'border-purple-200',
+      btnBg: 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white',
+      glowShadow: 'hover:shadow-purple-500/10'
+    },
+    bullets: [
+      'बैंक प्रोफाइल पासवर्ड, लॉगिन पासवर्ड व ट्रांजैक्शन पासवर्ड भूल जाने पर बैंक मानकों अनुसार सुरक्षित रिकवरी',
+      'यूजर आईडी अनब्लॉक व ई-स्टेटमेंट एक्टिवेशन',
+      'पूर्ण गोपनीयता का 100% पालन'
     ],
-    whatsappPrompt: 'नेट%20बैंकिंग%20पासवर्ड%20सेट%20एवं%20रीसेट'
+    btnText: 'पासवर्ड रीसेट सहायता →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se नेट बैंकिंग पासवर्ड रीसेट ke liye sampark kiya hai.'
   },
   {
-    id: 'credit-card-help',
+    id: 'credit-card-assistance',
+    serviceKey: 'क्रेडिट कार्ड अप्लाई / ब्लॉक',
     icon: CreditCard,
-    title: 'क्रेडिट कार्ड सहायता व ब्लॉकिंग',
-    badge: 'Financial Services',
-    badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
-    description: 'नए लाइफटाइम फ्री (LTF) क्रेडिट कार्ड हेतु पात्रता जांच एवं आवेदन। कार्ड चोरी, गुम या संदिग्ध ट्रांजेक्शन होने पर 24x7 तत्काल हॉटलिस्टिंग/ब्लॉकिंग मार्गदर्शन।',
-    highlights: [
-      'सिबिल स्कोर एवं आय अनुसार बेस्ट रिवॉर्ड क्रेडिट कार्ड सुझाव',
-      'खोए हुए कार्ड को बैंक के आधिकारिक चैनल से त्वरित ब्लॉक',
-      'क्रेडिट लिमिट वृद्धि एवं रिवॉर्ड पॉइंट रिडेम्पशन सहायता'
+    title: 'क्रेडिट कार्ड अप्लाई / ब्लॉक',
+    tag: 'Banking Help',
+    theme: {
+      border: 'border-teal-500/30',
+      borderHover: 'hover:border-teal-500',
+      cardBg: 'from-teal-50/50 via-white to-white',
+      iconBg: 'bg-teal-100 text-teal-600',
+      iconColor: 'text-teal-600',
+      tagBg: 'bg-teal-50',
+      tagColor: 'text-teal-700',
+      tagBorder: 'border-teal-200',
+      btnBg: 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white',
+      glowShadow: 'hover:shadow-teal-500/10'
+    },
+    bullets: [
+      'लाइफटाइम फ्री (LTF) क्रेडिट कार्ड आवेदन',
+      'चोरी या गुम होने पर तुरंत कार्ड ब्लॉकिंग व फ्रॉड प्रोटेक्शन गाइडेंस',
+      'क्रेडिट कार्ड लिमिट वृद्धि परामर्श'
     ],
-    whatsappPrompt: 'क्रेडिट%20कार्ड%20सहायता%20(Credit%20Card%20Support)'
+    btnText: 'क्रेडिट कार्ड सहायता लें →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se क्रेडिट कार्ड अप्लाई / ब्लॉक ke liye sampark kiya hai.'
   },
   {
-    id: 'cibil-score-repair',
+    id: 'cibil-score-guidance',
+    serviceKey: 'CIBIL स्कोर सुधार सलाह',
     icon: TrendingUp,
-    title: 'सिबिल (CIBIL) स्कोर सुधार परामर्श',
-    badge: 'क्रेडिट एक्सपर्ट',
-    badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
-    description: 'कम सिबिल स्कोर होने के कारण लोन या क्रेडिट कार्ड रिजेक्ट हो रहा है? सिबिल स्कोर 750+ तक पहुंचाने हेतु वित्तीय विशेषज्ञ मार्गदर्शन व चरणबद्ध सुधार योजना।',
-    highlights: [
-      'सिबिल रिपोर्ट का गहन विश्लेषण एवं नकारात्मक प्रविष्टियों की पहचान',
-      'क्रेडिट यूटिलाइजेशन रेश्यो (CUR) सही करने के उपाय',
-      'डिफॉल्ट या सेटल्ड अकाउंट्स का बैंक से नो-ड्यूज (NOC) निपटान'
+    title: 'CIBIL स्कोर सुधार सलाह',
+    tag: 'क्रेडिट स्कोर बूस्टर',
+    theme: {
+      border: 'border-fuchsia-500/30',
+      borderHover: 'hover:border-fuchsia-500',
+      cardBg: 'from-fuchsia-50/50 via-white to-white',
+      iconBg: 'bg-fuchsia-100 text-fuchsia-600',
+      iconColor: 'text-fuchsia-600',
+      tagBg: 'bg-fuchsia-50',
+      tagColor: 'text-fuchsia-700',
+      tagBorder: 'border-fuchsia-200',
+      btnBg: 'bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-700 hover:to-pink-700 text-white',
+      glowShadow: 'hover:shadow-fuchsia-500/10'
+    },
+    bullets: [
+      'कम सिबिल स्कोर से लोन नहीं मिल रहा?',
+      'डिफॉल्ट्स क्लियर करने व सिबिल 750+ करने हेतु एक्सपर्ट कंसल्टेंसी',
+      'CIBIL रिपोर्ट गहन विश्लेषण व नो-ड्यूज (NOC) निपटान'
     ],
-    whatsappPrompt: 'सिबिल%20(CIBIL)%20स्कोर%20सुधार%20परामर्श'
+    btnText: 'सिबिल सुधार परामर्श लें →',
+    whatsappMessage: 'नमस्ते Nitish ji, maine NP Job Portal se CIBIL स्कोर सुधार सलाह ke liye sampark kiya hai.'
   }
 ];
 
@@ -153,141 +263,140 @@ export default function AboutUsServicesPage() {
   const [contactModalOpen, setContactModalOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Header />
 
-      {/* Hero Banner Section */}
-      <section className="bg-gradient-to-br from-neutral-900 via-slate-900 to-red-950 text-white border-b border-red-800/40 relative overflow-hidden py-10 sm:py-14">
-        {/* Subtle decorative glow */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. COMPACT HERO BANNER (REDUCED PADDING BY 70%) */}
+      <section className="bg-gradient-to-r from-slate-950 via-neutral-900 to-red-950 text-white border-b border-red-800/50 py-5 sm:py-7 px-4 relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-0 right-10 w-72 h-72 bg-red-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-10 w-72 h-72 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 relative z-10">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/30 border border-red-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider mb-3">
-              <Sparkles className="w-3.5 h-3.5" />
-              100% विश्वसनीय डिजिटल समाधान
+        <div className="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            {/* Compact Badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-600/30 border border-red-500/40 text-amber-300 text-[11px] font-bold tracking-wide">
+                <Zap className="w-3 h-3 text-amber-400" />
+                ⚡ 100% विश्वसनीय डिजिटल समाधान
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/20 text-slate-200 text-[11px] font-bold">
+                <Sparkles className="w-3 h-3 text-yellow-400" />
+                ⭐ 8+ वर्ष का तकनीकी अनुभव
+              </span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white mb-3">
-              NP Job Portal - <span className="text-red-500">ऑनलाइन फॉर्म</span> एवं <span className="text-amber-400">तकनीकी सेवाएं</span>
+            {/* Title */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug">
+              <span className="text-white">NP Job Portal • </span>
+              <span className="bg-gradient-to-r from-red-400 via-rose-300 to-amber-300 bg-clip-text text-transparent">
+                डिजिटल सेवाएं एवं टेक क्लीनिक
+              </span>
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-300 font-medium mb-4 leading-relaxed">
-              संचालक व फॉर्म विशेषज्ञ: <strong className="text-white font-bold">{OWNER_INFO.name}</strong> • हेल्पलाइन: <a href="tel:8982324497" className="text-amber-400 hover:underline font-mono font-bold">8982324497</a>
+            {/* Sub-strip */}
+            <p className="text-xs sm:text-sm text-slate-300 font-medium">
+              संचालक: <strong className="text-white font-bold">{OWNER_INFO.name}</strong> ({OWNER_INFO.phone}) | <span className="text-amber-300 font-semibold">घर बैठे त्वरित एवं सुरक्षित समाधान</span>
             </p>
+          </div>
 
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
-              हम मध्य प्रदेश एवं पूरे भारत के युवाओं, छात्रों और नागरिकों को घर बैठे सुरक्षित ऑनलाइन आवेदन, छात्रवृत्ति फॉर्म, कंप्यूटर सॉफ्टवेयर इंस्टॉलेशन, बैंक व NPCI मैपिंग तथा वित्तीय सहायता सेवाएं प्रदान करते हैं।
-            </p>
+          {/* Quick Action Bar (Two Compact Pills) */}
+          <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+            <button
+              type="button"
+              onClick={() => setContactModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-black shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>📞 डायरेक्ट कॉल करें</span>
+            </button>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setContactModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-black text-sm shadow-lg transition-transform active:scale-95 cursor-pointer"
-              >
-                <Phone className="w-4 h-4" />
-                <span>सीधे संपर्क करें (8982324497)</span>
-              </button>
-
-              <a
-                href={OWNER_INFO.whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg transition-transform active:scale-95 cursor-pointer"
-              >
-                <MessageCircle className="w-4 h-4 fill-white" />
-                <span>व्हाट्सएप पर चैट करें</span>
-              </a>
-            </div>
+            <a
+              href={OWNER_INFO.whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <MessageCircle className="w-3.5 h-3.5 fill-white" />
+              <span>💬 व्हाट्सएप पर बात करें</span>
+            </a>
           </div>
         </div>
       </section>
 
-      {/* Trust Badges Strip */}
-      <section className="bg-white border-b border-neutral-200 py-3 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-            <div className="p-2 flex items-center justify-center gap-2 text-xs font-bold text-neutral-800">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>100% त्रुटिरहित फॉर्म सबमिशन</span>
-            </div>
-            <div className="p-2 flex items-center justify-center gap-2 text-xs font-bold text-neutral-800">
-              <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>गोपनीय डेटा पूर्णतः सुरक्षित</span>
-            </div>
-            <div className="p-2 flex items-center justify-center gap-2 text-xs font-bold text-neutral-800">
-              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>सुबह 8:00 AM से रात 10:00 PM</span>
-            </div>
-            <div className="p-2 flex items-center justify-center gap-2 text-xs font-bold text-neutral-800">
-              <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
-              <span>सत्यापित अधिकृत संचालक</span>
-            </div>
+      {/* 2. VIBRANT 3D / COLOR-CODED SERVICE CARDS */}
+      <main className="max-w-7xl mx-auto px-3 py-4 sm:py-6 flex-1 w-full space-y-4">
+        {/* Section Intro Strip */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-ping inline-block" />
+              <span>हमारी प्रमुख सेवाएं (All Tech & Digital Services)</span>
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
+              किसी भी सेवा हेतु संबंधित कार्ड के बटन पर टैप करें — व्हाट्सएप पर त्वरित सीधा समाधान मिलेगा
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-semibold self-start sm:self-auto">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded">
+              <Check className="w-3 h-3 text-emerald-600" /> 100% ऑनलाइन
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded">
+              <ShieldCheck className="w-3 h-3 text-blue-600" /> सुरक्षित भुगतान
+            </span>
           </div>
         </div>
-      </section>
 
-      {/* Services Grid Section */}
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:py-12 flex-1 w-full">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
-            हमारी प्रमुख तकनीकी एवं ऑनलाइन सेवाएं
-          </h2>
-          <p className="text-xs sm:text-sm text-neutral-600 mt-2">
-            किसी भी सेवा के लिए नीचे दिए गए बटन पर क्लिक करें। आपका व्हाट्सएप सीधे संचालक Nitish Khobragade (8982324497) से जुड़ जाएगा।
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {SERVICES_LIST.map((srv) => {
-            const Icon = srv.icon;
-            const waUrl = `https://wa.me/918982324497?text=नमस्ते%20Nitish%20ji,%20maine%20aapko%20NP%20Job%20Portal%20se%20sampark%20kiya%20hai.%20Mujhe%20is%20service%20ke%20bare%20me%20jankari%20chahiye:%20${srv.whatsappPrompt}`;
+        {/* 8 Vibrant Service Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {SERVICES_DATA.map((card) => {
+            const Icon = card.icon;
+            const waUrl = `https://wa.me/918982324497?text=${encodeURIComponent(card.whatsappMessage)}`;
 
             return (
               <div
-                key={srv.id}
-                className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between group"
+                key={card.id}
+                className={`bg-gradient-to-b ${card.theme.cardBg} rounded-xl border ${card.theme.border} ${card.theme.borderHover} p-3.5 sm:p-4 shadow-xs hover:shadow-lg ${card.theme.glowShadow} hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group`}
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-red-50 text-red-700 flex items-center justify-center border border-red-100 group-hover:bg-red-700 group-hover:text-white transition-colors shrink-0">
-                      <Icon className="w-6 h-6" />
+                  {/* Card Header: Icon & Tag Pill */}
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <div className={`w-9 h-9 rounded-lg ${card.theme.iconBg} flex items-center justify-center shrink-0 shadow-xs group-hover:scale-110 transition-transform`}>
+                      <Icon className="w-5 h-5" />
                     </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${srv.badgeColor}`}>
-                      {srv.badge}
+
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${card.theme.tagBg} ${card.theme.tagColor} ${card.theme.tagBorder}`}>
+                      {card.tag}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-black text-neutral-900 group-hover:text-red-700 transition-colors tracking-tight mb-2">
-                    {srv.title}
+                  {/* Card Title */}
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-red-700 transition-colors tracking-tight mb-2">
+                    {card.title}
                   </h3>
 
-                  <p className="text-xs text-neutral-600 leading-relaxed mb-4">
-                    {srv.description}
-                  </p>
-
-                  <div className="space-y-1.5 mb-6 pt-3 border-t border-neutral-100">
-                    {srv.highlights.map((h, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-[11px] text-neutral-700 font-medium leading-tight">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>{h}</span>
+                  {/* Bullet Points */}
+                  <div className="space-y-1.5 mb-3.5 pt-2 border-t border-slate-200/70">
+                    {card.bullets.map((point, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5 text-[11px] text-slate-700 font-medium leading-snug">
+                        <CheckCircle2 className={`w-3.5 h-3.5 ${card.theme.iconColor} shrink-0 mt-0.5`} />
+                        <span>{point}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="pt-2">
+                {/* Compact CTA Button */}
+                <div className="pt-2 border-t border-slate-100">
                   <a
                     href={waUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-xs transition-all active:scale-95 group/btn"
+                    className={`w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg shadow-xs hover:scale-[1.02] transition-all cursor-pointer ${card.theme.btnBg}`}
                   >
-                    <MessageCircle className="w-4 h-4 fill-white" />
-                    <span>सेवा हेतु संपर्क करें / WhatsApp Direct</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
+                    <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                    <span>{card.btnText}</span>
                   </a>
                 </div>
               </div>
@@ -295,38 +404,21 @@ export default function AboutUsServicesPage() {
           })}
         </div>
 
-        {/* Bottom Banner Call to Action */}
-        <div className="mt-12 bg-gradient-to-r from-red-700 via-rose-800 to-red-900 rounded-2xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 text-center md:text-left">
-            <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase">
-              सुरक्षित व त्वरित सुविधा
-            </span>
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight">
-              क्या आपको किसी अन्य तकनीकी कार्य में सहायता चाहिए?
-            </h3>
-            <p className="text-xs sm:text-sm text-red-100 max-w-xl">
-              हम आपके सभी डिजिटल फॉर्म, प्रिंटआउट, फोटो-हस्ताक्षर रिसाइज़, समग्र ई-केवाईसी एवं कंप्यूटर समस्याओं का त्वरित समाधान करते हैं।
-            </p>
+        {/* 4. COMPACT FOOTER STRIP */}
+        <div className="bg-white rounded-xl border border-amber-300/80 p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex items-center gap-2 text-xs text-slate-800 font-bold">
+            <span className="text-base">💡</span>
+            <span>दुकान जाने की आवश्यकता नहीं — सभी कार्य घर बैठे सुरक्षित व्हाट्सएप एवं ऑनलाइन माध्यम से संपन्न।</span>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full md:w-auto">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setContactModalOpen(true)}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-neutral-900 hover:bg-neutral-100 font-black text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+              className="text-xs text-red-700 hover:text-red-800 font-black hover:underline cursor-pointer"
             >
-              <Phone className="w-4 h-4 text-red-700" />
-              <span>कॉल करें: 8982324497</span>
+              संपर्क विवरण देखें →
             </button>
-            <a
-              href={OWNER_INFO.whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm shadow-md transition-all active:scale-95"
-            >
-              <MessageCircle className="w-5 h-5 fill-slate-950" />
-              <span>व्हाट्सएप खोलें</span>
-            </a>
           </div>
         </div>
       </main>

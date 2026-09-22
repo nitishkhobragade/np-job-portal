@@ -26,6 +26,8 @@ export interface JobPosterProps {
   customFeeAlert?: string;
   customPoints?: string[];
   customNote?: string;
+  customPosterUrl?: string;
+  useCustomPoster?: boolean;
   aspectRatio?: 'story' | 'feed'; // 'story' (9:16) or 'feed' (4:3)
   scale?: number;
   className?: string;
@@ -41,6 +43,8 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
       customFeeAlert,
       customPoints,
       customNote,
+      customPosterUrl: overrideCustomPosterUrl,
+      useCustomPoster: overrideUseCustomPoster,
       aspectRatio = 'story',
       className = ''
     },
@@ -95,6 +99,52 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
 
     const targetWidth = 1080;
     const targetHeight = aspectRatio === 'story' ? 1920 : 1440;
+
+    const useCustomPoster = overrideUseCustomPoster !== undefined
+      ? overrideUseCustomPoster
+      : Boolean(postRec?.useCustomPoster || detailRec?.useCustomPoster);
+    const customPosterUrl = overrideCustomPosterUrl !== undefined
+      ? overrideCustomPosterUrl
+      : (postRec?.customPosterUrl || detailRec?.customPosterUrl);
+
+    if (useCustomPoster && customPosterUrl) {
+      return (
+        <div
+          ref={ref}
+          id="job-poster-canvas"
+          style={{
+            width: `${targetWidth}px`,
+            height: `${targetHeight}px`
+          }}
+          className={`relative bg-slate-950 text-white flex flex-col justify-between select-none font-sans overflow-hidden ${className}`}
+        >
+          {/* Custom Poster Image Canvas */}
+          <div className="relative w-full h-full flex items-center justify-center bg-slate-950 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={customPosterUrl}
+              alt={title}
+              className="w-full h-full object-contain"
+            />
+
+            {/* Faint Official Seal Overlay on Custom Poster */}
+            <div className="absolute bottom-4 right-4 bg-slate-950/85 backdrop-blur-xs border border-amber-400/60 rounded-xl px-3.5 py-2 flex items-center gap-2 shadow-2xl z-30 pointer-events-none">
+              <div className="w-6 h-6 rounded-lg bg-amber-400 text-slate-950 font-black flex items-center justify-center text-xs">
+                NP
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] font-black text-amber-300 uppercase leading-none">
+                  NP JOB PORTAL
+                </p>
+                <p className="text-[9px] text-slate-300 font-medium mt-0.5">
+                  Nitish Khobragade (8982324497)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div

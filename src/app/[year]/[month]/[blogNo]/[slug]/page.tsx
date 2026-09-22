@@ -123,7 +123,9 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
           notificationPdfUrl: record.links?.notificationPdf || 'https://esb.mp.gov.in',
           syllabusUrl: record.links?.syllabusPdf,
           officialWebsiteUrl: record.links?.officialSite || 'https://esb.mp.gov.in',
-          serviceTagline: `घर बैठे सुरक्षित फॉर्म भरवाएं • ${OWNER_INFO.name} (${OWNER_INFO.phone})`
+          serviceTagline: `घर बैठे सुरक्षित फॉर्म भरवाएं • ${OWNER_INFO.name} (${OWNER_INFO.phone})`,
+          customPosterUrl: record.customPosterUrl,
+          useCustomPoster: record.useCustomPoster
         };
         setDynamicJob(synthesized);
       }

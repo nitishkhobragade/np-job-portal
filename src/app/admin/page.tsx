@@ -31,7 +31,13 @@ import {
   Layers,
   Share2,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  Database,
+  Download,
+  Upload,
+  Server,
+  ShieldAlert,
+  Bot
 } from 'lucide-react';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket, TickerAlert } from '../../types';
 import {
@@ -53,7 +59,10 @@ import {
   triggerSourceTestFetch,
   getTickers,
   saveTickers,
-  subscribeToTickers
+  subscribeToTickers,
+  exportFullDatabaseBackup,
+  restoreDatabaseFromBackup,
+  PortalDatabaseBackup
 } from '../../lib/firebase';
 import { seedPostsIfEmpty } from '../../lib/seedDatabase';
 import { PosterStudio } from '../../components/PosterStudio';
@@ -145,8 +154,8 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker'
-  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker'>('posts');
+  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup'
+  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup'>('posts');
 
   // Posts State
   const [posts, setPosts] = useState<PostRecord[]>([]);
@@ -193,6 +202,12 @@ export default function AdminPage() {
   const [formBlogNo, setFormBlogNo] = useState<string>('01');
   const [formSlug, setFormSlug] = useState<string>('');
   const [reviewedDraftId, setReviewedDraftId] = useState<string | null>(null);
+
+  // Custom Poster Engine state for Post form
+  const [formUseCustomPoster, setFormUseCustomPoster] = useState<boolean>(false);
+  const [formCustomPosterUrl, setFormCustomPosterUrl] = useState<string>('');
+  const [isFormCompressingPoster, setIsFormCompressingPoster] = useState<boolean>(false);
+  const [formPosterSizeKb, setFormPosterSizeKb] = useState<number | null>(null);
   
   // Tech specific form states
   const [formIsTechJob, setFormIsTechJob] = useState<boolean>(false);
@@ -219,6 +234,14 @@ export default function AdminPage() {
 
   // Controlled Status Changes state: changes remain in local state until user explicitly clicks "Save Changes"
   const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, 'published' | 'draft' | 'suspended'>>({});
+  const [isSavingStatusBatch, setIsSavingStatusBatch] = useState<boolean>(false);
+
+  // Database Backup & Restore Manager State
+  const [isExportingBackup, setIsExportingBackup] = useState<boolean>(false);
+  const [isRestoringBackup, setIsRestoringBackup] = useState<boolean>(false);
+  const [backupRestoreMessage, setBackupRestoreMessage] = useState<string | null>(null);
+  const [backupRestoreError, setBackupRestoreError] = useState<string | null>(null);
+  const [parsedBackupSnapshot, setParsedBackupSnapshot] = useState<PortalDatabaseBackup | null>(null);
   const [isSavingStatusChanges, setIsSavingStatusChanges] = useState<boolean>(false);
 
   // Social Share Modal State
@@ -576,7 +599,9 @@ export default function AdminPage() {
       role: formRole,
       experience: formExperience,
       location: formLocation,
-      batchEligibility: formBatchEligibility
+      batchEligibility: formBatchEligibility,
+      useCustomPoster: formUseCustomPoster && Boolean(formCustomPosterUrl),
+      customPosterUrl: formUseCustomPoster ? formCustomPosterUrl : ''
     };
 
     if (editingPostId) {
@@ -647,6 +672,9 @@ export default function AdminPage() {
     setFormExperience('');
     setFormLocation('');
     setFormBatchEligibility('');
+    setFormUseCustomPoster(false);
+    setFormCustomPosterUrl('');
+    setFormPosterSizeKb(null);
   };
 
   const startEditPost = (p: PostRecord) => {
@@ -692,6 +720,9 @@ export default function AdminPage() {
     setFormExperience(p.experience || '');
     setFormLocation(p.location || '');
     setFormBatchEligibility(p.batchEligibility || '');
+    setFormUseCustomPoster(Boolean(p.useCustomPoster && p.customPosterUrl));
+    setFormCustomPosterUrl(p.customPosterUrl || '');
+    setFormPosterSizeKb(p.customPosterUrl ? Math.round((p.customPosterUrl.length * 3) / 4 / 1024) : null);
     setShowAddForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1203,6 +1234,18 @@ export default function AdminPage() {
           >
             <Radio className="w-4 h-4 text-red-500 animate-pulse" />
             <span>लाइव रनिंग टिकर कंट्रोल ({tickersList.filter(t => t.active !== false).length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('backup')}
+            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+              activeTab === 'backup'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Database className="w-4 h-4 text-emerald-400" />
+            <span>डेटाबेस बैकअप एवं रीस्टोर (Full DB Backup)</span>
           </button>
         </div>
       </header>
@@ -1986,6 +2029,161 @@ export default function AdminPage() {
                             </button>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Custom Poster Upload & Compression Engine */}
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                      <div>
+                        <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-amber-400" />
+                          <span>कस्टम पोस्टर अपलोड एवं कंप्रेशन इंजन (Custom Poster Engine)</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          ऑटो-जेनरेटेड टेक्स्ट पोस्टर की जगह अपनी कस्टम बैनर इमेज लगाएं (ऑटो कंप्रेस ~100KB)
+                        </p>
+                      </div>
+
+                      {/* Mode Toggle */}
+                      <div className="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-700 text-xs font-bold shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setFormUseCustomPoster(false)}
+                          className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                            !formUseCustomPoster
+                              ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <Bot className="w-3.5 h-3.5" />
+                          <span>ऑटो-जनरेटेड</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormUseCustomPoster(true)}
+                          className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                            formUseCustomPoster
+                              ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>कस्टम इमेज</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {formUseCustomPoster && (
+                      <div className="space-y-3 pt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="form-poster-upload-input"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setIsFormCompressingPoster(true);
+
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  const img = new window.Image();
+                                  img.onload = () => {
+                                    const canvas = document.createElement('canvas');
+                                    const ctx = canvas.getContext('2d');
+                                    const targetWidth = 1080;
+                                    const scale = targetWidth / img.width;
+                                    const targetHeight = Math.round(img.height * scale);
+
+                                    canvas.width = targetWidth;
+                                    canvas.height = targetHeight;
+
+                                    if (ctx) {
+                                      ctx.imageSmoothingEnabled = true;
+                                      ctx.imageSmoothingQuality = 'high';
+                                      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+                                      let quality = 0.82;
+                                      let dataUrl = canvas.toDataURL('image/webp', quality);
+                                      let sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+
+                                      if (sizeKb > 150) {
+                                        quality = 0.70;
+                                        dataUrl = canvas.toDataURL('image/webp', quality);
+                                        sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+                                      }
+
+                                      setFormCustomPosterUrl(dataUrl);
+                                      setFormPosterSizeKb(sizeKb);
+                                      setIsFormCompressingPoster(false);
+                                    }
+                                  };
+                                  img.onerror = () => setIsFormCompressingPoster(false);
+                                  img.src = event.target?.result as string;
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                            <label
+                              htmlFor="form-poster-upload-input"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>{formCustomPosterUrl ? 'पोस्टर बदलें (Replace)' : 'पोस्टर इमेज अपलोड करें'}</span>
+                            </label>
+
+                            {formCustomPosterUrl && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormCustomPosterUrl('');
+                                  setFormPosterSizeKb(null);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-lg text-xs font-bold border border-rose-800/80"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>हटाएं</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="text-right text-[11px] text-slate-400">
+                            {isFormCompressingPoster ? (
+                              <span className="text-amber-400 font-bold animate-pulse">
+                                कंप्रेस हो रहा है (~1080px WebP)...
+                              </span>
+                            ) : formPosterSizeKb ? (
+                              <span className="text-emerald-400 font-bold">
+                                ✓ कंप्रेस्ड आकार: ~{formPosterSizeKb} KB
+                              </span>
+                            ) : (
+                              <span>आधिकारिक वॉटरमार्क स्वचालित रूप से लागू रहेगा</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {formCustomPosterUrl && (
+                          <div className="flex items-center gap-3 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={formCustomPosterUrl}
+                              alt="Form Custom Poster Preview"
+                              className="w-12 h-16 object-cover rounded border border-slate-700"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-white truncate">
+                                कस्टम पोस्टर इमेज लोड हो चुकी है
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                यह इमेज विवरण पृष्ठ एवं पोस्टर स्टूडियो दोनों में प्रदर्शित होगी।
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3634,6 +3832,252 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: DATABASE BACKUP & RESTORE MANAGER */}
+        {activeTab === 'backup' && (
+          <div className="space-y-6">
+            {/* Header info card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black text-white flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  <span>संपूर्ण पोर्टल डेटाबेस बैकअप एवं रीस्टोर प्रबंधक</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  पोर्टल की सभी {posts.length} सरकारी भर्तियां, AI स्क्रैपर स्रोत, रनिंग टिकर्स एवं विज्ञापन सेटिंग्स को एक क्लिक में JSON बैकअप के रूप में सुरक्षित डाउनलोड करें अथवा बैकअप से रीस्टोर करें।
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isExportingBackup}
+                  onClick={async () => {
+                    setIsExportingBackup(true);
+                    setBackupRestoreError(null);
+                    setBackupRestoreMessage('डेटाबेस स्नैपशॉट एकत्रित किया जा रहा है...');
+                    try {
+                      const snapshot = await exportFullDatabaseBackup();
+                      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      const dateStr = new Date().toISOString().slice(0, 10);
+                      a.href = url;
+                      a.download = `np-job-portal-backup-${dateStr}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      setBackupRestoreMessage(`सफलतापूर्वक बैकअप एक्सपोर्ट किया गया! (${snapshot.counts.posts} पोस्ट्स सुरक्षित)`);
+                      showToast('डेटाबेस बैकअप फ़ाइल डाउनलोड हो गई!');
+                    } catch (err: any) {
+                      console.error('Backup export failed:', err);
+                      setBackupRestoreError('बैकअप एक्सपोर्ट विफल: ' + (err.message || 'अज्ञात त्रुटि'));
+                    } finally {
+                      setIsExportingBackup(false);
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isExportingBackup ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  <span>पूर्ण बैकअप डाउनलोड करें (JSON)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Notification & Status Messages */}
+            {backupRestoreMessage && (
+              <div className="p-4 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-200 text-xs font-bold flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{backupRestoreMessage}</span>
+              </div>
+            )}
+
+            {backupRestoreError && (
+              <div className="p-4 bg-rose-950/80 border border-rose-500/50 rounded-xl text-rose-200 text-xs font-bold flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{backupRestoreError}</span>
+              </div>
+            )}
+
+            {/* Two Column Operational Grid: Live Stats & Restore Wizard */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Box 1: Current Database Status */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <h3 className="text-sm font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                  <Server className="w-4 h-4 text-amber-400" />
+                  <span>वर्तमान लाइव डेटाबेस स्नैपशॉट सारांश</span>
+                </h3>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span className="text-slate-400 block mb-1">कुल भर्ती पोस्ट्स:</span>
+                    <span className="text-xl font-black text-amber-400 font-mono">{posts.length}</span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      प्रकाशित: {posts.filter(p => p.status === 'published').length} • ड्राफ्ट: {posts.filter(p => p.status === 'draft').length}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span className="text-slate-400 block mb-1">लाइव टिकर अलर्ट्स:</span>
+                    <span className="text-xl font-black text-red-400 font-mono">{tickersList.length}</span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      सक्रिय: {tickersList.filter(t => t.active !== false).length}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span className="text-slate-400 block mb-1">AI स्क्रैपर स्रोत:</span>
+                    <span className="text-xl font-black text-purple-400 font-mono">{scraperSources.length}</span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      कतार में ड्राफ्ट: {scrapedDrafts.filter(d => d.status === 'queued').length}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span className="text-slate-400 block mb-1">पॉपअप कैंपेन:</span>
+                    <span className="text-xl font-black text-emerald-400 font-mono">
+                      {popupSettings.enabled ? 'सक्रिय 🟢' : 'निष्क्रिय ⚪'}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      {popupSettings.title ? popupSettings.title.slice(0, 20) + '...' : 'डिफ़ॉल्ट'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+                    ऑटो-क्लाउड व लोकल सिंक्रोनाइज़ेशन
+                  </p>
+                  <p className="text-slate-400">
+                    डेटाबेस Firestore क्लाउड पर सुरक्षित रूप से होस्टेड है। नियमित बैकअप लेने से किसी भी परिस्थिति में आपका डेटा 100% सुरक्षित रहता है।
+                  </p>
+                </div>
+              </div>
+
+              {/* Box 2: Restore from Backup JSON */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <h3 className="text-sm font-black text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                  <Upload className="w-4 h-4 text-blue-400" />
+                  <span>बैकअप JSON से रीस्टोर करें (Database Restore)</span>
+                </h3>
+
+                <p className="text-xs text-slate-400">
+                  पूर्व में डाउनलोड की गई <strong>.json</strong> बैकअप फ़ाइल का चयन करें। सिस्टम स्वचालित रूप से डेटा संरचना का सत्यापन कर डेटाबेस को अपडेट करेगा।
+                </p>
+
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    id="db-restore-file-input"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setBackupRestoreError(null);
+                      setBackupRestoreMessage(null);
+
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        try {
+                          const parsed = JSON.parse(event.target?.result as string);
+                          if (!parsed || !parsed.data || !Array.isArray(parsed.data.posts)) {
+                            throw new Error('अमान्य बैकअप संरचना। कृपया केवल NP Job Portal की बैकअप JSON फ़ाइल अपलोड करें।');
+                          }
+                          setParsedBackupSnapshot(parsed);
+                          setBackupRestoreMessage(`फ़ाइल मान्य है! पाया गया: ${parsed.data.posts.length} पोस्ट्स, ${parsed.data.tickers?.length || 0} टिकर अलर्ट्स।`);
+                        } catch (err: any) {
+                          setParsedBackupSnapshot(null);
+                          setBackupRestoreError('फ़ाइल पढ़ने में त्रुटि: ' + (err.message || 'अमान्य JSON'));
+                        }
+                      };
+                      reader.readAsText(file);
+                    }}
+                  />
+
+                  <label
+                    htmlFor="db-restore-file-input"
+                    className="w-full py-4 border-2 border-dashed border-slate-700 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors bg-slate-950/60"
+                  >
+                    <Upload className="w-6 h-6 text-blue-400" />
+                    <span className="text-xs font-bold text-white">
+                      बैकअप JSON फ़ाइल चुनें (.json)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      कंप्यूटर अथवा मोबाइल से बैकअप फ़ाइल ब्राउज करें
+                    </span>
+                  </label>
+
+                  {/* Parsed Snapshot Preview & Confirm Button */}
+                  {parsedBackupSnapshot && (
+                    <div className="p-4 bg-slate-950 rounded-xl border border-blue-500/40 space-y-3">
+                      <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
+                        <span className="font-bold text-blue-300">पहचाना गया बैकअप:</span>
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {parsedBackupSnapshot.exportedAt ? new Date(parsedBackupSnapshot.exportedAt).toLocaleString('hi-IN') : 'दिनांक अनुपलब्ध'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-400 block text-[10px]">पोस्ट्स</span>
+                          <span className="font-bold text-amber-400">{parsedBackupSnapshot.data.posts.length}</span>
+                        </div>
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-400 block text-[10px]">टिकर्स</span>
+                          <span className="font-bold text-red-400">{parsedBackupSnapshot.data.tickers?.length || 0}</span>
+                        </div>
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-400 block text-[10px]">स्रोत</span>
+                          <span className="font-bold text-purple-400">{parsedBackupSnapshot.data.scrapers?.length || 0}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isRestoringBackup}
+                        onClick={async () => {
+                          if (!confirm(`चेतावनी: क्या आप निश्चित रूप से ${parsedBackupSnapshot.data.posts.length} पोस्ट्स एवं टिकर डेटा रीस्टोर करना चाहते हैं?`)) {
+                            return;
+                          }
+                          setIsRestoringBackup(true);
+                          setBackupRestoreError(null);
+                          setBackupRestoreMessage('डेटाबेस रीस्टोर किया जा रहा है (Batch Commit)...');
+                          try {
+                            const res = await restoreDatabaseFromBackup(parsedBackupSnapshot);
+                            setBackupRestoreMessage(res.message);
+                            showToast('डेटाबेस सफलतापूर्वक रीस्टोर हो गया!');
+                            setParsedBackupSnapshot(null);
+                            await refreshData();
+                          } catch (err: any) {
+                            console.error('Database restore error:', err);
+                            setBackupRestoreError('रीस्टोर विफल: ' + (err.message || 'अज्ञात त्रुटि'));
+                          } finally {
+                            setIsRestoringBackup(false);
+                          }
+                        }}
+                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isRestoringBackup ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                        <span>डेटाबेस में रीस्टोर लागू करें (Confirm Restore)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -427,19 +427,19 @@ const HeaderInner: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* MOBILE HAMBURGER SLIDE DRAWER */}
+      {/* MOBILE HAMBURGER SLIDE DRAWER (COMPACT VERTICAL SPACING) */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-slate-950 text-white border-b border-slate-800 p-4 animate-in slide-in-from-top-2 duration-150">
-          <div className="flex flex-col space-y-2 text-sm font-bold">
+        <div className="md:hidden bg-slate-950 text-white border-b border-slate-800 p-2.5 sm:p-3 animate-in slide-in-from-top-2 duration-150 max-h-[calc(100dvh-75px)] overflow-y-auto">
+          <div className="flex flex-col space-y-1 text-xs font-bold">
             <Link
               href="/"
               onClick={handleHomeClick}
-              className={`px-3 py-2 rounded-lg flex items-center justify-between cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer ${
                 activeTab === 'home' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
             >
               <span>मुख्य पृष्ठ (Home)</span>
-              <span className="text-xs bg-red-850 px-2 py-0.5 rounded">All</span>
+              <span className="text-[10px] bg-red-850 px-1.5 py-0.5 rounded font-bold">All</span>
             </Link>
 
             <Link
@@ -448,12 +448,12 @@ const HeaderInner: React.FC<HeaderProps> = ({
                 if (setSelectedCategory) setSelectedCategory('Latest Jobs');
                 setMobileMenuOpen(false);
               }}
-              className={`px-3 py-2 rounded-lg flex items-center justify-between cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer ${
                 activeTab === 'latest-jobs' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
             >
               <span>लेटेस्ट सरकारी नौकरियां (Latest Jobs)</span>
-              <span className="text-xs bg-slate-800 px-2 py-0.5 rounded">New</span>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-bold">New</span>
             </Link>
 
             <Link
@@ -462,14 +462,14 @@ const HeaderInner: React.FC<HeaderProps> = ({
                 if (setSelectedCategory) setSelectedCategory('MP Special');
                 setMobileMenuOpen(false);
               }}
-              className={`text-left px-3 py-2 rounded-lg border font-black flex items-center justify-between cursor-pointer ${
+              className={`text-left px-2.5 py-1.5 rounded-lg border font-black flex items-center justify-between cursor-pointer ${
                 activeTab === 'mp-special'
                   ? 'bg-amber-500 text-slate-950 border-amber-400'
                   : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
               }`}
             >
               <span>★ मध्य प्रदेश स्पेशल (MP Special)</span>
-              <span className="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded font-black">Top</span>
+              <span className="text-[10px] bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black">Top</span>
             </Link>
 
             <Link
@@ -478,14 +478,14 @@ const HeaderInner: React.FC<HeaderProps> = ({
                 if (setSelectedCategory) setSelectedCategory('Tech Jobs');
                 setMobileMenuOpen(false);
               }}
-              className={`text-left px-3 py-2 rounded-lg border font-bold flex items-center justify-between cursor-pointer ${
+              className={`text-left px-2.5 py-1.5 rounded-lg border font-bold flex items-center justify-between cursor-pointer ${
                 activeTab === 'tech-jobs'
                   ? 'bg-blue-600 text-white border-blue-500'
                   : 'bg-blue-900/30 text-blue-300 border-blue-500/40 hover:bg-blue-900/50'
               }`}
             >
               <span>💻 Tech & Corporate Jobs (IT / MNC)</span>
-              <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded font-black">MNC</span>
+              <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded font-black">MNC</span>
             </Link>
 
             <Link
@@ -494,11 +494,11 @@ const HeaderInner: React.FC<HeaderProps> = ({
                 if (setSelectedCategory) setSelectedCategory('SSC/UPSC');
                 setMobileMenuOpen(false);
               }}
-              className={`text-left px-3 py-2 rounded-lg cursor-pointer ${
+              className={`text-left px-2.5 py-1.5 rounded-lg cursor-pointer ${
                 activeTab === 'central-ssc' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
             >
-              Central & SSC Govt Jobs
+              <span>Central & SSC Govt Jobs</span>
             </Link>
 
             <Link
@@ -507,11 +507,11 @@ const HeaderInner: React.FC<HeaderProps> = ({
                 if (setSelectedCategory) setSelectedCategory('Admit Card');
                 setMobileMenuOpen(false);
               }}
-              className={`px-3 py-2 rounded-lg cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg cursor-pointer ${
                 activeTab === 'admit-card' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
             >
-              एडमिट कार्ड (Admit Card)
+              <span>एडमिट कार्ड (Admit Card)</span>
             </Link>
 
             <Link
@@ -520,16 +520,16 @@ const HeaderInner: React.FC<HeaderProps> = ({
                 if (setSelectedCategory) setSelectedCategory('Results');
                 setMobileMenuOpen(false);
               }}
-              className={`px-3 py-2 rounded-lg cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg cursor-pointer ${
                 activeTab === 'results' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
             >
-              रिजल्ट एवं उत्तर कुंजी (Results)
+              <span>रिजल्ट एवं उत्तर कुंजी (Results)</span>
             </Link>
 
-            {/* अन्य सेवाएं एवं विकल्प (More Services Accordion) */}
-            <div className="pt-3 mt-2 border-t border-slate-800 space-y-1">
-              <div className="px-3 py-1 text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            {/* अन्य सेवाएं एवं विकल्प (More Services Accordion - Ultra Compact) */}
+            <div className="pt-2 mt-1 border-t border-slate-800 space-y-0.5">
+              <div className="px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <span>अन्य सेवाएं एवं विकल्प</span>
               </div>
 
@@ -537,7 +537,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <Link
                 href="/about-us"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                className="px-2 py-1 rounded-md flex items-center gap-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
               >
                 <Award className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>🌟 ऑनलाइन फॉर्म व तकनीकी सेवाएं (About Us)</span>
@@ -550,7 +550,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
                   setMobileMenuOpen(false);
                   setContactModalOpen(true);
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                className="w-full text-left px-2 py-1 rounded-md flex items-center gap-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
               >
                 <Phone className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>📞 संपर्क सूत्र (Contact Us)</span>
@@ -560,7 +560,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <Link
                 href="/category/syllabus"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                className="px-2 py-1 rounded-md flex items-center gap-2 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
               >
                 <Briefcase className="w-4 h-4 text-blue-400 shrink-0" />
                 <span>📑 सिलेबस व नियम पुस्तिका (Syllabus)</span>
@@ -570,19 +570,19 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <Link
                 href="/disclaimer"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                className="px-2 py-1 rounded-md flex items-center gap-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
               >
                 <FileText className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>⚖️ डिस्क्लेमर (Disclaimer)</span>
               </Link>
             </div>
 
-            <div className="pt-2 mt-2 border-t border-slate-800 flex flex-col space-y-2">
+            <div className="pt-2 mt-1 border-t border-slate-800 flex flex-col">
               <a
                 href={OWNER_INFO.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-black text-xs cursor-pointer shadow-md"
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer shadow-md transition-transform active:scale-98"
               >
                 <MessageCircle className="w-4 h-4 fill-white" />
                 <span>WhatsApp: {OWNER_INFO.phone}</span>

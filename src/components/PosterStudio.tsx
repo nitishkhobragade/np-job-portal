@@ -13,11 +13,16 @@ import {
   ZoomOut,
   Sliders,
   RotateCcw,
-  ShieldCheck
+  ShieldCheck,
+  Upload,
+  Image as ImageIcon,
+  Bot,
+  Trash2
 } from 'lucide-react';
 import { JobPostDetail, PostRecord } from '../types';
 import { OWNER_INFO } from '../data/portalData';
 import { JobPoster } from './JobPoster';
+import { updateJob } from '../lib/firebase';
 
 interface PosterStudioProps {
   job: JobPostDetail | PostRecord;
@@ -25,6 +30,7 @@ interface PosterStudioProps {
   isModal?: boolean;
   initialEditableMode?: boolean;
   isAdmin?: boolean;
+  onJobUpdated?: (updatedJob: PostRecord) => void;
 }
 
 export const PosterStudio: React.FC<PosterStudioProps> = ({
@@ -96,6 +102,116 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const [customNote, setCustomNote] = useState<string>(
     posterConfig?.note || 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
   );
+
+  // Poster Mode: 'auto' (algorithmic SVG/canvas) vs 'custom' (uploaded banner compressed to ~100KB)
+  const initialUseCustom = Boolean(postRec?.useCustomPoster || detailRec?.useCustomPoster);
+  const initialCustomUrl = postRec?.customPosterUrl || detailRec?.customPosterUrl || '';
+  const [posterMode, setPosterMode] = useState<'auto' | 'custom'>(initialUseCustom ? 'custom' : 'auto');
+  const [customPosterUrl, setCustomPosterUrl] = useState<string>(initialCustomUrl);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [compressedSizeKb, setCompressedSizeKb] = useState<number | null>(null);
+  const [saveStatusMsg, setSaveStatusMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle client-side image compression: Canvas + WebP (target 1080px width, ~100KB size)
+  const handleCustomImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    setSaveStatusMsg('छवि कंप्रेस की जा रही है (~100KB लक्ष्य)...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          // Target 1080px width while preserving aspect ratio
+          const targetWidth = 1080;
+          const scale = targetWidth / img.width;
+          const targetHeight = Math.round(img.height * scale);
+
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+            // Compress to WebP at quality 0.82
+            let quality = 0.82;
+            let dataUrl = canvas.toDataURL('image/webp', quality);
+
+            // Calculate approximate size in KB: length * 3/4
+            let sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+
+            // If still over 150KB, reduce quality slightly
+            if (sizeKb > 150) {
+              quality = 0.70;
+              dataUrl = canvas.toDataURL('image/webp', quality);
+              sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+            }
+
+            setCustomPosterUrl(dataUrl);
+            setCompressedSizeKb(sizeKb);
+            setPosterMode('custom');
+            setIsCompressing(false);
+            setSaveStatusMsg(`कंप्रेशन पूर्ण! साइज: ~${sizeKb} KB (WebP)`);
+            setTimeout(() => setSaveStatusMsg(null), 4000);
+          }
+        };
+        img.onerror = () => {
+          setIsCompressing(false);
+          setSaveStatusMsg('छवि लोड करने में त्रुटि!');
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Image compression error:', err);
+      setIsCompressing(false);
+      setSaveStatusMsg('कंप्रेशन विफल रहा।');
+    }
+  };
+
+  // Save Poster Preference to Firestore (if job exists with an id)
+  const handleSavePosterPreference = async () => {
+    const jobId = postRec?.id || detailRec?.id;
+    if (!jobId) {
+      setSaveStatusMsg('सहेजने के लिए जॉब ID उपलब्ध नहीं है');
+      return;
+    }
+
+    try {
+      setSaveStatusMsg('सहेजा जा रहा है...');
+      const isCustom = posterMode === 'custom' && Boolean(customPosterUrl);
+      const updateData = {
+        useCustomPoster: isCustom,
+        customPosterUrl: isCustom ? customPosterUrl : ''
+      };
+
+      await updateJob(jobId, updateData);
+
+      if (onJobUpdated && postRec) {
+        onJobUpdated({
+          ...postRec,
+          useCustomPoster: isCustom,
+          customPosterUrl: isCustom ? customPosterUrl : ''
+        });
+      }
+
+      setSaveStatusMsg('पोस्टर सेटिंग सफलतापूर्वक सुरक्षित की गई!');
+      setTimeout(() => setSaveStatusMsg(null), 3500);
+    } catch (err) {
+      console.error('Save poster error:', err);
+      setSaveStatusMsg('सहेजने में त्रुटि आई!');
+      setTimeout(() => setSaveStatusMsg(null), 3500);
+    }
+  };
 
   const handleResetDefaults = () => {
     setCustomHeadline(posterConfig?.headline || `★ ${defaultShortTitle} भर्ती अलर्ट ★`);
@@ -347,20 +463,157 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
       {/* Dynamic Customizer Drawer / Panel - ONLY FOR ADMIN */}
       {isAdminState && showCustomizer && (
-        <div className="mt-4 p-4 bg-slate-800/90 border border-amber-500/40 rounded-xl">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700">
+        <div className="mt-4 p-4 bg-slate-800/90 border border-amber-500/40 rounded-xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-700 gap-2">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-amber-400" />
               <span className="font-bold text-sm text-amber-300">पोस्टर कंटेंट कस्टमाइज़र (Admin Live Editor)</span>
             </div>
-            <button
-              onClick={handleResetDefaults}
-              className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1"
-            >
-              <RotateCcw className="w-3 h-3" /> रीसेट करें
-            </button>
+
+            <div className="flex items-center gap-2">
+              {saveStatusMsg && (
+                <span className="text-xs font-bold text-amber-300 bg-amber-950/80 px-2.5 py-1 rounded-md border border-amber-500/50">
+                  {saveStatusMsg}
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSavePosterPreference}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                title="पोस्टर सेटिंग्स सहेजें"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>सेटिंग्स सेव करें</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetDefaults}
+                className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1 px-2 py-1 bg-slate-900 rounded"
+              >
+                <RotateCcw className="w-3 h-3" /> रीसेट
+              </button>
+            </div>
           </div>
 
+          {/* POSTER MODE CONTROLLER: [🤖 ऑटो-जनरेटेड पोस्टर] vs [🖼️ कस्टम पोस्टर इमेज] */}
+          <div className="bg-slate-900/90 border border-slate-700 rounded-xl p-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div>
+                <span className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-amber-400" />
+                  पोस्टर मोड नियंत्रक (Poster Mode Controller)
+                </span>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  ऑटो-जेनरेटेड टेक्स्ट पोस्टर चुनें अथवा खुद का बना कस्टम पोस्टर अपलोड करें
+                </p>
+              </div>
+
+              {/* Mode Toggle Switch */}
+              <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-700 text-xs font-bold shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPosterMode('auto')}
+                  className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                    posterMode === 'auto'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>ऑटो-जनरेटेड</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPosterMode('custom')}
+                  className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                    posterMode === 'custom'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>कस्टम इमेज</span>
+                </button>
+              </div>
+            </div>
+
+            {/* If Custom Image Mode is active */}
+            {posterMode === 'custom' && (
+              <div className="pt-2 border-t border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCustomImageUpload}
+                      className="hidden"
+                      id="custom-poster-file-input"
+                    />
+                    <label
+                      htmlFor="custom-poster-file-input"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-md"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{customPosterUrl ? 'नया पोस्टर बदलें (Replace)' : 'पोस्टर इमेज अपलोड करें'}</span>
+                    </label>
+
+                    {customPosterUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomPosterUrl('');
+                          setCompressedSizeKb(null);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-lg text-xs font-bold border border-rose-800/80 cursor-pointer"
+                        title="इमेज हटाएं"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>हटाएं</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="text-right text-[11px] text-slate-400">
+                    {isCompressing ? (
+                      <span className="text-amber-400 font-bold animate-pulse">
+                        ऑटो-कंप्रेशन चालू है (~1080px, WebP)...
+                      </span>
+                    ) : compressedSizeKb ? (
+                      <span className="text-emerald-400 font-bold">
+                        ✓ कंप्रेस्ड आकार: ~{compressedSizeKb} KB (वेब अनुकूलित)
+                      </span>
+                    ) : (
+                      <span>अनुशंसित अनुपात: 9:16 (Story) या 4:3 (Feed) • ऑटो-कंप्रेस ~100KB</span>
+                    )}
+                  </div>
+                </div>
+
+                {customPosterUrl && (
+                  <div className="flex items-center gap-3 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={customPosterUrl}
+                      alt="Custom preview"
+                      className="w-12 h-16 object-cover rounded border border-slate-700"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white truncate">
+                        कस्टम पोस्टर सक्रिय (Active Live Preview)
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        Nitish Khobragade आधिकारिक वॉटरमार्क एवं मुहर ओवरले स्वचालित रूप से जोड़ी गई है।
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Text Customizer Fields (relevant for Auto mode or text overlay) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div>
               <label className="block text-slate-300 font-semibold mb-1">हेडलाइन / घोषणा बैनर:</label>
@@ -452,6 +705,8 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 customFeeAlert={customFeeAlert}
                 customPoints={customPoints}
                 customNote={customNote}
+                customPosterUrl={customPosterUrl}
+                useCustomPoster={posterMode === 'custom' && Boolean(customPosterUrl)}
                 aspectRatio={aspectRatio}
               />
             </div>
