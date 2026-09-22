@@ -73,7 +73,9 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
           department: record.dept,
           advtNo: record.advtNo || `ADV/${year}/${blogNo}`,
           totalPosts: String(record.totalPosts || 'विज्ञप्ति अनुसार'),
-          postDate: formatDateToDDMMYYYY(record.dates?.start || record.updatedAt),
+          postDate: record.publishedDate || formatDateToDDMMYYYY(record.dates?.start || record.updatedAt),
+          publishedDateFormatted: record.publishedDateFormatted,
+          importantLinks: record.importantLinks || [],
           startDate: formatDateToDDMMYYYY(record.dates?.start),
           lastDate: formatDateToDDMMYYYY(record.dates?.end),
           lastDateFee: formatDateToDDMMYYYY(record.dates?.end),
@@ -546,6 +548,27 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
                   <span>आधिकारिक वेबसाइट (Official Website)</span>
                   <ExternalLink className="w-3.5 h-3.5 text-neutral-700" />
                 </a>
+
+                {/* Dynamic Extra Important Hyperlinks */}
+                {job.importantLinks && job.importantLinks.length > 0 && (
+                  <div className="pt-2 border-t border-neutral-100 space-y-2">
+                    <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide">
+                      अन्य महत्वपूर्ण लिंक्स:
+                    </p>
+                    {job.importantLinks.map((linkItem) => (
+                      <a
+                        key={linkItem.id}
+                        href={linkItem.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg border border-blue-200 transition-colors"
+                      >
+                        <span className="truncate pr-2">{linkItem.title}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

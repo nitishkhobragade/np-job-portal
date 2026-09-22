@@ -28,8 +28,10 @@ function mapPostToJob(p: PostRecord): JobItem {
     department: p.dept,
     totalPosts: String(p.totalPosts || 'विज्ञप्ति अनुसार'),
     lastDate: p.dates?.end || p.lastDate || 'विज्ञप्ति देखें',
-    postDate: p.publishedDate || p.publishedAt || '21/09/2026',
-    publishedDate: p.publishedDate || p.publishedAt || '21/09/2026',
+    postDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
+    publishedDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
+    publishedDateFormatted: p.publishedDateFormatted || p.publishedDate,
+    importantLinks: p.importantLinks || [],
     state: p.state || (p.categories?.includes('mp_special') ? 'MP' : 'Central'),
     qualification: p.qualification || p.eligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
     category: (p.isTechJob || p.categories?.includes('tech'))
@@ -65,8 +67,8 @@ function mapPostToAdmitCard(p: PostRecord): AdmitCardItem {
     title: p.title,
     department: p.dept,
     examDate: p.examDate || p.dates?.exam || 'शीघ्र घोषित',
-    releaseDate: p.publishedDate || p.publishedAt || p.dates?.start || '21/09/2026',
-    publishedDate: p.publishedDate || p.publishedAt || '21/09/2026',
+    releaseDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
+    publishedDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
     hallTicketStatus: 'Live Now',
     isNew: true,
     downloadUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf
@@ -79,9 +81,9 @@ function mapPostToResult(p: PostRecord): ResultItem {
     id: p.id,
     title: p.title,
     department: p.dept,
-    declaredDate: p.publishedDate || p.publishedAt || '21/09/2026',
-    resultDate: p.publishedDate || p.publishedAt || p.dates?.start || '21/09/2026',
-    publishedDate: p.publishedDate || p.publishedAt || '21/09/2026',
+    declaredDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
+    resultDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
+    publishedDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
     type: p.title.toLowerCase().includes('answer key') ? 'Answer Key' : 'Final Result',
     isNew: true,
     status: 'Declared',
@@ -91,6 +93,7 @@ function mapPostToResult(p: PostRecord): ResultItem {
 }
 
 export default function NPJobPortalPage() {
+  const [currentLayout, setCurrentLayout] = useState<'A' | 'B'>('A');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Updates');
 
@@ -251,6 +254,8 @@ export default function NPJobPortalPage() {
           results={liveResults}
           searchQuery={searchQuery}
           selectedCategory={selectedCategory}
+          currentLayout={currentLayout}
+          onLayoutChange={setCurrentLayout}
           onSelectJob={handleSelectJob}
           onSelectAdmitCard={handleSelectAdmitCard}
           onSelectResult={handleSelectResult}

@@ -9,8 +9,8 @@ interface AdSenseBannerProps {
 export const AdSenseBanner: React.FC<AdSenseBannerProps> = ({ slotType, id }) => {
   if (slotType === 'leaderboard') {
     return (
-      <div id={id || 'adsense-header-leaderboard'} className="w-full max-w-7xl mx-auto px-4 my-3">
-        <div className="relative overflow-hidden rounded-xl border border-dashed border-amber-300 bg-linear-to-r from-amber-50/90 via-orange-50/70 to-yellow-50/90 p-3 shadow-xs">
+      <div id={id || 'adsense-header-leaderboard'} className="w-full max-w-7xl mx-auto px-2 sm:px-4 my-2 sm:my-3 overflow-hidden box-border">
+        <div className="w-full max-w-full relative overflow-hidden rounded-xl border border-dashed border-amber-300 bg-linear-to-r from-amber-50/90 via-orange-50/70 to-yellow-50/90 p-3 shadow-xs">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
             <div className="flex items-center gap-3">
               <span className="shrink-0 inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900 bg-amber-200/80 rounded">

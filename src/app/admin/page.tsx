@@ -30,7 +30,8 @@ import {
   Building2,
   Layers,
   Share2,
-  Calendar
+  Calendar,
+  CheckCircle2
 } from 'lucide-react';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket } from '../../types';
 import {
@@ -178,6 +179,7 @@ export default function AdminPage() {
   const [formPdfLink, setFormPdfLink] = useState<string>('');
   const [formSyllabusLink, setFormSyllabusLink] = useState<string>('');
   const [formOfficialSite, setFormOfficialSite] = useState<string>('');
+  const [formImportantLinks, setFormImportantLinks] = useState<Array<{ id: string; title: string; url: string }>>([]);
   const [formStatus, setFormStatus] = useState<'draft' | 'pending_approval' | 'published' | 'suspended'>('published');
   const [formYear, setFormYear] = useState<string>(() => String(new Date().getFullYear()));
   const [formMonth, setFormMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -203,9 +205,14 @@ export default function AdminPage() {
   const [overridePdfUrl, setOverridePdfUrl] = useState<string>('');
   const [overrideSyllabusUrl, setOverrideSyllabusUrl] = useState<string>('');
   const [overrideSiteUrl, setOverrideSiteUrl] = useState<string>('');
+  const [overrideImportantLinks, setOverrideImportantLinks] = useState<Array<{ id: string; title: string; url: string }>>([]);
 
   // Poster Studio Active Job State
   const [posterJob, setPosterJob] = useState<PostRecord | null>(null);
+
+  // Controlled Status Changes state: changes remain in local state until user explicitly clicks "Save Changes"
+  const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, 'published' | 'draft' | 'suspended'>>({});
+  const [isSavingStatusChanges, setIsSavingStatusChanges] = useState<boolean>(false);
 
   // Social Share Modal State
   const [selectedShareJob, setSelectedShareJob] = useState<PostRecord | null>(null);
@@ -364,21 +371,61 @@ export default function AdminPage() {
     }
   };
 
-  // Instant Status Toggle Handler (published <-> draft <-> suspended)
-  const handleToggleStatus = async (
+  // Controlled Status Toggle Handler: Decoupled from immediate Firestore mutation.
+  // Updates local state and tracks uncommitted changes until user clicks "Save Changes".
+  const handleToggleStatus = (
     postId: string,
     newStatus: 'published' | 'draft' | 'suspended'
   ) => {
+    // Update pending changes
+    setPendingStatusChanges((prev) => {
+      const origPost = posts.find((p) => p.id === postId);
+      if (origPost && origPost.status === newStatus) {
+        // If reverted back to original status, remove from pending
+        const copy = { ...prev };
+        delete copy[postId];
+        return copy;
+      }
+      return { ...prev, [postId]: newStatus };
+    });
+
+    // Update posts in local state so UI reflects change immediately
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, status: newStatus } : p))
+    );
+
+    showToast(`स्थिति स्थानीय रूप से '${newStatus}' चुनी गई (सुरक्षित करने हेतु 'Save Changes' पर क्लिक करें)।`);
+  };
+
+  // Explicit Commit Handler for Controlled Status Changes
+  const handleSaveStatusChanges = async () => {
+    const changedPostIds = Object.keys(pendingStatusChanges);
+    if (changedPostIds.length === 0) return;
+
+    setIsSavingStatusChanges(true);
     try {
-      await updateJob(postId, { status: newStatus });
-      setPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, status: newStatus } : p))
+      await Promise.all(
+        changedPostIds.map(async (postId) => {
+          const newStatus = pendingStatusChanges[postId];
+          await updateJob(postId, { status: newStatus });
+        })
       );
-      showToast(`पोस्ट स्थिति '${newStatus}' में परिवर्तित की गई।`);
+      setPendingStatusChanges({});
+      showToast(`${changedPostIds.length} पोस्ट की स्थितियां सफलतापूर्वक सुरक्षित की गईं!`);
+      await refreshData();
     } catch (err) {
-      console.error('Failed to toggle status:', err);
-      showToast('स्थिति बदलने में त्रुटि हुई!');
+      console.error('Failed to commit status changes:', err);
+      showToast('स्थिति सुरक्षित करने में त्रुटि हुई!');
+    } finally {
+      setIsSavingStatusChanges(false);
     }
+  };
+
+  // Discard pending uncommitted status changes
+  const handleDiscardStatusChanges = async () => {
+    setPendingStatusChanges({});
+    await refreshData();
+    showToast('असुरक्षित परिवर्तन रद्द कर दिए गए।');
   };
 
   // Handle Logout
@@ -420,6 +467,7 @@ export default function AdminPage() {
     setOverridePdfUrl(job.links?.notificationPdf || '');
     setOverrideSyllabusUrl(job.links?.syllabusPdf || '');
     setOverrideSiteUrl(job.links?.officialSite || '');
+    setOverrideImportantLinks(job.importantLinks || []);
   };
 
   // Save Overridden Links
@@ -432,9 +480,12 @@ export default function AdminPage() {
       officialSite: overrideSiteUrl
     };
 
-    await updateJob(overrideJob.id, { links: updatedLinks });
+    await updateJob(overrideJob.id, {
+      links: updatedLinks,
+      importantLinks: overrideImportantLinks
+    });
     setPosts((prev) =>
-      prev.map((p) => (p.id === overrideJob.id ? { ...p, links: updatedLinks } : p))
+      prev.map((p) => (p.id === overrideJob.id ? { ...p, links: updatedLinks, importantLinks: overrideImportantLinks } : p))
     );
     showToast('हाइपरलिंक सफलतापूर्वक अपडेट किए गए!');
     setOverrideJob(null);
@@ -484,6 +535,7 @@ export default function AdminPage() {
         syllabusPdf: formSyllabusLink,
         officialSite: formOfficialSite || 'https://esb.mp.gov.in'
       },
+      importantLinks: formImportantLinks,
       status: formStatus,
       year: formYear || String(new Date().getFullYear()),
       month: formMonth || String(new Date().getMonth() + 1).padStart(2, '0'),
@@ -548,6 +600,7 @@ export default function AdminPage() {
     setFormPdfLink('');
     setFormSyllabusLink('');
     setFormOfficialSite('');
+    setFormImportantLinks([]);
     setFormStatus('published');
     setFormYear(curYear);
     setFormMonth(curMonth);
@@ -588,6 +641,7 @@ export default function AdminPage() {
     setFormPdfLink(p.links?.notificationPdf || '');
     setFormSyllabusLink(p.links?.syllabusPdf || '');
     setFormOfficialSite(p.links?.officialSite || '');
+    setFormImportantLinks(p.importantLinks || []);
     setFormStatus(p.status);
     setFormYear(p.year || '2026');
     setFormMonth(p.month || '09');
@@ -1052,7 +1106,7 @@ export default function AdminPage() {
         </div>
 
         {/* 4 Main Feature Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 flex items-center gap-2 overflow-x-auto border-t border-slate-800/80 pt-2 pb-2 scrollbar-none text-xs font-bold">
+        <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border-t border-slate-800/80 pt-2 pb-2 scrollbar-none text-xs font-bold box-border">
           <button
             onClick={() => setActiveTab('posts')}
             className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
@@ -1754,6 +1808,83 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* Dynamic Important Hyperlinks Repeater */}
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                          अतिरिक्त महत्वपूर्ण हाइपरलिंक्स (Dynamic Links Repeater)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          अभ्यर्थियों के लिए अतिरिक्त लिंक्स (जैसे मॉक टेस्ट, सिलेबस, आंसर की, हेल्पडेस्क) जोड़ें
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormImportantLinks((prev) => [
+                            ...prev,
+                            { id: `link_${Date.now()}`, title: '', url: '' }
+                          ])
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        लिंक जोड़ें (Add Link)
+                      </button>
+                    </div>
+
+                    {formImportantLinks.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic py-1">
+                        कोई अतिरिक्त लिंक नहीं जोड़ा गया। (वैकल्पिक)
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {formImportantLinks.map((item, idx) => (
+                          <div
+                            key={item.id || idx}
+                            className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-2 rounded-lg"
+                          >
+                            <input
+                              type="text"
+                              placeholder="लिंक शीर्षक (e.g. मॉक टेस्ट लिंक / एडमिट कार्ड)"
+                              value={item.title}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormImportantLinks((prev) =>
+                                  prev.map((lnk, i) => (i === idx ? { ...lnk, title: val } : lnk))
+                                );
+                              }}
+                              className="w-1/2 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-white placeholder:text-slate-500"
+                            />
+                            <input
+                              type="url"
+                              placeholder="URL (https://...)"
+                              value={item.url}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormImportantLinks((prev) =>
+                                  prev.map((lnk, i) => (i === idx ? { ...lnk, url: val } : lnk))
+                                );
+                              }}
+                              className="w-1/2 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-white placeholder:text-slate-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormImportantLinks((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded border border-rose-900/50 transition-colors shrink-0"
+                              title="हटाएं (Remove)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Status & Submit */}
                   <div className="pt-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1825,9 +1956,54 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* CONTROLLED STATUS COMMIT BANNER (Visible whenever uncommitted status changes exist) */}
+            {Object.keys(pendingStatusChanges).length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-amber-500/10 border-2 border-amber-500/80 rounded-xl p-3.5 shadow-lg">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                  <div>
+                    <span className="font-black text-amber-300 text-xs sm:text-sm">
+                      {Object.keys(pendingStatusChanges).length} पोस्ट की स्थिति में अप्रकाशित बदलाव हैं (Unsaved Status Changes)
+                    </span>
+                    <p className="text-[11px] text-amber-200/80 mt-0.5">
+                      ये बदलाव अभी स्थानीय हैं। जब तक आप &apos;Save Changes&apos; पर क्लिक नहीं करते, डेटाबेस में बदलाव सुरक्षित नहीं होगा।
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={handleDiscardStatusChanges}
+                    disabled={isSavingStatusChanges}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-colors cursor-pointer border border-slate-700"
+                  >
+                    रद्द करें (Discard)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveStatusChanges}
+                    disabled={isSavingStatusChanges}
+                    className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-lg shadow transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSavingStatusChanges ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>सहेजा जा रहा है...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Save Changes (परिवर्तन सुरक्षित करें)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* LIVE POSTS HORIZONTAL DATA TABLE */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto -mx-2 sm:mx-0 shadow rounded-lg border border-slate-800 bg-slate-900">
+              <div className="overflow-x-auto w-full">
                 <table className="w-full text-left text-xs min-w-[900px]">
                   <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase tracking-wider">
                     <tr>
@@ -1913,26 +2089,35 @@ export default function AdminPage() {
                             {/* 5. Status Badge & Quick Change */}
                             <td className="py-3 px-3">
                               <div className="space-y-1">
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
-                                    job.status === 'published'
-                                      ? 'bg-emerald-950 text-emerald-400 border-emerald-700'
-                                      : job.status === 'suspended'
-                                      ? 'bg-rose-950 text-rose-400 border-rose-700'
-                                      : 'bg-amber-950 text-amber-400 border-amber-700'
-                                  }`}
-                                >
-                                  <span className={`w-1.5 h-1.5 rounded-full ${
-                                    job.status === 'published' ? 'bg-emerald-400' : job.status === 'suspended' ? 'bg-rose-400' : 'bg-amber-400'
-                                  }`}></span>
-                                  {job.status === 'published' ? 'Published' : job.status === 'suspended' ? 'Suspended' : 'Draft'}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                      job.status === 'published'
+                                        ? 'bg-emerald-950 text-emerald-400 border-emerald-700'
+                                        : job.status === 'suspended'
+                                        ? 'bg-rose-950 text-rose-400 border-rose-700'
+                                        : 'bg-amber-950 text-amber-400 border-amber-700'
+                                    }`}
+                                  >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      job.status === 'published' ? 'bg-emerald-400' : job.status === 'suspended' ? 'bg-rose-400' : 'bg-amber-400'
+                                    }`}></span>
+                                    {job.status === 'published' ? 'Published' : job.status === 'suspended' ? 'Suspended' : 'Draft'}
+                                  </span>
+                                  {pendingStatusChanges[job.id] && (
+                                    <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/50 rounded text-[9px] font-bold animate-pulse" title="असुरक्षित परिवर्तन">
+                                      Unsaved
+                                    </span>
+                                  )}
+                                </div>
                                 
                                 {/* Quick Status Selector */}
                                 <select
                                   value={job.status || 'published'}
                                   onChange={(e) => handleToggleStatus(job.id, e.target.value as 'published' | 'draft' | 'suspended')}
-                                  className="block text-[10px] bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-slate-300 hover:border-slate-500 cursor-pointer"
+                                  className={`block text-[10px] bg-slate-950 border rounded px-1.5 py-0.5 text-slate-300 hover:border-slate-500 cursor-pointer ${
+                                    pendingStatusChanges[job.id] ? 'border-amber-400 text-amber-200 ring-1 ring-amber-400/30' : 'border-slate-700'
+                                  }`}
                                   title="स्थिति बदलें (Change Status)"
                                 >
                                   <option value="published">प्रकाशित (Published)</option>
@@ -2313,8 +2498,8 @@ export default function AdminPage() {
                 </div>
 
                 {/* Full Sources Table */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-                  <div className="overflow-x-auto">
+                <div className="w-full overflow-x-auto -mx-2 sm:mx-0 shadow rounded-lg border border-slate-800 bg-slate-900">
+                  <div className="overflow-x-auto w-full">
                     <table className="w-full text-left text-xs text-slate-300">
                       <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black border-b border-slate-800">
                         <tr>
@@ -3123,6 +3308,69 @@ export default function AdminPage() {
                 onChange={(e) => setOverrideSiteUrl(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-white"
               />
+            </div>
+
+            {/* Dynamic Important Links in Override Modal */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300 font-bold">अतिरिक्त महत्वपूर्ण लिंक्स:</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOverrideImportantLinks((prev) => [
+                      ...prev,
+                      { id: `link_${Date.now()}`, title: '', url: '' }
+                    ])
+                  }
+                  className="px-2 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 rounded text-[11px] font-bold"
+                >
+                  + नया लिंक
+                </button>
+              </div>
+
+              {overrideImportantLinks.length === 0 ? (
+                <p className="text-[11px] text-slate-500 italic">कोई अतिरिक्त लिंक नहीं।</p>
+              ) : (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {overrideImportantLinks.map((item, idx) => (
+                    <div key={item.id || idx} className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded border border-slate-800">
+                      <input
+                        type="text"
+                        placeholder="शीर्षक (e.g. एडमिट कार्ड)"
+                        value={item.title}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOverrideImportantLinks((prev) =>
+                            prev.map((l, i) => (i === idx ? { ...l, title: val } : l))
+                          );
+                        }}
+                        className="w-1/2 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                      />
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={item.url}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOverrideImportantLinks((prev) =>
+                            prev.map((l, i) => (i === idx ? { ...l, url: val } : l))
+                          );
+                        }}
+                        className="w-1/2 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOverrideImportantLinks((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="p-1 text-rose-400 hover:text-rose-300"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex justify-end gap-2">

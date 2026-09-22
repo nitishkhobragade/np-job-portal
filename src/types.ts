@@ -10,6 +10,8 @@ export interface JobPostDetail {
   advtNo?: string;
   totalPosts: string;
   postDate: string;
+  publishedDateFormatted?: string;
+  importantLinks?: Array<{ id: string; title: string; url: string }>;
   startDate: string;
   lastDate: string;
   lastDateFee: string;
@@ -78,6 +80,8 @@ export interface JobItem {
   fee?: string;
   postDate?: string;
   publishedDate?: string; // dd/mm/yyyy
+  publishedDateFormatted?: string; // e.g. "22/09/2026, 09:15 PM"
+  importantLinks?: Array<{ id: string; title: string; url: string }>;
   isNew?: boolean;
   isHot?: boolean;
   category: 'Police' | 'Teaching' | 'Defense' | 'SSC/UPSC' | 'Railway' | 'Banking' | 'Health' | 'Tech/IT' | 'Other';
@@ -152,7 +156,9 @@ export interface PostRecord {
   categories?: string[]; // multi-category tags e.g. ['vacancy', 'mp_special']
   status: 'published' | 'draft' | 'suspended'; // Single Source of Truth
   publishedDate?: string; // Mandatory dd/mm/yyyy (Date of publication on portal)
-  publishedAt?: string; // dd/mm/yyyy alias
+  publishedAt?: unknown; // Firestore serverTimestamp, ISO string, or number timestamp
+  publishedDateFormatted?: string; // Date & exact time string e.g. "22/09/2026, 09:15 PM"
+  importantLinks?: Array<{ id: string; title: string; url: string }>; // Dynamic repeater hyperlinks
   startDate?: string; // dd/mm/yyyy
   lastDate?: string; // dd/mm/yyyy
   examDate?: string; // dd/mm/yyyy or "शीघ्र घोषित"

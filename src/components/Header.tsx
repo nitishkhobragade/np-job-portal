@@ -119,34 +119,34 @@ const HeaderInner: React.FC<HeaderProps> = ({
       <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600"></div>
 
       {/* Main Brand & Contact Bar */}
-      <div className="max-w-7xl mx-auto px-4 py-2.5">
-        <div className="flex items-center justify-between gap-3">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 overflow-hidden box-border">
+        <div className="w-full max-w-full flex items-center justify-between gap-2 sm:gap-3 overflow-hidden">
           
           {/* Logo & Portal Identity - Clicking Logo routes to / and immediately resets to HOME */}
-          <Link href="/" onClick={handleHomeClick} className="flex items-center gap-2.5 sm:gap-3 shrink-0 cursor-pointer group">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-rose-900 text-white flex flex-col items-center justify-center font-black shadow-md border border-red-500/30 shrink-0 group-hover:scale-102 transition-transform">
-              <span className="text-lg sm:text-2xl leading-none tracking-tight">NP</span>
-              <span className="text-[7.5px] sm:text-[9px] uppercase tracking-wider font-semibold text-amber-300">PORTAL</span>
+          <Link href="/" onClick={handleHomeClick} className="flex items-center gap-2 sm:gap-3 shrink min-w-0 cursor-pointer group">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-rose-900 text-white flex flex-col items-center justify-center font-black shadow-md border border-red-500/30 shrink-0 group-hover:scale-102 transition-transform">
+              <span className="text-base sm:text-2xl leading-none tracking-tight">NP</span>
+              <span className="text-[7px] sm:text-[9px] uppercase tracking-wider font-semibold text-amber-300">PORTAL</span>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-lg sm:text-2xl font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-red-700 transition-colors">
+                <span className="text-base sm:text-2xl font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-red-700 transition-colors truncate">
                   NP <span className="text-red-600">Job Portal</span>
                 </span>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200 shrink-0">
                   <CheckCircle2 className="w-3 h-3 text-red-600" />
                   MP & Central
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-neutral-600 font-medium line-clamp-1 mt-0.5">
+              <p className="hidden md:block text-[11px] sm:text-xs text-neutral-600 font-medium line-clamp-1 mt-0.5">
                 घर बैठे सुरक्षित फॉर्म भरवाएं • Nitish Khobragade (8982324497)
               </p>
             </div>
           </Link>
 
           {/* Quick Contact & WhatsApp Pill (Desktop & Tablet) */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <div className="text-right mr-1">
               <div className="text-[10px] text-neutral-500 font-semibold uppercase">संचालक व फॉर्म विशेषज्ञ</div>
               <div className="text-xs font-black text-neutral-900">{OWNER_INFO.name}</div>
@@ -410,8 +410,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
       </nav>
 
       {/* Fast Category Badges Strip */}
-      <div className="bg-neutral-50 border-b border-neutral-200 px-4 py-2">
-        <div className="max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+      <div className="w-full max-w-full bg-neutral-50 border-b border-neutral-200 px-2 sm:px-4 py-2 overflow-hidden box-border">
+        <div className="w-full max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
           <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider shrink-0 mr-1">
             श्रेणी:
           </span>

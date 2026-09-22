@@ -9,7 +9,10 @@ import {
   MessageCircle,
   Clock,
   ChevronRight,
-  Filter
+  Filter,
+  Building2,
+  Table as TableIcon,
+  AlignLeft
 } from 'lucide-react';
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
@@ -21,6 +24,8 @@ interface ThreeColumnLayoutProps {
   results: ResultItem[];
   searchQuery: string;
   selectedCategory: string;
+  currentLayout?: 'A' | 'B';
+  onLayoutChange?: (layout: 'A' | 'B') => void;
   onSelectJob: (job: JobItem) => void;
   onSelectAdmitCard: (card: AdmitCardItem) => void;
   onSelectResult: (res: ResultItem) => void;
@@ -32,6 +37,8 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
   results,
   searchQuery,
   selectedCategory,
+  currentLayout = 'A',
+  onLayoutChange,
   onSelectJob,
   onSelectAdmitCard,
   onSelectResult,
@@ -106,24 +113,40 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 text-xs">
-            <Link
-              href="/category/latest-jobs"
-              className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-bold rounded-md shadow-2xs transition-colors flex items-center gap-1"
+          <div className="flex items-center gap-1.5 text-xs bg-slate-100 p-1 rounded-lg border border-slate-300">
+            <button
+              type="button"
+              onClick={() => onLayoutChange?.('A')}
+              className={`px-2.5 py-1 font-bold rounded-md transition-all flex items-center gap-1.5 ${
+                currentLayout === 'A'
+                  ? 'bg-red-700 text-white shadow-md'
+                  : 'text-neutral-700 hover:text-neutral-900 border border-transparent'
+              }`}
+              title="Layout A (Sarkari Classic)"
             >
+              <AlignLeft className="w-3.5 h-3.5" />
               <span>Layout A (Sarkari Classic)</span>
-            </Link>
-            <Link
-              href="/category/latest-jobs"
-              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-md shadow-2xs transition-colors flex items-center gap-1"
+            </button>
+            <button
+              type="button"
+              onClick={() => onLayoutChange?.('B')}
+              className={`px-2.5 py-1 font-bold rounded-md transition-all flex items-center gap-1.5 ${
+                currentLayout === 'B'
+                  ? 'bg-emerald-700 text-white shadow-md'
+                  : 'text-neutral-700 hover:text-neutral-900 border border-transparent'
+              }`}
+              title="Layout B (FreeJobAlert Table)"
             >
+              <TableIcon className="w-3.5 h-3.5" />
               <span>Layout B (FreeJobAlert)</span>
-            </Link>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* 3-Column SarkariResult Layout */}
+      {/* Conditional Layout: Layout A (3-Column Sarkari Classic Grid) vs Layout B (FreeJobAlert Compact Table) */}
+      {currentLayout === 'A' ? (
+      /* 3-Column SarkariResult Layout */
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start w-full max-w-full overflow-hidden">
         
         {/* ================= COLUMN 1: LATEST JOBS ================= */}
@@ -194,16 +217,17 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
 
                     {/* Badges: Total Posts, Published Date & Last Date */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
-                      <span className="inline-flex items-center gap-1 font-bold text-blue-800 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center gap-1 font-bold text-blue-800 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded text-[11px] shrink-0">
                         <Users className="w-3 h-3 text-blue-600" />
                         {job.totalPosts}
                       </span>
 
-                      <span className="inline-flex items-center gap-1 font-medium text-neutral-600 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded text-[10px]">
-                        प्रकाशित तिथि: {job.publishedDate || job.postDate || '21/09/2026'}
+                      <span className="inline-flex items-center gap-1 font-medium text-neutral-600 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded text-[10px] shrink-0">
+                        <Clock className="w-3 h-3 text-neutral-500" />
+                        प्रकाशित: {job.publishedDateFormatted || job.publishedDate || job.postDate || '22/09/2026'}
                       </span>
 
-                      <span className="inline-flex items-center gap-1 font-bold text-rose-800 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center gap-1 font-bold text-rose-800 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded text-[11px] shrink-0">
                         <Calendar className="w-3 h-3 text-rose-600" />
                         अंतिम तिथि: {job.lastDate}
                       </span>
@@ -311,13 +335,14 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
 
                     {/* Badges: Exam Date & Published Date Tag */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
-                      <span className="inline-flex items-center gap-1 font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center gap-1 font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] shrink-0">
                         <Clock className="w-3 h-3 text-amber-700" />
                         {card.examDate}
                       </span>
 
-                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
-                        प्रकाशित तिथि: {card.publishedDate || card.releaseDate || '21/09/2026'}
+                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200 shrink-0">
+                        <Clock className="w-3 h-3 text-neutral-500" />
+                        प्रकाशित: {card.publishedDate || card.releaseDate || '22/09/2026'}
                       </span>
                     </div>
 
@@ -419,13 +444,14 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
 
                     {/* Declaration Date & Scorecard status */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
-                      <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                      <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px] shrink-0">
                         <Calendar className="w-3 h-3 text-emerald-600" />
                         {res.declaredDate}
                       </span>
 
-                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
-                        प्रकाशित तिथि: {res.publishedDate || res.declaredDate || '21/09/2026'}
+                      <span className="inline-flex items-center gap-1 text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200 shrink-0">
+                        <Clock className="w-3 h-3 text-neutral-500" />
+                        प्रकाशित: {res.publishedDate || res.declaredDate || '22/09/2026'}
                       </span>
 
                       {res.scoreCardAvailable && (
@@ -475,6 +501,149 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
         </div>
 
       </div>
+      ) : (
+      /* ================================================================= */
+      /* LAYOUT B: FREEJOBALERT HIGH-DENSITY COMPACT TABLE VIEW            */
+      /* ================================================================= */
+      <div className="w-full bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
+        {/* Table Header Bar */}
+        <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b-2 border-emerald-400">
+          <div className="flex items-center gap-2">
+            <TableIcon className="w-5 h-5 text-emerald-300" />
+            <h3 className="font-extrabold text-base tracking-wide uppercase">
+              FreeJobAlert Style - Live Government Job Notification Table
+            </h3>
+          </div>
+          <span className="text-xs font-bold bg-white/20 px-2.5 py-0.5 rounded-full">
+            कुल {filteredJobs.length} भर्तियां उपलब्ध
+          </span>
+        </div>
+
+        {/* Responsive Table Container */}
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-800 border-b border-slate-300 font-black text-[11px] uppercase tracking-wider">
+                <th className="py-2.5 px-3 border-r border-slate-300 w-28 whitespace-nowrap">पोस्ट / प्रकाशित</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 w-44">बोर्ड / विभाग</th>
+                <th className="py-2.5 px-3 border-r border-slate-300">परीक्षा / पद नाम (Post Title)</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 w-40 hidden md:table-cell">योग्यता</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 w-24 hidden sm:table-cell">कुल पद</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 w-28 whitespace-nowrap">अंतिम तिथि</th>
+                <th className="py-2.5 px-3 text-center w-36">कार्रवाई (Action)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredJobs.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-500 text-xs">
+                    कोई भर्ती नहीं मिली। कृपया सर्च फ़िल्टर रीसेट करें।
+                  </td>
+                </tr>
+              ) : (
+                filteredJobs.map((job) => {
+                  const formBharwayeinUrl = `https://wa.me/918982324497?text=%E0%A4%A8%E0%A4%AE%E0%A4%B8%E0%A5%8D%E0%A4%A4%E0%A5%87%20Nitish%20Ji%2C%20%E0%A4%AE%E0%A5%81%E0%A4%9D%E0%A5%87%20*${encodeURIComponent(
+                    job.title
+                  )}*%20%E0%A4%95%E0%A4%BE%20%E0%A4%AB%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%AE%20%E0%A4%AD%E0%A4%B0%E0%A4%B5%E0%A4%BE%E0%A4%A8%E0%A4%BE%20%E0%A4%B9%E0%A5%88%E0%A5%A4%20Total%20Posts%3A%20${encodeURIComponent(
+                    job.totalPosts
+                  )}%20Last%20Date%3A%20${encodeURIComponent(job.lastDate)}`;
+
+                  return (
+                    <tr key={job.id} className="even:bg-slate-50/70 hover:bg-amber-50/60 transition-colors">
+                      {/* Post Date */}
+                      <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800">{job.publishedDateFormatted || job.publishedDate || job.postDate || '22/09/2026'}</span>
+                        </div>
+                      </td>
+
+                      {/* Board / Department */}
+                      <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-slate-800">
+                        {job.companyName ? (
+                          <div className="flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="text-blue-900">{job.companyName}</span>
+                          </div>
+                        ) : (
+                          <span className="line-clamp-2">{job.department}</span>
+                        )}
+                      </td>
+
+                      {/* Post Title */}
+                      <td className="py-2.5 px-3 border-r border-slate-200">
+                        <div className="flex items-start gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => onSelectJob(job)}
+                            className="font-bold text-slate-900 hover:text-red-700 hover:underline text-left leading-tight"
+                          >
+                            {job.title}
+                          </button>
+                          {job.isNew && (
+                            <span className="bg-red-600 text-white font-black text-[9px] px-1 py-0.2 rounded shrink-0 uppercase animate-pulse">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Qualification */}
+                      <td className="py-2.5 px-3 border-r border-slate-200 text-slate-700 hidden md:table-cell">
+                        <span className="line-clamp-2">{job.qualification}</span>
+                      </td>
+
+                      {/* Total Posts */}
+                      <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-blue-700 hidden sm:table-cell whitespace-nowrap">
+                        {job.totalPosts}
+                      </td>
+
+                      {/* Last Date */}
+                      <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-rose-700 whitespace-nowrap">
+                        {job.lastDate}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Link
+                            href={getPostUrl(job)}
+                            className="px-2 py-1 bg-red-700 hover:bg-red-800 text-white font-bold rounded text-[11px] shadow-2xs transition-colors"
+                          >
+                            Get Details
+                          </Link>
+                          <a
+                            href={formBharwayeinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
+                            title="घर बैठे ऑनलाइन फॉर्म भरवाएं - Nitish Khobragade (8982324497)"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 fill-white text-white" />
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* FreeJobAlert Table Footer Help Bar */}
+        <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+          <span>* किसी भी भर्ती की अंतिम तिथि से पूर्व आवेदन करें। अधिक जानकारी हेतु विज्ञप्ति (Notification PDF) डाउनलोड करें।</span>
+          <a
+            href={OWNER_INFO.whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1 shrink-0"
+          >
+            फॉर्म भरवाने हेतु संपर्क करें: 8982324497 <ChevronRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+      )}
     </section>
   );
 };

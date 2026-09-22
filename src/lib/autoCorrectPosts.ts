@@ -5,7 +5,7 @@
  * qualifications, age limits, and publication metadata.
  */
 
-import { collection, doc, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { PostRecord } from '../types';
 
@@ -762,7 +762,6 @@ export async function runDatabaseSanitizationAudit(): Promise<{
   message: string;
 }> {
   try {
-    const postsRef = collection(db, 'posts');
     let count = 0;
 
     for (const post of AUDITED_POSTS_DATABASE) {

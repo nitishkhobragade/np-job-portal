@@ -97,11 +97,61 @@ export const persistStoredPosts = (posts: PostRecord[]) => {
   }
 };
 
+// Helper to extract a numerical sorting timestamp from a PostRecord
+export function getPostSortingTimestamp(p: PostRecord): number {
+  if (p.publishedAt) {
+    if (typeof p.publishedAt === 'number') return p.publishedAt;
+    if (typeof p.publishedAt === 'object' && 'seconds' in p.publishedAt) {
+      return (p.publishedAt as { seconds: number }).seconds * 1000;
+    }
+    if (typeof p.publishedAt === 'string') {
+      // Check if dd/mm/yyyy
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(p.publishedAt)) {
+        const parts = p.publishedAt.split('/');
+        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
+      }
+      const parsed = Date.parse(p.publishedAt);
+      if (!isNaN(parsed)) return parsed;
+    }
+  }
+  if (p.updatedAt) {
+    if (typeof p.updatedAt === 'number') return p.updatedAt;
+    if (typeof p.updatedAt === 'object' && 'seconds' in p.updatedAt) {
+      return (p.updatedAt as { seconds: number }).seconds * 1000;
+    }
+    const parsed = Date.parse(String(p.updatedAt));
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (p.createdAt) {
+    if (typeof p.createdAt === 'number') return p.createdAt;
+    if (typeof p.createdAt === 'object' && 'seconds' in p.createdAt) {
+      return (p.createdAt as { seconds: number }).seconds * 1000;
+    }
+    const parsed = Date.parse(String(p.createdAt));
+    if (!isNaN(parsed)) return parsed;
+  }
+  return 0;
+}
+
+// Helper to format Date & exact Time for live post cards
+export function formatPublicationDateTime(dateInput?: unknown): string {
+  const d = dateInput instanceof Date ? dateInput : new Date();
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${day}/${month}/${year}, ${strHours}:${minutes} ${ampm}`;
+}
+
 let hasAttemptedSeed = false;
 
 /**
  * Realtime Firestore subscriber that listens to collection("posts")
- * Orders by createdAt desc and filters by status when specified.
+ * Orders descending by publication timestamp and respects status committed states.
  */
 export function subscribeToPosts(
   onUpdate: (posts: PostRecord[]) => void,
@@ -109,8 +159,9 @@ export function subscribeToPosts(
 ): () => void {
   // Always emit cached/seed posts first for immediate rendering
   const initial = getStoredPosts();
+  initial.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
   const filteredInitial = statusFilter === 'published'
-    ? initial.filter((p) => p.status === 'published')
+    ? initial.filter((p) => (p.status || 'published') === 'published')
     : initial;
   onUpdate(filteredInitial);
 
@@ -135,14 +186,10 @@ export function subscribeToPosts(
             const data = docSnap.data() as PostRecord;
             list.push({ ...data, id: docSnap.id });
           });
-          // Sort latest first
-          list.sort((a, b) => {
-            const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : Date.now();
-            const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : Date.now();
-            return timeB - timeA;
-          });
+          // Sort real-time descending: newest published first
+          list.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
           persistStoredPosts(list);
-          onUpdate(statusFilter === 'published' ? list.filter((p) => p.status === 'published') : list);
+          onUpdate(statusFilter === 'published' ? list.filter((p) => (p.status || 'published') === 'published') : list);
         }
       },
       (err) => {
@@ -172,19 +219,16 @@ export async function getJobs(statusFilter?: 'published' | 'all'): Promise<PostR
       snapshot.forEach((docSnap) => {
         firestoreList.push({ ...(docSnap.data() as PostRecord), id: docSnap.id });
       });
-      firestoreList.sort((a, b) => {
-        const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : Date.now();
-        const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : Date.now();
-        return timeB - timeA;
-      });
+      firestoreList.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
       persistStoredPosts(firestoreList);
-      return statusFilter === 'published' ? firestoreList.filter(p => p.status === 'published') : firestoreList;
+      return statusFilter === 'published' ? firestoreList.filter(p => (p.status || 'published') === 'published') : firestoreList;
     }
   } catch (err) {
     console.warn('Firestore fetch failed, using cached store:', err);
   }
   const cached = getStoredPosts();
-  return statusFilter === 'published' ? cached.filter(p => p.status === 'published') : cached;
+  cached.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
+  return statusFilter === 'published' ? cached.filter(p => (p.status || 'published') === 'published') : cached;
 }
 
 /**
@@ -306,7 +350,10 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
     lastDate: formatDateToDDMMYYYY(jobData.lastDate || jobData.dates?.end || '15/10/2026'),
     detailsUrl: `/${currentYear}/${currentMonth}/${nextBlogNo}/${generatedSlug}`,
     content: jobData.content || jobData.title || '',
-    publishedAt: jobData.publishedAt || formatDateToDDMMYYYY(new Date().toISOString()),
+    publishedAt: jobData.publishedAt || Date.now(),
+    publishedDate: jobData.publishedDate || formatDateToDDMMYYYY(new Date().toISOString()),
+    publishedDateFormatted: jobData.publishedDateFormatted || formatPublicationDateTime(new Date()),
+    importantLinks: jobData.importantLinks || [],
     dates: {
       start: formatDateToDDMMYYYY(jobData.dates?.start || '15/09/2026'),
       end: formatDateToDDMMYYYY(jobData.dates?.end || '15/10/2026'),
@@ -365,10 +412,13 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
     ]
   };
 
+  const isPublishing = newPost.status === 'published';
+
   try {
     const docRef = doc(db, 'posts', generatedSlug);
     await setDoc(docRef, {
       ...newPost,
+      publishedAt: isPublishing ? serverTimestamp() : (newPost.publishedAt || Date.now()),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -399,9 +449,27 @@ export async function updateJob(id: string, updates: Partial<PostRecord>): Promi
       }
     : (index >= 0 ? currentPosts[index].dates : undefined);
 
+  const isPublishingNow = updates.status === 'published' && (index < 0 || currentPosts[index]?.status !== 'published');
+
+  const payload: Record<string, unknown> = {
+    ...updates,
+    updatedAt: serverTimestamp()
+  };
+
+  if (isPublishingNow) {
+    payload.publishedAt = serverTimestamp();
+    payload.publishedDateFormatted = formatPublicationDateTime(new Date());
+  }
+
   const updatedRecord: PostRecord = {
     ...(index >= 0 ? currentPosts[index] : ({} as PostRecord)),
     ...updates,
+    ...(isPublishingNow
+      ? {
+          publishedAt: Date.now(),
+          publishedDateFormatted: formatPublicationDateTime(new Date())
+        }
+      : {}),
     dates: cleanedDates || { start: '15/09/2026', end: '15/10/2026', exam: 'शीघ्र घोषित' },
     id,
     updatedAt: Date.now()
@@ -409,15 +477,12 @@ export async function updateJob(id: string, updates: Partial<PostRecord>): Promi
 
   try {
     const docRef = doc(db, 'posts', id);
-    await updateDoc(docRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
+    await updateDoc(docRef, payload);
   } catch (err) {
     console.warn('Firestore updateDoc failed, fallback to setDoc merge:', err);
     try {
       const docRef = doc(db, 'posts', id);
-      await setDoc(docRef, { ...updates, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(docRef, payload, { merge: true });
     } catch (innerErr) {
       console.warn('setDoc fallback warning:', innerErr);
     }
@@ -756,13 +821,30 @@ export async function approveScrapedDraft(draftId: string): Promise<PostRecord |
   const draft = drafts[targetIndex];
   draft.status = 'approved';
 
-  // Publish to posts
+  // Publish to posts with complete compliant fields
   const postToPublish: Partial<PostRecord> = {
     ...draft.suggestedPost,
-    status: 'published'
+    status: 'published',
+    publishedDate: draft.suggestedPost.publishedDate || '21/09/2026',
+    publishedAt: draft.suggestedPost.publishedAt || '21/09/2026',
+    startDate: draft.suggestedPost.dates?.start || draft.suggestedPost.startDate || '15/09/2026',
+    lastDate: draft.suggestedPost.lastDate || draft.suggestedPost.dates?.end || '15/10/2026',
+    examDate: draft.suggestedPost.dates?.exam || draft.suggestedPost.examDate || 'शीघ्र घोषित',
+    admitCardDate: draft.suggestedPost.admitCardDate || 'परीक्षा से 7 दिन पूर्व',
+    applyLink: draft.suggestedPost.links?.apply || draft.suggestedPost.applyLink || 'https://esb.mp.gov.in',
+    notificationPdf: draft.suggestedPost.links?.notificationPdf || draft.suggestedPost.notificationPdf || 'https://esb.mp.gov.in',
+    eligibility: draft.suggestedPost.eligibility || draft.suggestedPost.qualification || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण'
   };
 
-  const postId = await addJob(postToPublish);
+  // Check if post already exists in Firestore by ID
+  const existingJob = await getJobBySlug(draft.suggestedPost.id);
+  let postId = draft.suggestedPost.id;
+  if (existingJob) {
+    await updateJob(existingJob.id, postToPublish);
+  } else {
+    postId = await addJob(postToPublish);
+  }
+
   drafts[targetIndex] = draft;
 
   if (typeof window !== 'undefined') {
