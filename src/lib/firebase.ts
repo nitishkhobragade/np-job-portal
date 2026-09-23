@@ -381,6 +381,7 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
       note: jobData.posterConfig?.note || 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
     },
     status: jobData.status || 'published',
+    isPublished: (jobData.status || 'published') === 'published',
     updatedAt: Date.now(),
     state: jobData.state || 'MP',
     advtNo: jobData.advtNo || `ADV/${currentYear}/${nextBlogNo}`,
@@ -458,6 +459,10 @@ export async function updateJob(id: string, updates: Partial<PostRecord>): Promi
     updatedAt: serverTimestamp()
   };
 
+  if (updates.status) {
+    payload.isPublished = updates.status === 'published';
+  }
+
   if (isPublishingNow) {
     payload.publishedAt = serverTimestamp();
     payload.publishedDateFormatted = formatPublicationDateTime(new Date());
@@ -466,6 +471,7 @@ export async function updateJob(id: string, updates: Partial<PostRecord>): Promi
   const updatedRecord: PostRecord = {
     ...(index >= 0 ? currentPosts[index] : ({} as PostRecord)),
     ...updates,
+    isPublished: updates.status ? updates.status === 'published' : (index >= 0 ? currentPosts[index]?.isPublished : true),
     ...(isPublishingNow
       ? {
           publishedAt: Date.now(),

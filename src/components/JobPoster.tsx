@@ -355,11 +355,11 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
     const isFeed = aspectRatio === 'feed';
     const hasCharacter = characterType !== 'none';
 
-    // Character Scale Class
+    // Character Scale Class - Significantly reduced footprint as a neat corner cutout / side badge
     const charScaleClass = {
-      normal: 'max-h-[560px]',
-      large: 'max-h-[620px] scale-105 origin-bottom',
-      xlarge: 'max-h-[680px] scale-110 origin-bottom'
+      normal: 'max-h-[240px]',
+      large: 'max-h-[280px] scale-105 origin-bottom',
+      xlarge: 'max-h-[320px] scale-110 origin-bottom'
     }[characterScale];
 
     // Formatted Qualification text
@@ -482,10 +482,10 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
           </div>
         </div>
 
-        {/* MIDDLE SECTION: 4 HIGH-CONTRAST TILES (75% WIDTH) + CANDIDATE CHARACTER (25% WIDTH) */}
-        <div className={`relative z-10 flex items-stretch gap-4 ${isFeed ? 'my-2' : 'my-4'} flex-1 min-h-0`}>
-          {/* LEFT TILES GRID - 75% OF POSTER */}
-          <div className={`${hasCharacter ? 'w-[75%]' : 'w-full'} flex flex-col justify-between gap-3.5`}>
+        {/* MIDDLE SECTION: 4 HIGH-CONTRAST TILES (87% MAXIMUM SPACE) + CANDIDATE CORNER BADGE (13%) */}
+        <div className={`relative z-10 flex items-stretch gap-3.5 ${isFeed ? 'my-2' : 'my-4'} flex-1 min-h-0`}>
+          {/* LEFT TILES GRID - 87% MAXIMUM SPACE ALLOCATED TO KEY JOB INFO */}
+          <div className={`${hasCharacter ? 'w-[87%]' : 'w-full'} flex flex-col justify-between gap-3.5`}>
             <div className="grid grid-cols-2 gap-3.5 h-full">
               {/* TILE 1: योग्यता / Qualification (Teal to Emerald) */}
               <div className="bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-600 text-white rounded-3xl p-5 shadow-lg border-2 border-teal-300/40 flex flex-col justify-between">
@@ -647,14 +647,19 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
             </div>
           </div>
 
-          {/* RIGHT CANDIDATE CHARACTER GRAPHIC (~25% ALIGNED STRICTLY BOTTOM-RIGHT) */}
+          {/* RIGHT CANDIDATE CHARACTER GRAPHIC (~13% NEAT CORNER CUTOUT / SIDE BADGE) */}
           {hasCharacter && (
-            <div className="w-[25%] flex items-end justify-end relative overflow-hidden self-end pb-1">
-              <CandidateCharacter
-                type={characterType}
-                customUrl={customCharacterUrl}
-                className={`w-full h-full ${charScaleClass} object-bottom`}
-              />
+            <div className="w-[13%] flex flex-col items-center justify-end relative self-end pb-1 shrink-0 overflow-visible">
+              <div className="relative w-full flex items-end justify-center">
+                <CandidateCharacter
+                  type={characterType}
+                  customUrl={customCharacterUrl}
+                  className={`w-full ${charScaleClass} object-bottom drop-shadow-[0_12px_24px_rgba(0,0,0,0.25)]`}
+                />
+              </div>
+              <div className="mt-1 bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full text-center shadow-xs tracking-wider whitespace-nowrap">
+                ★ VERIFIED ★
+              </div>
             </div>
           )}
         </div>

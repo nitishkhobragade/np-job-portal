@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { toPng } from 'html-to-image';
 import {
@@ -56,6 +56,8 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   onJobUpdated
 }) => {
   const posterRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
@@ -63,6 +65,28 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   // Aspect ratio: 'feed' (4:5 - 1080x1350) or 'story' (9:16 - 1080x1920)
   const [aspectRatio, setAspectRatio] = useState<'feed' | 'story'>('feed');
   const [zoomLevel, setZoomLevel] = useState<number>(0.38);
+
+  // Responsive container observer for zero-crop mobile viewport scaling
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const width = el.getBoundingClientRect().width;
+      if (width > 0) {
+        setContainerWidth(width);
+      }
+    };
+
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
 
   // Download Config State
   const [downloadResolution, setDownloadResolution] = useState<DownloadResolution>('1080x1350');
@@ -89,6 +113,13 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   // Canvas target dimensions
   const targetWidth = 1080;
   const targetHeight = aspectRatio === 'story' ? 1920 : 1350;
+
+  // Dynamic responsive scale to ensure 1080x1350 poster scales down smoothly without cutting edges on small viewports
+  const maxSafeScale = containerWidth > 32 ? (containerWidth - 16) / targetWidth : 0.32;
+  const responsiveScale = containerWidth > 0 ? Math.min(zoomLevel, maxSafeScale) : Math.min(zoomLevel, 0.35);
+  const isScaledForMobile = containerWidth > 0 && maxSafeScale < zoomLevel;
+  const previewRenderWidth = Math.round(targetWidth * responsiveScale);
+  const previewRenderHeight = Math.round(targetHeight * responsiveScale);
 
   // Normalize post details
   const isPostRecord = (j: JobPostDetail | PostRecord): j is PostRecord => 'dates' in j;
@@ -1684,18 +1715,28 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         </div>
 
         {/* Scrollable / Scaled Preview Container */}
-        <div className="w-full overflow-x-auto overflow-y-hidden py-2 flex justify-center items-center">
+        <div ref={previewContainerRef} className="w-full max-w-full py-2 flex flex-col items-center justify-center overflow-x-auto overflow-y-hidden">
+          {isScaledForMobile && (
+            <div className="mb-2.5 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-[11px] font-bold text-amber-300 shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>मोबाइल स्क्रीन अनुकूलित (किनारे नहीं कटेंगे • 100% दृश्यमान)</span>
+            </div>
+          )}
+
           <div
             style={{
-              width: `${targetWidth * zoomLevel}px`,
-              height: `${targetHeight * zoomLevel}px`
+              width: `${previewRenderWidth}px`,
+              height: `${previewRenderHeight}px`,
+              maxWidth: '100%'
             }}
-            className="relative shadow-2xl rounded-2xl border-2 border-amber-500/40 overflow-hidden bg-white"
+            className="relative shadow-2xl rounded-2xl border-2 border-amber-500/40 overflow-hidden bg-white shrink-0 transition-all duration-150"
           >
             {/* The Actual Canvas Being Scaled */}
             <div
               style={{
-                transform: `scale(${zoomLevel})`,
+                width: `${targetWidth}px`,
+                height: `${targetHeight}px`,
+                transform: `scale(${responsiveScale})`,
                 transformOrigin: 'top left'
               }}
               className="absolute top-0 left-0"

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../../lib/firebase';
@@ -74,16 +74,43 @@ async function isJobDuplicate(slug: string, title: string): Promise<boolean> {
   }
 }
 
-export async function GET() {
-  return handleAutoScrape();
+export async function GET(req: NextRequest) {
+  return handleAutoScrape(req);
 }
 
-export async function POST() {
-  return handleAutoScrape();
+export async function POST(req: NextRequest) {
+  return handleAutoScrape(req);
 }
 
-async function handleAutoScrape() {
+async function handleAutoScrape(req: NextRequest) {
   const startTime = Date.now();
+
+  // CRON_SECRET Security Validation
+  // Supports Vercel native cron (Authorization: Bearer <CRON_SECRET>)
+  // and external cron tools like cron-job.org (?secret=<CRON_SECRET> or header x-cron-secret)
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = req.headers.get('authorization');
+    const secretParam = req.nextUrl?.searchParams?.get('secret') || req.nextUrl?.searchParams?.get('key');
+    const customHeader = req.headers.get('x-cron-secret');
+
+    const isAuthorized =
+      authHeader === `Bearer ${cronSecret}` ||
+      secretParam === cronSecret ||
+      customHeader === cronSecret;
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized. Invalid or missing CRON_SECRET token.',
+          hint: 'Provide Authorization: Bearer <CRON_SECRET> or append ?secret=<CRON_SECRET> to the URL.'
+        },
+        { status: 401 }
+      );
+    }
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -217,6 +244,7 @@ Do NOT use generic filler. Write in engaging Hindi-English (Hinglish/Hindi). Adh
         publishedAt: Date.now(),
         publishedDate: formatDateToDDMMYYYY(new Date().toISOString()),
         status: 'draft', // Strictly saved as draft for admin review
+        isPublished: false, // Ensure public feeds filter this out until admin approves
         isAiVerified: true,
         aiAuditPassed: true,
         dates: {

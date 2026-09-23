@@ -163,6 +163,7 @@ export interface PostRecord {
   category?: string; // mp-special, results, admit-card, latest-jobs, tech-jobs, central
   categories?: string[]; // multi-category tags e.g. ['vacancy', 'mp_special']
   status: 'published' | 'draft' | 'suspended'; // Single Source of Truth
+  isPublished?: boolean; // Explicit boolean flag for draft filtering
   publishedDate?: string; // Mandatory dd/mm/yyyy (Date of publication on portal)
   publishedAt?: unknown; // Firestore serverTimestamp, ISO string, or number timestamp
   publishedDateFormatted?: string; // Date & exact time string e.g. "22/09/2026, 09:15 PM"
