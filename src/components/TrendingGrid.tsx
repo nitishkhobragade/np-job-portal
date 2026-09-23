@@ -96,13 +96,13 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard }) => {
                     </a>
                   </div>
 
-                  {/* Direct Poster & Sarkari Table Link */}
+                  {/* Direct Poster & Table Link */}
                   {card.id === 'trend-1' && (
                     <Link
                       href="/2026/09/02/mp-police-constable-2026"
                       className="mt-2 text-center text-[10px] font-bold text-red-700 hover:underline block"
                     >
-                      ★ सरकारी रिजल्ट टेबल व WhatsApp पोस्टर →
+                      ★ भर्ती विवरण तालिका व WhatsApp पोस्टर →
                     </Link>
                   )}
                   {card.id === 'trend-2' && (

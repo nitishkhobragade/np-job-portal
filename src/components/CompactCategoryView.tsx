@@ -46,7 +46,7 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
   onSelectResult
 }) => {
   const [activeCategory, setActiveCategory] = useState<CategorySlug>(initialCategory);
-  const [viewMode, setViewMode] = useState<'sarkari' | 'freejobalert'>('sarkari');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Category navigation tabs
@@ -206,29 +206,29 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
           {/* Layout A vs Layout B Switcher Toggle */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-300 shrink-0 w-full sm:w-auto justify-center">
             <button
-              onClick={() => setViewMode('sarkari')}
+              onClick={() => setViewMode('grid')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                viewMode === 'sarkari'
+                viewMode === 'grid'
                   ? 'bg-red-700 text-white shadow-xs'
                   : 'text-slate-700 hover:text-slate-950'
               }`}
-              title="Sarkari Classic List (Layout A)"
+              title="कार्ड ग्रिड व्यू (Card Grid View)"
             >
               <AlignLeft className="w-3.5 h-3.5" />
-              <span>Layout A (Sarkari Classic)</span>
+              <span>कार्ड ग्रिड व्यू (Card Grid View)</span>
             </button>
 
             <button
-              onClick={() => setViewMode('freejobalert')}
+              onClick={() => setViewMode('table')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                viewMode === 'freejobalert'
+                viewMode === 'table'
                   ? 'bg-emerald-700 text-white shadow-xs'
                   : 'text-slate-700 hover:text-slate-950'
               }`}
-              title="FreeJobAlert Table (Layout B)"
+              title="विस्तृत तालिका व्यू (Compact Table View)"
             >
               <TableIcon className="w-3.5 h-3.5" />
-              <span>Layout B (FreeJobAlert Table)</span>
+              <span>विस्तृत तालिका व्यू (Compact Table View)</span>
             </button>
           </div>
         </div>
@@ -236,10 +236,10 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
 
       {/* 2. MAIN COMPACT CONTENT SECTION */}
       <div className="bg-white border-2 border-slate-300 rounded-xl overflow-hidden shadow-xs">
-        {/* Red/Maroon Header Box */}
+        {/* Header Box */}
         <div
           className={`py-2.5 px-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 ${
-            viewMode === 'sarkari'
+            viewMode === 'grid'
               ? 'bg-gradient-to-r from-red-800 via-rose-800 to-red-900 border-b-2 border-amber-400'
               : 'bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 border-b-2 border-emerald-400'
           }`}
@@ -260,9 +260,9 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* LAYOUT A: SARKARI CLASSIC LIST (Single-Line High-Density Rows) */}
+        {/* LAYOUT A: CARD GRID VIEW (Single-Line High-Density Rows) */}
         {/* ------------------------------------------------------------- */}
-        {viewMode === 'sarkari' && (
+        {viewMode === 'grid' && (
           <div className="divide-y divide-slate-200">
             {/* Jobs List */}
             {filteredJobs.length > 0 ? (
@@ -333,7 +333,7 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
               ))
             ) : null}
 
-            {/* Admit Cards in Sarkari List */}
+            {/* Admit Cards in Card Grid */}
             {filteredAdmitCards.map((admit) => (
               <div
                 key={admit.id}
@@ -366,7 +366,7 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
               </div>
             ))}
 
-            {/* Results in Sarkari List */}
+            {/* Results in Card Grid */}
             {filteredResults.map((res) => (
               <div
                 key={res.id}
@@ -408,9 +408,9 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
         )}
 
         {/* ----------------------------------------------------------------- */}
-        {/* LAYOUT B: FREEJOBALERT TABLE (High-Density Multi-Column Grid Table)*/}
+        {/* LAYOUT B: COMPACT TABLE VIEW (High-Density Multi-Column Grid Table)*/}
         {/* ----------------------------------------------------------------- */}
-        {viewMode === 'freejobalert' && (
+        {viewMode === 'table' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>

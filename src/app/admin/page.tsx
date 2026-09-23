@@ -37,7 +37,8 @@ import {
   Upload,
   Server,
   ShieldAlert,
-  Bot
+  Bot,
+  BookOpen
 } from 'lucide-react';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket, TickerAlert } from '../../types';
 import {
@@ -234,7 +235,6 @@ export default function AdminPage() {
 
   // Controlled Status Changes state: changes remain in local state until user explicitly clicks "Save Changes"
   const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, 'published' | 'draft' | 'suspended'>>({});
-  const [isSavingStatusBatch, setIsSavingStatusBatch] = useState<boolean>(false);
 
   // Database Backup & Restore Manager State
   const [isExportingBackup, setIsExportingBackup] = useState<boolean>(false);
@@ -1247,6 +1247,14 @@ export default function AdminPage() {
             <Database className="w-4 h-4 text-emerald-400" />
             <span>डेटाबेस बैकअप एवं रीस्टोर (Full DB Backup)</span>
           </button>
+
+          <Link
+            href="/admin/blogs"
+            className="px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 text-slate-300 hover:bg-slate-800 transition-all font-bold hover:text-amber-400 bg-slate-900 border border-slate-700"
+          >
+            <BookOpen className="w-4 h-4 text-amber-400" />
+            <span>ब्लॉग कंट्रोलर (Blogger Studio) ↗</span>
+          </Link>
         </div>
       </header>
 
@@ -3873,9 +3881,9 @@ export default function AdminPage() {
                       URL.revokeObjectURL(url);
                       setBackupRestoreMessage(`सफलतापूर्वक बैकअप एक्सपोर्ट किया गया! (${snapshot.counts.posts} पोस्ट्स सुरक्षित)`);
                       showToast('डेटाबेस बैकअप फ़ाइल डाउनलोड हो गई!');
-                    } catch (err: any) {
+                    } catch (err: unknown) {
                       console.error('Backup export failed:', err);
-                      setBackupRestoreError('बैकअप एक्सपोर्ट विफल: ' + (err.message || 'अज्ञात त्रुटि'));
+                      setBackupRestoreError('बैकअप एक्सपोर्ट विफल: ' + (err instanceof Error ? err.message : 'अज्ञात त्रुटि'));
                     } finally {
                       setIsExportingBackup(false);
                     }
@@ -3995,9 +4003,9 @@ export default function AdminPage() {
                           }
                           setParsedBackupSnapshot(parsed);
                           setBackupRestoreMessage(`फ़ाइल मान्य है! पाया गया: ${parsed.data.posts.length} पोस्ट्स, ${parsed.data.tickers?.length || 0} टिकर अलर्ट्स।`);
-                        } catch (err: any) {
+                        } catch (err: unknown) {
                           setParsedBackupSnapshot(null);
-                          setBackupRestoreError('फ़ाइल पढ़ने में त्रुटि: ' + (err.message || 'अमान्य JSON'));
+                          setBackupRestoreError('फ़ाइल पढ़ने में त्रुटि: ' + (err instanceof Error ? err.message : 'अमान्य JSON'));
                         }
                       };
                       reader.readAsText(file);
@@ -4058,9 +4066,9 @@ export default function AdminPage() {
                             showToast('डेटाबेस सफलतापूर्वक रीस्टोर हो गया!');
                             setParsedBackupSnapshot(null);
                             await refreshData();
-                          } catch (err: any) {
+                          } catch (err: unknown) {
                             console.error('Database restore error:', err);
-                            setBackupRestoreError('रीस्टोर विफल: ' + (err.message || 'अज्ञात त्रुटि'));
+                            setBackupRestoreError('रीस्टोर विफल: ' + (err instanceof Error ? err.message : 'अज्ञात त्रुटि'));
                           } finally {
                             setIsRestoringBackup(false);
                           }

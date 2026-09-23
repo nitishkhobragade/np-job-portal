@@ -15,10 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NP Job Portal - Latest Sarkari Jobs, Admit Card, Results | Nitish Khobragade (8982324497)",
+  title: "NP Job Portal - Latest MP & Central Government Jobs, Admit Card, Results | Nitish Khobragade (8982324497)",
   description: "NP Job Portal - Official portal for latest MP and Central Government jobs, admit cards, results, and online form filling service by Nitish Khobragade (8982324497). घर बैठे सुरक्षित फॉर्म भरवाएं.",
   openGraph: {
-    title: "NP Job Portal - Latest Sarkari Jobs, Admit Card, Results | Nitish Khobragade (8982324497)",
+    title: "NP Job Portal - Latest MP & Central Government Jobs, Admit Card, Results | Nitish Khobragade (8982324497)",
     description: "NP Job Portal - Official portal for latest MP and Central Government jobs, admit cards, results, and online form filling service by Nitish Khobragade (8982324497). घर बैठे सुरक्षित फॉर्म भरवाएं.",
     type: "website",
   }

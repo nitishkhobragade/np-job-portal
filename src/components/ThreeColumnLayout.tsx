@@ -101,7 +101,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
             सरकारी भर्ती, प्रवेश पत्र एवं परीक्षा परिणाम
           </h2>
           <p className="text-xs sm:text-sm text-neutral-500">
-            Sarkari Result स्टाइल लाइव अपडेट्स • किसी भी भर्ती की सहायता के लिए Nitish Khobragade (8982324497) से संपर्क करें
+            NP Job Portal आधिकारिक लाइव अपडेट्स • किसी भी भर्ती की सहायता के लिए Nitish Khobragade (8982324497) से संपर्क करें
           </p>
         </div>
 
@@ -122,10 +122,10 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                   ? 'bg-red-700 text-white shadow-md'
                   : 'text-neutral-700 hover:text-neutral-900 border border-transparent'
               }`}
-              title="Layout A (Sarkari Classic)"
+              title="कार्ड ग्रिड व्यू (Card Grid View)"
             >
               <AlignLeft className="w-3.5 h-3.5" />
-              <span>Layout A (Sarkari Classic)</span>
+              <span>कार्ड ग्रिड व्यू (Card Grid View)</span>
             </button>
             <button
               type="button"
@@ -135,18 +135,18 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                   ? 'bg-emerald-700 text-white shadow-md'
                   : 'text-neutral-700 hover:text-neutral-900 border border-transparent'
               }`}
-              title="Layout B (FreeJobAlert Table)"
+              title="विस्तृत तालिका व्यू (Compact Table View)"
             >
               <TableIcon className="w-3.5 h-3.5" />
-              <span>Layout B (FreeJobAlert)</span>
+              <span>विस्तृत तालिका व्यू (Compact Table View)</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Conditional Layout: Layout A (3-Column Sarkari Classic Grid) vs Layout B (FreeJobAlert Compact Table) */}
+      {/* Conditional Layout: Layout A (3-Column Card Grid) vs Layout B (Compact Table View) */}
       {currentLayout === 'A' ? (
-      /* 3-Column SarkariResult Layout */
+      /* 3-Column Card Grid Layout */
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start w-full max-w-full overflow-hidden">
         
         {/* ================= COLUMN 1: LATEST JOBS ================= */}
@@ -503,7 +503,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
       </div>
       ) : (
       /* ================================================================= */
-      /* LAYOUT B: FREEJOBALERT HIGH-DENSITY COMPACT TABLE VIEW            */
+      /* LAYOUT B: HIGH-DENSITY COMPACT TABLE VIEW                         */
       /* ================================================================= */
       <div className="w-full bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden">
         {/* Table Header Bar */}
@@ -511,7 +511,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
           <div className="flex items-center gap-2">
             <TableIcon className="w-5 h-5 text-emerald-300" />
             <h3 className="font-extrabold text-base tracking-wide uppercase">
-              FreeJobAlert Style - Live Government Job Notification Table
+              NP Job Portal - आधिकारिक सरकारी एवं प्राइवेट भर्ती तालिका
             </h3>
           </div>
           <span className="text-xs font-bold bg-white/20 px-2.5 py-0.5 rounded-full">
@@ -630,7 +630,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
           </table>
         </div>
 
-        {/* FreeJobAlert Table Footer Help Bar */}
+        {/* Compact Table Footer Help Bar */}
         <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
           <span>* किसी भी भर्ती की अंतिम तिथि से पूर्व आवेदन करें। अधिक जानकारी हेतु विज्ञप्ति (Notification PDF) डाउनलोड करें।</span>
           <a

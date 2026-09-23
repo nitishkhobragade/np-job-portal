@@ -28,6 +28,8 @@ import { AdSenseBanner } from '../../../../../components/AdSenseBanner';
 import { PosterStudio } from '../../../../../components/PosterStudio';
 import { Footer } from '../../../../../components/Footer';
 import { PopupAdModal } from '../../../../../components/PopupAdModal';
+import { TrendingJobsWidget } from '../../../../../components/TrendingJobsWidget';
+import { RelatedBlogsWidget } from '../../../../../components/RelatedBlogsWidget';
 import { getJobBySlug, getPostByParams } from '../../../../../lib/firebase';
 import { JobPostDetail } from '../../../../../types';
 import { formatDateToDDMMYYYY } from '../../../../../lib/postRouting';
@@ -641,7 +643,15 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
 
             {/* Sidebar AdSense Banner */}
             <AdSenseBanner slot="job-detail-sidebar-slot" format="vertical" />
+
+            {/* Trending Jobs Widget */}
+            <TrendingJobsWidget currentPostId={record?.id || slug} />
           </div>
+        </div>
+
+        {/* Educational & Career Blog Recommendations */}
+        <div className="mt-8 max-w-7xl mx-auto">
+          <RelatedBlogsWidget />
         </div>
       </main>
 

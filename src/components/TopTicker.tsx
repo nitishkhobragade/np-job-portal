@@ -41,14 +41,12 @@ export const TopTicker: React.FC = () => {
 
         {/* Continuous Marquee Content */}
         <div
-          className="flex-1 overflow-hidden relative w-full py-0.5 cursor-pointer"
+          className="flex-1 overflow-hidden relative w-full py-0.5 cursor-pointer ticker-container"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
           <div
-            className={`whitespace-nowrap flex items-center gap-8 ${
-              isPaused ? '' : 'animate-marquee'
-            }`}
+            className="whitespace-nowrap flex items-center gap-8 animate-marquee"
             style={{
               animationPlayState: isPaused ? 'paused' : 'running',
             }}

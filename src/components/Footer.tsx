@@ -197,6 +197,9 @@ export const Footer: React.FC = () => {
               <Link href="/about-us" className="text-[11px] text-neutral-400 hover:text-white">
                 सेवाएं
               </Link>
+              <Link href="/blogs" className="text-[11px] text-amber-400 font-bold hover:text-amber-300">
+                करियर ब्लॉग्स
+              </Link>
               <Link
                 href="/admin"
                 className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-amber-400 transition-colors px-2 py-1 rounded bg-neutral-800/80 hover:bg-neutral-800"

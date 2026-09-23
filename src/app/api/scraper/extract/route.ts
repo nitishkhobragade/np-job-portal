@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemPrompt = `You are an expert Sarkari & Corporate Job data extractor for "NP Job Portal" in India.
+    const systemPrompt = `You are an expert Government & Corporate Job data extractor for "NP Job Portal" in India.
 Analyze the provided job URL or text and extract clean, structured job post data.
 All dates MUST strictly be in dd/mm/yyyy format (e.g. 15/04/2026). If unknown, use "शीघ्र घोषित" or "विज्ञप्ति अनुसार".
 All fee amounts must include currency symbol (e.g. ₹500/- or Free).
@@ -91,7 +91,7 @@ If it is an IT / Corporate / MNC job:
 - set isTechJob: true
 - set showReservationSection: false
 - extract role, location, batchEligibility
-If it is a Government / Sarkari job:
+If it is a Government job:
 - set isTechJob: false
 - set showReservationSection: true
 

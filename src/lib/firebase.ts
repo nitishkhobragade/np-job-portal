@@ -15,7 +15,7 @@ import {
   serverTimestamp,
   writeBatch
 } from 'firebase/firestore';
-import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, TickerAlert } from '../types';
+import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, TickerAlert, BlogPost } from '../types';
 import { TICKER_ALERTS } from '../data/portalData';
 import { getNextBlogNumber, formatDateToDDMMYYYY } from './postRouting';
 import { getInitialSeedPosts, seedPostsIfEmpty } from './seedDatabase';
@@ -1597,4 +1597,208 @@ export async function restoreDatabaseFromBackup(backup: PortalDatabaseBackup): P
     }
   };
 }
+
+// ============================================================================
+// DEDICATED BLOG ENGINE & RICH ARTICLES (BLOGGER.COM STYLE)
+// ============================================================================
+
+export const SEED_BLOG_POSTS: BlogPost[] = [
+  {
+    id: 'mp-police-constable-2026-exam-strategy',
+    slug: 'mp-police-constable-2026-exam-strategy',
+    title: 'MP Police Constable 2026: परीक्षा पैटर्न, शारीरिक दक्षता परीक्षण (PET) एवं 100% सटीक तैयारी रणनीति',
+    excerpt: 'मध्य प्रदेश पुलिस आरक्षक भर्ती 2026 की लिखित परीक्षा और फिजिकल टेस्ट को पहले प्रयास में पास करने की प्रमाणित रणनीति एवं महत्वपूर्ण विषय गाइड।',
+    category: 'Exam Prep',
+    author: {
+      name: 'Nitish Khobragade',
+      role: 'Chief Editor & Career Counselor',
+      phone: '8982324497'
+    },
+    bannerUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1080&auto=format&fit=crop&q=80',
+    status: 'published',
+    tags: ['MP Police', 'Constable', 'Exam Pattern', 'Physical Test', 'Syllabus'],
+    readingTimeMinutes: 6,
+    views: 1420,
+    seoKeywords: ['MP Police Constable 2026', 'MP Police Syllabus', 'Physical Test PET', 'MP Police Cut Off'],
+    createdAt: Date.now() - 86400000 * 2,
+    publishedAt: Date.now() - 86400000 * 2
+  },
+  {
+    id: 'government-form-filling-top-5-mistakes',
+    slug: 'government-form-filling-top-5-mistakes',
+    title: 'सरकारी नौकरी फॉर्म भरते समय 5 सबसे बड़ी गलतियां और उनसे कैसे बचें: Nitish Khobragade स्पेशल गाइड',
+    excerpt: 'ऑनलाइन फॉर्म में नाम की स्पेलिंग, फोटो डेट, जाति प्रमाण पत्र और फीस भुगतान से जुड़ी गलतियों के कारण हजारों फॉर्म रिजेक्ट होते हैं। जानें कैसे सुरक्षित आवेदन करें।',
+    category: 'Career Guidance',
+    author: {
+      name: 'Nitish Khobragade',
+      role: 'Online Form Specialist',
+      phone: '8982324497'
+    },
+    bannerUrl: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1080&auto=format&fit=crop&q=80',
+    status: 'published',
+    tags: ['Form Filling', 'Mistakes', 'Admit Card Rejection', 'MP Online'],
+    readingTimeMinutes: 5,
+    views: 2890,
+    seoKeywords: ['Sarkari Form Mistakes', 'Online Form Filling Guidance', 'Form Rejection Reasons'],
+    createdAt: Date.now() - 86400000 * 4,
+    publishedAt: Date.now() - 86400000 * 4
+  },
+  {
+    id: 'mp-cpct-scorecard-importance-guide',
+    slug: 'mp-cpct-scorecard-importance-guide',
+    title: 'CPCT स्कोर कार्ड क्या है? MP ESB ग्रुप 4 एवं सहायक ग्रेड-3 भर्ती में इसकी अनिवार्यता एवं तैयारी टिप्स',
+    excerpt: 'मध्य प्रदेश की समस्त लिपिकीय एवं स्टेनो भर्तियों हेतु CPCT परीक्षा पास करना अनिवार्य है। कंप्यूटर ज्ञान और हिंदी टाइपिंग स्पीड कैसे बढ़ाएं, पढ़ें पूरी गाइड।',
+    category: 'Gov Schemes',
+    author: {
+      name: 'Nitish Khobragade',
+      role: 'Career Counselor',
+      phone: '8982324497'
+    },
+    bannerUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1080&auto=format&fit=crop&q=80',
+    status: 'published',
+    tags: ['CPCT', 'MPESB Group 4', 'Typing Test', 'Assistant Grade 3'],
+    readingTimeMinutes: 7,
+    views: 1980,
+    seoKeywords: ['CPCT Exam Pattern', 'MP CPCT Syllabus', 'Hindi Typing Speed'],
+    createdAt: Date.now() - 86400000 * 6,
+    publishedAt: Date.now() - 86400000 * 6
+  }
+];
+
+export async function getBlogPosts(statusFilter: 'published' | 'all' = 'published'): Promise<BlogPost[]> {
+  try {
+    const col = collection(db, 'blogs');
+    const q = statusFilter === 'published'
+      ? query(col, where('status', '==', 'published'))
+      : col;
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const list: BlogPost[] = [];
+      snap.forEach((d) => {
+        list.push({ ...(d.data() as BlogPost), id: d.id });
+      });
+      list.sort((a, b) => Number(b.publishedAt || b.createdAt || 0) - Number(a.publishedAt || a.createdAt || 0));
+      return list;
+    }
+  } catch (err) {
+    console.warn('Error fetching blogs from Firestore, falling back to seed blogs:', err);
+  }
+  return statusFilter === 'published'
+    ? SEED_BLOG_POSTS.filter((b) => b.status === 'published')
+    : SEED_BLOG_POSTS;
+}
+
+export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
+  const normalizedSlug = slug.toLowerCase().trim();
+  try {
+    const docRef = doc(db, 'blogs', normalizedSlug);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return { ...(snap.data() as BlogPost), id: snap.id };
+    }
+    const col = collection(db, 'blogs');
+    const q = query(col, where('slug', '==', normalizedSlug));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) {
+      return { ...(querySnap.docs[0].data() as BlogPost), id: querySnap.docs[0].id };
+    }
+  } catch (err) {
+    console.warn('Error fetching blog post by slug from Firestore:', err);
+  }
+  const match = SEED_BLOG_POSTS.find((b) => b.slug.toLowerCase() === normalizedSlug || b.id === normalizedSlug);
+  return match || null;
+}
+
+export async function saveBlogPost(blog: Partial<BlogPost>): Promise<string> {
+  const slug = (blog.slug || blog.title || `blog-${Date.now()}`)
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const id = blog.id || slug;
+  const now = Date.now();
+
+  const blogData: BlogPost = {
+    id,
+    slug,
+    title: blog.title || 'नई करियर गाइड एवं ब्लॉग पोस्ट',
+    excerpt: blog.excerpt || blog.title?.slice(0, 150) || '',
+    content: blog.content || '',
+    category: blog.category || 'Career Guidance',
+    author: {
+      name: blog.author?.name || 'Nitish Khobragade',
+      role: blog.author?.role || 'Portal Administrator & Career Guide',
+      phone: blog.author?.phone || '8982324497'
+    },
+    bannerUrl: blog.bannerUrl || 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1080&auto=format&fit=crop&q=80',
+    status: blog.status || 'published',
+    tags: blog.tags || ['Career', 'Government Exam'],
+    readingTimeMinutes: blog.readingTimeMinutes || Math.max(3, Math.ceil((blog.content?.length || 500) / 400)),
+    views: blog.views || 10,
+    seoKeywords: blog.seoKeywords || [],
+    createdAt: blog.createdAt || now,
+    publishedAt: blog.status === 'published' ? (blog.publishedAt || now) : undefined,
+    updatedAt: now
+  };
+
+  try {
+    const docRef = doc(db, 'blogs', id);
+    await setDoc(docRef, blogData, { merge: true });
+  } catch (err) {
+    console.warn('Could not save blog to Firestore:', err);
+  }
+
+  return id;
+}
+
+export async function deleteBlogPost(id: string): Promise<void> {
+  try {
+    const docRef = doc(db, 'blogs', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('Could not delete blog from Firestore:', err);
+  }
+}
+
+export function subscribeToBlogPosts(
+  onUpdate: (blogs: BlogPost[]) => void,
+  statusFilter: 'published' | 'all' = 'published'
+): () => void {
+  // Emit initial seed blogs immediately
+  const initial = statusFilter === 'published'
+    ? SEED_BLOG_POSTS.filter((b) => b.status === 'published')
+    : SEED_BLOG_POSTS;
+  onUpdate(initial);
+
+  try {
+    const col = collection(db, 'blogs');
+    const q = statusFilter === 'published'
+      ? query(col, where('status', '==', 'published'))
+      : col;
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        if (!snap.empty) {
+          const list: BlogPost[] = [];
+          snap.forEach((d) => {
+            list.push({ ...(d.data() as BlogPost), id: d.id });
+          });
+          list.sort((a, b) => Number(b.publishedAt || b.createdAt || 0) - Number(a.publishedAt || a.createdAt || 0));
+          onUpdate(list);
+        }
+      },
+      (err) => {
+        console.warn('Blog subscription notice:', err);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Error setting up blog subscriber:', err);
+    return () => {};
+  }
+}
+
 

@@ -15,7 +15,8 @@ import {
   FileText,
   Briefcase,
   Send,
-  BellRing
+  BellRing,
+  BookOpen
 } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 import { ContactModal } from './ContactModal';
@@ -320,6 +321,17 @@ const HeaderInner: React.FC<HeaderProps> = ({
               Central / SSC
             </Link>
 
+            <Link
+              href="/blogs"
+              className={`px-3.5 py-3 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
+                pathname.startsWith('/blogs')
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-amber-300 hover:bg-amber-600 hover:text-slate-950'
+              }`}
+            >
+              <span>📖 ब्लॉग (Blogs)</span>
+            </Link>
+
             {/* More Dropdown */}
             <div className="relative">
               <button
@@ -532,6 +544,16 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <div className="px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <span>अन्य सेवाएं एवं विकल्प</span>
               </div>
+
+              {/* Blogs link in mobile drawer */}
+              <Link
+                href="/blogs"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2 py-1 rounded-md flex items-center gap-2 text-xs font-bold text-amber-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>📖 करियर ब्लॉग्स (Career Blogs & Guides)</span>
+              </Link>
 
               {/* 1. Online Forms & Tech Services -> /about-us */}
               <Link

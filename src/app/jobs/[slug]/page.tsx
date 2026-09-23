@@ -28,6 +28,8 @@ import { AdSenseBanner } from '../../../components/AdSenseBanner';
 import { PosterStudio } from '../../../components/PosterStudio';
 import { Footer } from '../../../components/Footer';
 import { PopupAdModal } from '../../../components/PopupAdModal';
+import { TrendingJobsWidget } from '../../../components/TrendingJobsWidget';
+import { RelatedBlogsWidget } from '../../../components/RelatedBlogsWidget';
 import { getJobBySlug } from '../../../lib/firebase';
 import { JobPostDetail } from '../../../types';
 
@@ -242,7 +244,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
           </div>
         </div>
 
-        {/* 3. SARKARI RESULT CLASSIC TABLE CONTAINER */}
+        {/* 3. OFFICIAL VACANCY NOTIFICATION CONTAINER */}
         <article className="bg-white border-2 border-red-700 rounded-xl shadow-md overflow-hidden my-5">
           {/* Main Top Header of the Vacancy */}
           <div className="bg-red-700 text-white p-4 sm:p-6 text-center border-b-2 border-red-800">
@@ -281,7 +283,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
             <span><strong>श्रेणी:</strong> {job.category}</span>
           </div>
 
-          {/* SARKARI 2-COLUMN TABLE: IMPORTANT DATES & APPLICATION FEE */}
+          {/* OFFICIAL 2-COLUMN TABLE: IMPORTANT DATES & APPLICATION FEE */}
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-neutral-200 border-b-2 border-neutral-200">
             {/* Left Column: Important Dates */}
             <div className="p-4 sm:p-5">
@@ -475,7 +477,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
             </ol>
           </div>
 
-          {/* 4. IMPORTANT ACTION LINKS BOX (THE SARKARI RESULT SIGNATURE TABLE) */}
+          {/* 4. IMPORTANT ACTION LINKS BOX */}
           <div className="p-4 sm:p-6 bg-linear-to-b from-amber-50 to-orange-50/60">
             <div className="text-center mb-4">
               <span className="bg-red-700 text-white font-black text-xs uppercase px-3 py-1 rounded-full shadow-xs">
@@ -660,6 +662,12 @@ export default function JobDetailPage({ params }: JobPageProps) {
               <span>फॉर्म भरवाने हेतु संपर्क</span>
             </a>
           </div>
+        </div>
+
+        {/* 7. CROSS-PROMOTIONAL INTERNAL LINKING WIDGETS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+          <TrendingJobsWidget currentPostId={job.id} />
+          <RelatedBlogsWidget />
         </div>
       </main>
 

@@ -53,10 +53,11 @@ body {
 .animate-marquee {
   display: inline-flex;
   white-space: nowrap;
-  animation: marquee 40s linear infinite;
+  animation: marquee 60s linear infinite;
   will-change: transform;
 }
 
-.animate-marquee:hover {
+.animate-marquee:hover,
+.ticker-container:hover .animate-marquee {
   animation-play-state: paused !important;
 }

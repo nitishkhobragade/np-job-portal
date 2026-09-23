@@ -192,7 +192,7 @@ export interface PostRecord {
   createdAt?: unknown;
   updatedAt?: unknown;
 
-  // Additional Sarkari display / backward compatibility fields
+  // Additional display / backward compatibility fields
   detailsUrl?: string;
   content?: string;
   dates?: {
@@ -297,3 +297,29 @@ export interface ScrapedJobDraft {
   suggestedPost: Partial<PostRecord>;
   status: 'queued' | 'approved' | 'rejected';
 }
+
+export type BlogCategory = 'Exam Prep' | 'Career Guidance' | 'Tech Tips' | 'Gov Schemes' | 'General';
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string; // HTML or Markdown formatted content
+  category: BlogCategory;
+  author: {
+    name: string;
+    phone?: string;
+    role?: string;
+  };
+  bannerUrl?: string;
+  status: 'draft' | 'published';
+  tags?: string[];
+  readingTimeMinutes?: number;
+  views?: number;
+  seoKeywords?: string[];
+  createdAt: string | number;
+  publishedAt?: string | number;
+  updatedAt?: string | number;
+}
+
