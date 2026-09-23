@@ -179,18 +179,18 @@ export default function BlogDetailPage() {
 
               {/* Main Rich Content */}
               <div className="prose max-w-none text-slate-800 text-sm sm:text-base leading-relaxed space-y-4 my-6">
-                {blog.content ? (
-                  blog.content.split('\n\n').map((para, idx) => {
+                {(blog.content || '').split('\n\n').map((para, idx) => {
+                  const renderedElement = (() => {
                     if (para.startsWith('## ')) {
                       return (
-                        <h2 key={idx} className="text-xl sm:text-2xl font-black text-slate-900 pt-4 pb-1 border-b-2 border-red-200">
+                        <h2 key={idx} className="text-xl sm:text-2xl font-black text-slate-900 pt-5 pb-1.5 border-b-2 border-red-200">
                           {para.replace('## ', '')}
                         </h2>
                       );
                     }
                     if (para.startsWith('### ')) {
                       return (
-                        <h3 key={idx} className="text-lg sm:text-xl font-bold text-slate-900 pt-3">
+                        <h3 key={idx} className="text-lg sm:text-xl font-bold text-slate-900 pt-4">
                           {para.replace('### ', '')}
                         </h3>
                       );
@@ -198,18 +198,52 @@ export default function BlogDetailPage() {
                     if (para.startsWith('- ') || para.startsWith('* ')) {
                       const items = para.split('\n');
                       return (
-                        <ul key={idx} className="list-disc pl-5 space-y-1 text-slate-700 my-2">
+                        <ul key={idx} className="list-disc pl-5 space-y-1.5 text-slate-700 my-3">
                           {items.map((it, i) => (
-                            <li key={i}>{it.replace(/^[-*]\s+/, '')}</li>
+                            <li key={i} className="leading-relaxed">{it.replace(/^[-*]\s+/, '')}</li>
                           ))}
                         </ul>
                       );
                     }
-                    return <p key={idx} className="leading-relaxed">{para}</p>;
-                  })
-                ) : (
-                  <p className="text-slate-600">इस लेख की विस्तृत जानकारी शीघ्र अपडेट की जा रही है।</p>
-                )}
+                    if (para.startsWith('---')) {
+                      return <hr key={idx} className="my-6 border-slate-200" />;
+                    }
+                    return <p key={idx} className="leading-relaxed my-2">{para}</p>;
+                  })();
+
+                  // Embed high-conversion banner after 3rd paragraph / section
+                  const isCalloutPosition = idx === 3;
+
+                  return (
+                    <React.Fragment key={idx}>
+                      {renderedElement}
+                      {isCalloutPosition && (
+                        <div className="my-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="space-y-1 text-center sm:text-left">
+                            <div className="inline-flex items-center gap-1.5 bg-black/20 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-bold text-amber-200">
+                              <Sparkles className="w-3.5 h-3.5" /> घर बैठे ऑनलाइन फॉर्म सेवा
+                            </div>
+                            <h4 className="text-base sm:text-lg font-black tracking-tight">
+                              फॉर्म भरने में सहायता चाहिए? सीधे संपर्क करें: {OWNER_INFO.phone}
+                            </h4>
+                            <p className="text-xs text-amber-100">
+                              फोटो रिसाइजिंग, डोमिसाइल, जाति प्रमाण पत्र व 100% सटीक सबमिशन — Nitish Khobragade द्वारा।
+                            </p>
+                          </div>
+                          <a
+                            href={OWNER_INFO.whatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 px-4 py-2.5 bg-white text-slate-950 font-black text-xs sm:text-sm rounded-xl hover:bg-amber-100 transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                          >
+                            <PhoneCall className="w-4 h-4 text-emerald-600" />
+                            <span>व्हाट्सएप पर संपर्क करें</span>
+                          </a>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </div>
 
               {/* Tags Strip */}

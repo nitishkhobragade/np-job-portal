@@ -211,9 +211,18 @@ export interface PostRecord {
     officialSite: string;
   };
   posterConfig?: {
-    headline: string;
-    keyPoints: string[];
-    note: string;
+    headline?: string;
+    keyPoints?: string[];
+    note?: string;
+    theme?: 'classic' | 'navy' | 'emerald' | 'crimson';
+    characterType?: 'male' | 'female' | 'custom' | 'none';
+    customCharacterUrl?: string;
+    titleScale?: 'sm' | 'md' | 'lg' | 'xl';
+    aspectRatio?: 'feed' | 'story';
+    customPosts?: string;
+    customLastDate?: string;
+    customFeeAlert?: string;
+    showQrCode?: boolean;
   };
   state?: 'MP' | 'Central' | 'All India';
   advtNo?: string;

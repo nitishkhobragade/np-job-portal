@@ -39,28 +39,28 @@ export const TopTicker: React.FC = () => {
           </span>
         </div>
 
-        {/* Continuous Marquee Content */}
+        {/* Continuous Marquee Content (Twin-Track Gapless Engine) */}
         <div
-          className="flex-1 overflow-hidden relative w-full py-0.5 cursor-pointer ticker-container"
+          className="flex-1 overflow-hidden relative w-full py-0.5 cursor-pointer flex ticker-container min-h-[28px] items-center"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
+          {/* TRACK 1 */}
           <div
-            className="whitespace-nowrap flex items-center gap-8 animate-marquee"
+            className="animate-marquee-continuous flex items-center shrink-0 pr-8"
             style={{
               animationPlayState: isPaused ? 'paused' : 'running',
             }}
           >
-            {/* Render items twice to guarantee smooth continuous loop */}
-            {[...activeItems, ...activeItems].map((alert, idx) => (
+            {activeItems.map((alert, idx) => (
               <a
-                key={`${alert.id}-${idx}`}
+                key={`t1-${alert.id || idx}-${idx}`}
                 href={alert.link || OWNER_INFO.whatsappUrl}
                 target={alert.link && !alert.link.startsWith('/') ? '_blank' : undefined}
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-neutral-200 hover:text-amber-300 transition-colors"
+                className="inline-flex items-center gap-2 mr-8 text-xs sm:text-sm font-medium text-neutral-200 hover:text-amber-300 transition-colors whitespace-nowrap"
               >
-                <span className={`inline-block px-1.5 py-0.2 rounded border text-[10px] font-bold ${
+                <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold ${
                   alert.isBreaking
                     ? 'bg-red-500/20 border-red-500/40 text-red-300'
                     : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
@@ -68,7 +68,37 @@ export const TopTicker: React.FC = () => {
                   {alert.date || (alert.isBreaking ? 'BREAKING' : 'NEW')}
                 </span>
                 <span>{alert.text}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+              </a>
+            ))}
+          </div>
+
+          {/* TRACK 2 (Seamless Twin Track for Gapless Loop) */}
+          <div
+            className="animate-marquee-continuous flex items-center shrink-0 pr-8"
+            aria-hidden="true"
+            style={{
+              animationPlayState: isPaused ? 'paused' : 'running',
+            }}
+          >
+            {activeItems.map((alert, idx) => (
+              <a
+                key={`t2-${alert.id || idx}-${idx}`}
+                href={alert.link || OWNER_INFO.whatsappUrl}
+                target={alert.link && !alert.link.startsWith('/') ? '_blank' : undefined}
+                rel="noopener noreferrer"
+                tabIndex={-1}
+                className="inline-flex items-center gap-2 mr-8 text-xs sm:text-sm font-medium text-neutral-200 hover:text-amber-300 transition-colors whitespace-nowrap"
+              >
+                <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold ${
+                  alert.isBreaking
+                    ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                    : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                }`}>
+                  {alert.date || (alert.isBreaking ? 'BREAKING' : 'NEW')}
+                </span>
+                <span>{alert.text}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
               </a>
             ))}
           </div>

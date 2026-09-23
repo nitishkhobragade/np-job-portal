@@ -43,7 +43,16 @@ body {
 
 @keyframes marquee {
   0% {
-    transform: translateX(100%);
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes marquee-twin {
+  0% {
+    transform: translateX(0%);
   }
   100% {
     transform: translateX(-100%);
@@ -53,11 +62,20 @@ body {
 .animate-marquee {
   display: inline-flex;
   white-space: nowrap;
-  animation: marquee 60s linear infinite;
+  animation: marquee-twin 45s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-continuous {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  animation: marquee-twin 40s linear infinite;
   will-change: transform;
 }
 
 .animate-marquee:hover,
-.ticker-container:hover .animate-marquee {
+.ticker-container:hover .animate-marquee,
+.ticker-container:hover .animate-marquee-continuous {
   animation-play-state: paused !important;
 }

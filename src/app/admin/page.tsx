@@ -347,6 +347,25 @@ export default function AdminPage() {
     };
   }, [isAuthenticated]);
 
+  // Sync URL query params with admin tab and poster postId
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get('tab');
+    const postIdParam = searchParams.get('postId');
+
+    if (tabParam === 'poster') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab('poster');
+    }
+    if (postIdParam && posts.length > 0) {
+      const found = posts.find((p) => p.id === postIdParam || p.slug === postIdParam);
+      if (found) {
+        setPosterJob(found);
+      }
+    }
+  }, [posts]);
+
   const showToast = (msg: string) => {
     setNotificationMsg(msg);
     setTimeout(() => setNotificationMsg(''), 4000);
@@ -1003,7 +1022,7 @@ export default function AdminPage() {
                   if (e.key === "Enter") handleAdminLogin(e);
                 }}
                 placeholder="Enter User ID / Admin Email"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400 touch-action-manipulation"
               />
             </div>
 
@@ -1024,7 +1043,7 @@ export default function AdminPage() {
                     if (e.key === "Enter") handleAdminLogin(e);
                   }}
                   placeholder="Enter Password"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3.5 pr-11 py-2.5 text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3.5 pr-12 py-2.5 min-h-[44px] text-sm text-white focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400 touch-action-manipulation"
                 />
                 <button
                   type="button"
@@ -1033,7 +1052,7 @@ export default function AdminPage() {
                     e.stopPropagation();
                     setShowPass(!showPass);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors z-20 cursor-pointer"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-400 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-slate-800 transition-colors z-20 cursor-pointer touch-action-manipulation"
                   aria-label={showPass ? "Hide password" : "Show password"}
                   title={showPass ? "पासवर्ड छुपाएं" : "पासवर्ड देखें"}
                 >
@@ -1047,7 +1066,7 @@ export default function AdminPage() {
               id="admin-login-submit-btn"
               disabled={isSubmitting}
               onClick={handleAdminLogin}
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-60 text-slate-950 font-black rounded-xl text-sm shadow-lg hover:shadow-amber-500/20 transition-all active:scale-98 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full py-3 min-h-[48px] touch-action-manipulation bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-60 text-slate-950 font-black rounded-xl text-sm shadow-lg hover:shadow-amber-500/20 transition-all active:scale-98 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed select-none"
             >
               {isSubmitting ? (
                 <>
@@ -1066,7 +1085,7 @@ export default function AdminPage() {
           <div className="mt-6 pt-4 border-t border-slate-800 text-center">
             <Link
               href="/"
-              className="text-xs text-slate-400 hover:text-amber-300 transition-colors inline-flex items-center gap-1"
+              className="text-xs text-slate-400 hover:text-amber-300 transition-colors inline-flex items-center justify-center gap-1 min-h-[44px] touch-action-manipulation"
             >
               <span>← मुख्य जॉब पोर्टल पर वापस जाएं</span>
             </Link>
@@ -1178,7 +1197,7 @@ export default function AdminPage() {
         <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border-t border-slate-800/80 pt-2 pb-2 scrollbar-none text-xs font-bold box-border">
           <button
             onClick={() => setActiveTab('posts')}
-            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
               activeTab === 'posts'
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                 : 'text-slate-300 hover:bg-slate-800'
@@ -1190,7 +1209,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab('poster')}
-            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
               activeTab === 'poster'
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                 : 'text-slate-300 hover:bg-slate-800'
@@ -1202,7 +1221,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab('scraper')}
-            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
               activeTab === 'scraper'
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                 : 'text-slate-300 hover:bg-slate-800'
@@ -1214,7 +1233,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab('popup')}
-            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
               activeTab === 'popup'
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                 : 'text-slate-300 hover:bg-slate-800'
@@ -1226,7 +1245,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab('ticker')}
-            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
               activeTab === 'ticker'
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                 : 'text-slate-300 hover:bg-slate-800'
@@ -1238,7 +1257,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab('backup')}
-            className={`px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
               activeTab === 'backup'
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                 : 'text-slate-300 hover:bg-slate-800'
@@ -1250,7 +1269,7 @@ export default function AdminPage() {
 
           <Link
             href="/admin/blogs"
-            className="px-3.5 py-2 rounded-lg flex items-center gap-2 shrink-0 text-slate-300 hover:bg-slate-800 transition-all font-bold hover:text-amber-400 bg-slate-900 border border-slate-700"
+            className="px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 text-slate-300 hover:bg-slate-800 transition-all font-bold hover:text-amber-400 bg-slate-900 border border-slate-700"
           >
             <BookOpen className="w-4 h-4 text-amber-400" />
             <span>ब्लॉग कंट्रोलर (Blogger Studio) ↗</span>
@@ -2477,9 +2496,15 @@ export default function AdminPage() {
                                   onClick={() => {
                                     setPosterJob(job);
                                     setActiveTab('poster');
+                                    if (typeof window !== 'undefined') {
+                                      const url = new URL(window.location.href);
+                                      url.searchParams.set('tab', 'poster');
+                                      url.searchParams.set('postId', job.id);
+                                      window.history.pushState(null, '', url.toString());
+                                    }
                                   }}
                                   className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 transition-colors cursor-pointer"
-                                  title="पोस्टर स्टूडियो में खोलें (Generate Poster)"
+                                  title="पोस्टर बनाएं / एडिट करें (Generate/Edit Poster)"
                                 >
                                   <ImageIcon className="w-3.5 h-3.5" />
                                 </button>
@@ -2558,7 +2583,24 @@ export default function AdminPage() {
             </div>
 
             {posterJob ? (
-              <PosterStudio job={posterJob} initialEditableMode={true} />
+              <PosterStudio
+                job={posterJob}
+                initialEditableMode={true}
+                isAdmin={true}
+                onBackToPosts={() => {
+                  setActiveTab('posts');
+                  if (typeof window !== 'undefined') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tab', 'posts');
+                    url.searchParams.delete('postId');
+                    window.history.pushState(null, '', url.toString());
+                  }
+                }}
+                onJobUpdated={(updated) => {
+                  setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+                  setPosterJob(updated);
+                }}
+              />
             ) : (
               <div className="text-center py-12 text-slate-400">
                 पोस्टर बनाने के लिए कृपया ऊपर से कोई भर्ती चुनें।

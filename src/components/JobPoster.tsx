@@ -7,8 +7,14 @@ import {
   Clock,
   CheckCircle2,
   FileText,
-  QrCode,
-  Laptop
+  Laptop,
+  ShieldCheck,
+  Terminal,
+  BookOpen,
+  Train,
+  Landmark,
+  Award,
+  QrCode
 } from 'lucide-react';
 import { JobPostDetail, PostRecord } from '../types';
 import { OWNER_INFO } from '../data/portalData';
@@ -17,6 +23,56 @@ import { getWhatsAppQrCodeDataUrl, WHATSAPP_CHANNEL_URL } from '../lib/qrCodeHel
 
 export type PosterTheme = 'classic' | 'navy' | 'emerald' | 'crimson';
 export type TitleScale = 'sm' | 'md' | 'lg' | 'xl';
+
+const getCategoryEmblem = (category?: string, title?: string, dept?: string) => {
+  const combined = `${category || ''} ${title || ''} ${dept || ''}`.toLowerCase();
+  if (combined.includes('police') || combined.includes('constable') || combined.includes('sub-inspector') || combined.includes('si ') || combined.includes('defence') || combined.includes('सुरक्षा') || combined.includes('पुलिस')) {
+    return {
+      type: 'police',
+      label: 'MP POLICE & DEFENCE RECRUITMENT',
+      Icon: ShieldCheck,
+      badgeText: '🛡️ POLICE / DEFENCE RECRUITMENT 2026'
+    };
+  }
+  if (combined.includes('tech') || combined.includes('software') || combined.includes('developer') || combined.includes('it ') || combined.includes('mnc') || combined.includes('कंप्यूटर')) {
+    return {
+      type: 'tech',
+      label: 'IT & TECH MNC HIRING 2026',
+      Icon: Terminal,
+      badgeText: '💻 TECH & IT HIRING 2026'
+    };
+  }
+  if (combined.includes('teach') || combined.includes('shikshak') || combined.includes('varg') || combined.includes('professor') || combined.includes('bed') || combined.includes('शिक्षक') || combined.includes('शिक्षा')) {
+    return {
+      type: 'teaching',
+      label: 'TEACHING & EDUCATION VACANCY',
+      Icon: BookOpen,
+      badgeText: '📚 TEACHING & EDUCATION VACANCY'
+    };
+  }
+  if (combined.includes('railway') || combined.includes('rrb') || combined.includes('rpf') || combined.includes('alp') || combined.includes('लोको') || combined.includes('रेलवे')) {
+    return {
+      type: 'railway',
+      label: 'INDIAN RAILWAYS / RRB RECRUITMENT',
+      Icon: Train,
+      badgeText: '🚆 RAILWAY / RRB RECRUITMENT'
+    };
+  }
+  if (combined.includes('ssc') || combined.includes('upsc') || combined.includes('central') || combined.includes('केन्द्रीय')) {
+    return {
+      type: 'central',
+      label: 'CENTRAL GOVT / SSC VACANCY',
+      Icon: Landmark,
+      badgeText: '🏛️ CENTRAL GOVT / SSC RECRUITMENT'
+    };
+  }
+  return {
+    type: 'general',
+    label: 'OFFICIAL VACANCY UPDATE 2026',
+    Icon: Award,
+    badgeText: '★ OFFICIAL VACANCY UPDATE 2026 ★'
+  };
+};
 
 export interface JobPosterProps {
   job: JobPostDetail | PostRecord;
@@ -76,6 +132,7 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
 
     const isTechJob = Boolean(postRec?.isTechJob || detailRec?.isTechJob || postRec?.category === 'tech-jobs');
     const roleSubtitle = postRec?.role || department || (isTechJob ? 'IT & Tech Hiring' : 'विज्ञप्ति अनुसार');
+    const categoryEmblem = getCategoryEmblem(postRec?.category || detailRec?.category, title, department);
 
     // QR Code State
     const [qrDataUrl, setQrDataUrl] = useState<string>(passedQrDataUrl || '');
@@ -247,10 +304,9 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
             {/* Glossy top bevel reflection */}
             <div className="absolute top-0 left-0 right-0 h-1/2 bg-white/10 pointer-events-none" />
 
-            <div className="inline-flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3.5 py-1 rounded-full text-xs font-black tracking-wider uppercase mb-1 border border-white/20 text-white">
-              <span>★</span>
-              <span>{isTechJob ? 'IT & TECH VACANCY 2026' : 'OFFICIAL VACANCY UPDATE 2026'}</span>
-              <span>★</span>
+            <div className="inline-flex items-center gap-2 bg-black/40 backdrop-blur-xs px-4 py-1 rounded-full text-xs font-black tracking-wider uppercase mb-1 border border-white/20 text-white shadow-xs">
+              <categoryEmblem.Icon className="w-4 h-4 text-amber-300 shrink-0" />
+              <span>{categoryEmblem.badgeText}</span>
             </div>
 
             <h1
@@ -315,10 +371,10 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
           </div>
         </div>
 
-        {/* MIDDLE SECTION: 2x2 HIGH-CONTRAST TILES (LEFT) + CANDIDATE CHARACTER (RIGHT) */}
+        {/* MIDDLE SECTION: 2x2 HIGH-CONTRAST TILES (LEFT 75%) + CANDIDATE CHARACTER (RIGHT ~25%) */}
         <div className={`relative z-10 flex items-stretch gap-4 ${isFeed ? 'my-2.5' : 'my-4'} flex-1 min-h-0`}>
-          {/* LEFT TILES GRID */}
-          <div className={`${hasCharacter ? 'w-[58%]' : 'w-full'} flex flex-col justify-between gap-3`}>
+          {/* LEFT TILES GRID - EXPANDED 75% CANVAS */}
+          <div className={`${hasCharacter ? 'w-[75%]' : 'w-full'} flex flex-col justify-between gap-3`}>
             <div className="grid grid-cols-2 gap-3 h-full">
               {/* TILE 1: योग्यता / Qualification (Teal to Emerald) */}
               <div className="bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-600 text-white rounded-3xl p-4 sm:p-4.5 shadow-lg border-2 border-teal-300/40 flex flex-col justify-between">
@@ -327,17 +383,17 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
                     <GraduationCap className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-black uppercase text-teal-100 tracking-wider block">
+                    <span className="text-xs font-black uppercase text-teal-100 tracking-wider block">
                       शैक्षणिक योग्यता
                     </span>
-                    <span className="text-xs font-bold text-teal-200">
+                    <span className="text-xs font-black text-teal-200 uppercase tracking-wide">
                       पात्रता विवरण
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-2">
-                  <p className="text-lg sm:text-xl font-black text-white leading-snug line-clamp-3 drop-shadow-xs">
+                  <p className="text-xl sm:text-2xl font-extrabold text-white leading-snug line-clamp-3 drop-shadow-xs">
                     {displayEligibility}
                   </p>
                 </div>
@@ -350,20 +406,20 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-black uppercase text-pink-100 tracking-wider block">
+                    <span className="text-xs font-black uppercase text-pink-100 tracking-wider block">
                       आयु सीमा
                     </span>
-                    <span className="text-xs font-bold text-pink-200">
+                    <span className="text-xs font-black text-pink-200 uppercase tracking-wide">
                       Age Criteria
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-2">
-                  <p className="text-2xl sm:text-3xl font-black text-white leading-tight drop-shadow-xs">
+                  <p className="text-2xl sm:text-3xl font-extrabold text-white leading-tight drop-shadow-xs">
                     {displayAge}
                   </p>
-                  <p className="text-[11px] font-bold text-pink-100 mt-0.5">
+                  <p className="text-xs font-bold text-pink-100 mt-0.5">
                     नियमानुसार आयु में छूट लागू
                   </p>
                 </div>
@@ -376,20 +432,20 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
                     <CheckCircle2 className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-black uppercase text-amber-100 tracking-wider block">
+                    <span className="text-xs font-black uppercase text-amber-100 tracking-wider block">
                       आवेदन प्रारंभ
                     </span>
-                    <span className="text-xs font-bold text-amber-200">
+                    <span className="text-xs font-black text-amber-200 uppercase tracking-wide">
                       Starting Date
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-2">
-                  <p className="text-xl sm:text-2xl font-black text-white leading-tight drop-shadow-xs">
+                  <p className="text-2xl sm:text-3xl font-extrabold text-white leading-tight drop-shadow-xs">
                     {displayStartDate}
                   </p>
-                  <p className="text-[11px] font-bold text-amber-100 mt-0.5">
+                  <p className="text-xs font-bold text-amber-100 mt-0.5">
                     ऑनलाइन पोर्टल खुला है
                   </p>
                 </div>
@@ -402,20 +458,20 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
                     <Clock className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-black uppercase text-cyan-100 tracking-wider block">
+                    <span className="text-xs font-black uppercase text-cyan-100 tracking-wider block">
                       अंतिम तिथि
                     </span>
-                    <span className="text-xs font-bold text-cyan-200">
+                    <span className="text-xs font-black text-cyan-200 uppercase tracking-wide">
                       Last Date Alert
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-2">
-                  <p className="text-2xl sm:text-3xl font-black text-white leading-tight drop-shadow-xs">
+                  <p className="text-2xl sm:text-3xl font-extrabold text-white leading-tight drop-shadow-xs">
                     {displayLastDate}
                   </p>
-                  <p className="text-[11px] font-bold text-cyan-100 mt-0.5">
+                  <p className="text-xs font-bold text-cyan-100 mt-0.5">
                     अंतिम तिथि से पूर्व आवेदन करें
                   </p>
                 </div>
@@ -460,13 +516,13 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
             </div>
           </div>
 
-          {/* RIGHT CANDIDATE CHARACTER GRAPHIC */}
+          {/* RIGHT CANDIDATE CHARACTER GRAPHIC (~25% ALIGNED STRICTLY BOTTOM-RIGHT) */}
           {hasCharacter && (
-            <div className="w-[42%] flex items-end justify-center relative overflow-hidden">
+            <div className="w-[25%] flex items-end justify-end relative overflow-hidden self-end pb-1">
               <CandidateCharacter
                 type={characterType}
                 customUrl={customCharacterUrl}
-                className="w-full h-full"
+                className="w-full h-full max-h-[580px] object-bottom"
               />
             </div>
           )}

@@ -19,7 +19,11 @@ import {
   QrCode,
   User,
   Palette,
-  Type
+  Type,
+  ArrowLeft,
+  Search,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { JobPostDetail, PostRecord } from '../types';
 import { OWNER_INFO } from '../data/portalData';
@@ -31,6 +35,7 @@ import { WHATSAPP_CHANNEL_URL } from '../lib/qrCodeHelper';
 interface PosterStudioProps {
   job: JobPostDetail | PostRecord;
   onClose?: () => void;
+  onBackToPosts?: () => void;
   isModal?: boolean;
   initialEditableMode?: boolean;
   isAdmin?: boolean;
@@ -40,6 +45,7 @@ interface PosterStudioProps {
 export const PosterStudio: React.FC<PosterStudioProps> = ({
   job,
   onClose,
+  onBackToPosts,
   isModal = false,
   initialEditableMode = false,
   isAdmin,
@@ -90,23 +96,87 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const defaultEligibility = postRec ? postRec.eligibility || '' : detailRec?.qualificationSummary || '';
   const posterConfig = postRec?.posterConfig;
 
-  // Visual Customizer Controls
-  const [theme, setTheme] = useState<PosterTheme>('classic');
-  const [characterType, setCharacterType] = useState<CharacterType>('male');
-  const [customCharacterUrl, setCustomCharacterUrl] = useState<string>('');
-  const [titleScale, setTitleScale] = useState<TitleScale>('md');
-  const [showQrCode, setShowQrCode] = useState<boolean>(true);
+  // Visual Customizer Controls with State Persistence
+  const [theme, setTheme] = useState<PosterTheme>(posterConfig?.theme || 'classic');
+  const [characterType, setCharacterType] = useState<CharacterType>(posterConfig?.characterType || 'male');
+  const [customCharacterUrl, setCustomCharacterUrl] = useState<string>(posterConfig?.customCharacterUrl || '');
+  const [titleScale, setTitleScale] = useState<TitleScale>(posterConfig?.titleScale || 'md');
+  const [showQrCode, setShowQrCode] = useState<boolean>(posterConfig?.showQrCode !== undefined ? posterConfig.showQrCode : true);
 
   // Content Customizer Controls
   const [customHeadline, setCustomHeadline] = useState<string>(
     posterConfig?.headline || `${defaultShortTitle} भर्ती 2026`
   );
-  const [customPosts, setCustomPosts] = useState<string>(defaultPosts);
-  const [customLastDate, setCustomLastDate] = useState<string>(defaultLastDate);
-  const [customFeeAlert, setCustomFeeAlert] = useState<string>(`${defaultFeeGen} / ${defaultFeeRes}`);
+  const [customPosts, setCustomPosts] = useState<string>(posterConfig?.customPosts || defaultPosts);
+  const [customLastDate, setCustomLastDate] = useState<string>(posterConfig?.customLastDate || defaultLastDate);
+  const [customFeeAlert, setCustomFeeAlert] = useState<string>(posterConfig?.customFeeAlert || `${defaultFeeGen} / ${defaultFeeRes}`);
   const [customNote, setCustomNote] = useState<string>(
     posterConfig?.note || 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
   );
+
+  // AI Character & Logo Selector State
+  const AI_AVATARS = [
+    {
+      id: 'police',
+      title: 'MP Police / Defence',
+      badge: '👮 वर्दीधारी पुलिस',
+      url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
+      type: 'custom' as CharacterType
+    },
+    {
+      id: 'female-bank',
+      title: 'Female Bank Officer',
+      badge: '👩‍💼 बैंक/प्रशासनिक अधिकारी',
+      url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
+      type: 'female' as CharacterType
+    },
+    {
+      id: 'railway',
+      title: 'Railway Loco Pilot',
+      badge: '🚆 रेलवे लोको पायलट',
+      url: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=600&q=80',
+      type: 'custom' as CharacterType
+    },
+    {
+      id: 'tech',
+      title: 'Tech & IT Specialist',
+      badge: '💻 IT सॉफ्टवेयर इंजीनियर',
+      url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+      type: 'male' as CharacterType
+    }
+  ];
+  const [aiSearchPrompt, setAiSearchPrompt] = useState<string>('');
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>('');
+  const [isAiRegenerating, setIsAiRegenerating] = useState<boolean>(false);
+
+  const handleSelectAiAvatar = (avatar: typeof AI_AVATARS[0]) => {
+    setSelectedAvatarId(avatar.id);
+    setCharacterType(avatar.type);
+    setCustomCharacterUrl(avatar.type === 'custom' ? avatar.url : '');
+  };
+
+  const handleAiRegenerate = () => {
+    setIsAiRegenerating(true);
+    setTimeout(() => {
+      // Dynamic AI rotation / avatar assignment based on prompt or category
+      const q = aiSearchPrompt.toLowerCase().trim();
+      let picked = AI_AVATARS[0];
+      if (q.includes('female') || q.includes('bank') || q.includes('महिला') || q.includes('officer')) {
+        picked = AI_AVATARS[1];
+      } else if (q.includes('rail') || q.includes('train') || q.includes('लोको') || q.includes('इंजीनियर')) {
+        picked = AI_AVATARS[2];
+      } else if (q.includes('tech') || q.includes('it') || q.includes('developer') || q.includes('software')) {
+        picked = AI_AVATARS[3];
+      } else {
+        const randomIdx = Math.floor(Math.random() * AI_AVATARS.length);
+        picked = AI_AVATARS[randomIdx];
+      }
+      handleSelectAiAvatar(picked);
+      setIsAiRegenerating(false);
+      setSaveStatusMsg(`AI कैरेक्टर सेट: ${picked.title}`);
+      setTimeout(() => setSaveStatusMsg(null), 3000);
+    }, 400);
+  };
 
   // Poster Mode: 'auto' (high-impact viral engine) vs 'custom' (uploaded banner compressed to ~100KB)
   const initialUseCustom = Boolean(postRec?.useCustomPoster || detailRec?.useCustomPoster);
@@ -189,7 +259,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     }
   };
 
-  // Save Settings to Firestore
+  // Save Settings to Firestore (Persisting posterConfig)
   const handleSavePosterPreference = async () => {
     if (!job.id || !isAdminState) return;
 
@@ -197,18 +267,29 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       setSaveStatusMsg('सेव किया जा रहा है...');
       const isCustom = posterMode === 'custom' && Boolean(customPosterUrl);
 
+      const configToPersist = {
+        headline: customHeadline,
+        keyPoints: [
+          `कुल पद: ${customPosts}`,
+          `अंतिम तिथि: ${customLastDate}`,
+          `शैक्षणिक योग्यता: ${defaultEligibility.slice(0, 60)}`
+        ],
+        note: customNote,
+        theme,
+        characterType,
+        customCharacterUrl,
+        titleScale,
+        aspectRatio,
+        customPosts,
+        customLastDate,
+        customFeeAlert,
+        showQrCode
+      };
+
       await updateJob(job.id, {
         useCustomPoster: isCustom,
         customPosterUrl: isCustom ? customPosterUrl : '',
-        posterConfig: {
-          headline: customHeadline,
-          keyPoints: [
-            `कुल पद: ${customPosts}`,
-            `अंतिम तिथि: ${customLastDate}`,
-            `शैक्षणिक योग्यता: ${defaultEligibility.slice(0, 60)}`
-          ],
-          note: customNote
-        }
+        posterConfig: configToPersist
       });
 
       if (onJobUpdated && postRec) {
@@ -216,19 +297,11 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           ...postRec,
           useCustomPoster: isCustom,
           customPosterUrl: isCustom ? customPosterUrl : '',
-          posterConfig: {
-            headline: customHeadline,
-            keyPoints: [
-              `कुल पद: ${customPosts}`,
-              `अंतिम तिथि: ${customLastDate}`,
-              `शैक्षणिक योग्यता: ${defaultEligibility.slice(0, 60)}`
-            ],
-            note: customNote
-          }
+          posterConfig: configToPersist
         });
       }
 
-      setSaveStatusMsg('सेटिंग्स सफलतापूर्वक सुरक्षित की गईं!');
+      setSaveStatusMsg('पोस्टर सेटिंग्स सफलतापूर्वक सुरक्षित की गईं!');
       setTimeout(() => setSaveStatusMsg(null), 3500);
     } catch (err) {
       console.error('Save poster error:', err);
@@ -338,6 +411,62 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         isModal ? 'max-w-6xl mx-auto' : ''
       }`}
     >
+      {/* 0. ACTIVE EDITING PERSISTENCE BANNER */}
+      <div className="bg-gradient-to-r from-amber-950/90 via-slate-900 to-slate-950 border border-amber-500/50 rounded-xl p-3.5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shrink-0">
+            📌
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-amber-300 font-bold uppercase tracking-wider">
+                वर्तमान में एडिट हो रहा है:
+              </span>
+              <span className="font-mono text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30 text-amber-200 font-bold">
+                ID: {job.id}
+              </span>
+            </div>
+            <h3 className="text-sm sm:text-base font-black text-white truncate max-w-xl mt-0.5">
+              {job.title}
+            </h3>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (onBackToPosts) {
+                onBackToPosts();
+              } else if (onClose) {
+                onClose();
+              } else if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', 'posts');
+                url.searchParams.delete('postId');
+                window.history.pushState(null, '', url.toString());
+                window.location.reload();
+              }
+            }}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-xs"
+          >
+            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <span>← वापस पोस्ट सूची में जाएं (Back to Posts)</span>
+          </button>
+
+          {isAdminState && (
+            <button
+              type="button"
+              onClick={handleSavePosterPreference}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>💾 पोस्टर सेटिंग्स सुरक्षित करें</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* 1. STUDIO HEADER BAR */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-700/80">
         <div>
@@ -528,6 +657,82 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               >
                 <RotateCcw className="w-3 h-3" /> रीसेट
               </button>
+            </div>
+          </div>
+
+          {/* AI SEARCH & PROMPT LOGO / CHARACTER SELECTOR */}
+          <div className="bg-gradient-to-r from-purple-950/50 via-slate-900 to-indigo-950/50 border border-purple-500/40 p-3.5 rounded-xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-purple-200 font-black text-xs flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+                <span>AI सर्च व प्रॉम्प्ट लोगो / कैरेक्टर चयनकर्ता (AI Character Selector):</span>
+              </label>
+              <span className="text-[11px] text-purple-300 font-medium">
+                4 त्वरित अवतार + AI री-जनरेट विकल्प
+              </span>
+            </div>
+
+            {/* Input Prompt Box */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={aiSearchPrompt}
+                  onChange={(e) => setAiSearchPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAiRegenerate();
+                  }}
+                  placeholder="कस्टम कैरेक्टर या लोगो सर्च करें (उदा. 'MP Police Constable Cartoon', 'Female Bank Officer', 'Railway Engineer')..."
+                  className="w-full bg-slate-950 border border-purple-500/40 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-purple-400"
+                />
+                <Search className="w-3.5 h-3.5 text-purple-400 absolute right-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAiRegenerate}
+                disabled={isAiRegenerating}
+                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isAiRegenerating ? 'animate-spin' : ''}`} />
+                <span>{isAiRegenerating ? 'जनरेटिंग...' : '🔄 AI री-जनरेट करें'}</span>
+              </button>
+            </div>
+
+            {/* 4 Instant Selectable Preset Avatars */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              {AI_AVATARS.map((av) => {
+                const isSelected = selectedAvatarId === av.id || (av.type === 'custom' && customCharacterUrl === av.url) || (av.type !== 'custom' && characterType === av.type);
+                return (
+                  <button
+                    key={av.id}
+                    type="button"
+                    onClick={() => handleSelectAiAvatar(av)}
+                    className={`p-2 rounded-xl border text-left transition-all flex items-center gap-2.5 cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-900/60 border-purple-400 text-white font-black shadow-md ring-1 ring-purple-400'
+                        : 'bg-slate-950/70 border-slate-700/80 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center">
+                      {av.type === 'custom' ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={av.url} alt={av.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-base">{av.id === 'tech' ? '💻' : '👩‍💼'}</span>
+                      )}
+                    </div>
+                    <div className="truncate">
+                      <div className="text-[11px] font-bold truncate leading-tight text-white">
+                        {av.badge}
+                      </div>
+                      <div className="text-[9px] text-purple-300 truncate">
+                        {av.title}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
