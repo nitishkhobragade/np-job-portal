@@ -689,7 +689,7 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
             <AdSenseBanner slot="job-detail-sidebar-slot" format="vertical" />
 
             {/* Trending Jobs Widget */}
-            <TrendingJobsWidget currentPostId={record?.id || slug} />
+            <TrendingJobsWidget currentPostId={job?.id || slug} />
           </div>
         </div>
 
