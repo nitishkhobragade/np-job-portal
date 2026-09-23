@@ -516,6 +516,50 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
               </div>
             </div>
 
+            {/* 3.5 Contextual In-Content Humanized Blog Tip */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-300/80 p-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">💡</span>
+                  <h4 className="font-black text-sm text-amber-950">
+                    Nitish Khobragade स्पेशल गाइड: फॉर्म भरने से पूर्व आवश्यक सलाह
+                  </h4>
+                </div>
+                <Link
+                  href="/blogs"
+                  className="text-xs font-bold text-amber-900 hover:text-red-700 underline"
+                >
+                  सभी गाइड्स →
+                </Link>
+              </div>
+              <p className="text-xs text-amber-900 leading-relaxed mb-3">
+                सरकारी नौकरी का फॉर्म भरते समय छोटी सी त्रुटि भी फॉर्म रिजेक्ट करवा सकती है। अपनी सुविधा के लिए हमारे विशेष गाइड्स पढ़ें:
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Link
+                  href="/blogs/sarkari-form-bhart-samay-5-galatiyan"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-amber-300 font-bold text-neutral-800 hover:text-red-700 hover:border-amber-500 shadow-2xs transition-all"
+                >
+                  <span>📝 5 सबसे बड़ी गलतियां और बचाव</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+                </Link>
+                <Link
+                  href="/blogs/photo-signature-resize-background-guide"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-amber-300 font-bold text-neutral-800 hover:text-red-700 hover:border-amber-500 shadow-2xs transition-all"
+                >
+                  <span>📸 फोटो व सिग्नेचर सही साइज गाइड</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+                </Link>
+                <Link
+                  href="/blogs/mp-online-kiosk-csc-form-jaruri-dastavej"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-amber-300 font-bold text-neutral-800 hover:text-red-700 hover:border-amber-500 shadow-2xs transition-all"
+                >
+                  <span>📑 कियोस्क हेतु जरूरी दस्तावेज</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+                </Link>
+              </div>
+            </div>
+
             {/* 4. Age Limit Card */}
             <div className="bg-white rounded-xl border border-neutral-200 p-5 sm:p-6 shadow-xs">
               <h3 className="text-lg font-black text-neutral-900 mb-4 flex items-center gap-2 pb-2 border-b border-neutral-100">

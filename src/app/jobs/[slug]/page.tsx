@@ -459,6 +459,50 @@ export default function JobDetailPage({ params }: JobPageProps) {
             </div>
           </div>
 
+          {/* CONTEXTUAL IN-CONTENT BLOG GUIDES */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-b-2 border-amber-200">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">💡</span>
+                <h4 className="font-black text-sm sm:text-base text-amber-950">
+                  Nitish Khobragade स्पेशल गाइड: फॉर्म भरने से पूर्व जरूर पढ़ें
+                </h4>
+              </div>
+              <Link
+                href="/blogs"
+                className="text-xs font-bold text-amber-900 hover:text-red-700 underline shrink-0"
+              >
+                सभी गाइड देखें →
+              </Link>
+            </div>
+            <p className="text-xs text-amber-900 leading-relaxed mb-3">
+              ऑनलाइन फॉर्म भरते समय गलतियों से बचने व 100% सही आवेदन हेतु हमारे प्रमुख गाइड लेख पढ़ें:
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Link
+                href="/blogs/sarkari-form-bhart-samay-5-galatiyan"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-amber-300 font-bold text-neutral-800 hover:text-red-700 hover:border-amber-500 shadow-2xs transition-all"
+              >
+                <span>📝 फॉर्म भरते समय 5 सबसे बड़ी गलतियां और बचाव</span>
+                <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+              </Link>
+              <Link
+                href="/blogs/photo-signature-resize-background-guide"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-amber-300 font-bold text-neutral-800 hover:text-red-700 hover:border-amber-500 shadow-2xs transition-all"
+              >
+                <span>📸 फोटो व सिग्नेचर सही साइज गाइड</span>
+                <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+              </Link>
+              <Link
+                href="/blogs/mp-online-kiosk-csc-form-jaruri-dastavej"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-amber-300 font-bold text-neutral-800 hover:text-red-700 hover:border-amber-500 shadow-2xs transition-all"
+              >
+                <span>📑 कियोस्क हेतु जरूरी दस्तावेज</span>
+                <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+              </Link>
+            </div>
+          </div>
+
           {/* HOW TO APPLY INSTRUCTIONS */}
           <div className="p-4 sm:p-5 border-b-2 border-neutral-200 bg-white">
             <h3 className="text-base sm:text-lg font-black text-neutral-900 border-b-2 border-neutral-200 pb-2 mb-3 flex items-center gap-2">

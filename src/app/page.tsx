@@ -117,6 +117,7 @@ export default function NPJobPortalPage() {
   const [selectedCategory, setSelectedCategory] = useState('All Updates');
 
   // Dynamic real-time states
+  const [rawPosts, setRawPosts] = useState<PostRecord[]>([]);
   const [liveJobs, setLiveJobs] = useState<JobItem[]>([]);
   const [liveAdmitCards, setLiveAdmitCards] = useState<AdmitCardItem[]>([]);
   const [liveResults, setLiveResults] = useState<ResultItem[]>([]);
@@ -152,6 +153,7 @@ export default function NPJobPortalPage() {
 
           // Strict descending order: latest published post strictly on top
           publishedList.sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
+          setRawPosts(publishedList);
 
           // Separate into Jobs, Admit Cards, and Results
           const jobsList = publishedList
@@ -267,7 +269,11 @@ export default function NPJobPortalPage() {
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-full overflow-x-hidden">
         {/* Trending Cards Grid */}
-        <TrendingGrid onSelectCard={handleSelectTrendingCard} />
+        <TrendingGrid
+          posts={rawPosts}
+          onSelectCard={handleSelectTrendingCard}
+          onSelectJob={handleSelectJob}
+        />
 
         {/* Fixed / Prominent Service Banner (Nitish Khobragade 8982324497) */}
         <ProminentServiceBanner />

@@ -1605,7 +1605,7 @@ export async function restoreDatabaseFromBackup(backup: PortalDatabaseBackup): P
 export const SEED_BLOG_POSTS: BlogPost[] = [
   {
     id: 'government-form-filling-top-5-mistakes',
-    slug: 'government-form-filling-top-5-mistakes',
+    slug: 'sarkari-form-bhart-samay-5-galatiyan',
     title: 'सरकारी नौकरी फॉर्म भरते समय 5 सबसे बड़ी गलतियां और उनसे कैसे बचें: Nitish Khobragade स्पेशल गाइड',
     excerpt: 'ऑनलाइन फॉर्म में नाम की स्पेलिंग, फोटो डेट, जाति प्रमाण पत्र और फीस भुगतान से जुड़ी गलतियों के कारण हजारों फॉर्म रिजेक्ट होते हैं। जानें कैसे सुरक्षित आवेदन करें।',
     category: 'Career Guidance',
@@ -1617,8 +1617,8 @@ export const SEED_BLOG_POSTS: BlogPost[] = [
     bannerUrl: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=1080&auto=format&fit=crop&q=80',
     status: 'published',
     tags: ['Form Filling', 'Mistakes', 'Admit Card Rejection', 'MP Online', 'Aadhar Card'],
-    readingTimeMinutes: 8,
-    views: 3420,
+    readingTimeMinutes: 9,
+    views: 4520,
     seoKeywords: ['Sarkari Form Mistakes', 'Online Form Filling Guidance', 'Form Rejection Reasons', 'MP Online Portal Form Guide'],
     createdAt: Date.now() - 86400000 * 2,
     publishedAt: Date.now() - 86400000 * 2,
@@ -1636,10 +1636,11 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 
 ### सामान्य गलतियां जो अभ्यर्थी करते हैं:
 - आधार कार्ड में उपनाम (Surname) अलग होना या पिता के नाम का संक्षिप्त रूप (Initials) होना।
-- 10वीं की मार्कशीट में "Shri", "Late" या "Km" जैसे प्रीफिक्स को गलत कॉलम में दर्ज कर देना।
+- 10वीं की मार्कशीट में "Shri", "Late", "Smt" या "Km" जैसे प्रीफिक्स को गलत कॉलम में दर्ज कर देना।
 - स्पेस (Space) की गलती, जैसे "RAM KUMAR" को "RAMKUMAR" लिख देना।
+- माता के नाम में मार्कशीट में कुमारी या देवी होना, जबकि फॉर्म में केवल नाम लिख देना।
 
-### समाधान एवं सावधानी:
+### समाधान एवं सुरक्षा कदम:
 1. हमेशा फॉर्म भरते समय 10वीं की मूल अंकसूची सामने रखें।
 2. यदि आधार कार्ड में नाम या जन्मतिथि मार्कशीट से अलग है, तो तत्काल आधार अपडेट सेंटर पर जाकर बायोमेट्रिक संशोधन कराएं अथवा फॉर्म में 10वीं के विवरण को प्राथमिकता दें।
 3. विवाह के पश्चात नाम परिवर्तन की स्थिति में राजपत्र अधिसूचना (Gazette Notification) या मैरिज सर्टिफिकेट तैयार रखें।
@@ -1651,9 +1652,10 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 कर्मचारी चयन आयोग (SSC), मध्य प्रदेश कर्मचारी चयन मंडल (MPESB) तथा अन्य भर्ती आयोगों द्वारा फॉर्म रिजेक्ट करने का सबसे प्रमुख कारण अमान्य फोटोग्राफ होता है।
 
 ### प्रमुख मानक जिनका पालन अनिवार्य है:
-- **बैकग्राउंड (Background):** फोटो का बैकग्राउंड हमेशा सफेद (White) या हल्का स्लेटी (Light Grey) होना चाहिए। सेल्फी, रंग-बिरंगे बैकग्राउंड या तिरछी तस्वीरों को कंप्यूटर सॉफ्टवेयर तुरंत फ्लैग कर देता है।
+- **बैकग्राउंड (Background):** फोटो का बैकग्राउंड हमेशा सफेद (White) या हल्का स्लेटी (Light Grey) होना चाहिए। सेल्फी, रंग-बिरंगे बैकग्राउंड, पार्क की फोटो या तिरछी तस्वीरों को कंप्यूटर सॉफ्टवेयर तुरंत फ्लैग कर देता है।
 - **DOP एवं नाम:** कुछ परीक्षाओं (जैसे MP Police, Vyapam Profile, SSC) में फोटो के नीचे उम्मीदवार का नाम एवं फोटो खींचने की तिथि (Date of Photograph) 3 माह से अधिक पुरानी नहीं होनी चाहिए।
 - **चश्मा व कैप प्रतिबंध:** फोटो खिंचवाते समय टोपी, मफलर, धूप का चश्मा या रंगीन लेंस वाला चश्मा पूरी तरह प्रतिबंधित है। दोनों कान और आँखें स्पष्ट रूप से दिखाई देनी चाहिए।
+- **हस्ताक्षर (Signature):** हमेशा सफेद सादे कागज पर काली या नीली स्याही के बॉलपेन से साफ हस्ताक्षर करें। ओवर-राइटिंग या कटी-फटी दस्तखत अपलोड न करें।
 
 ---
 
@@ -1664,6 +1666,7 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 ### ध्यान देने योग्य महत्वपूर्ण बातें:
 - **EWS एवं OBC-NCL वैधता:** आर्थिक रूप से कमजोर वर्ग (EWS) एवं अन्य पिछड़ा वर्ग नॉन-क्रीमी लेयर प्रमाण पत्र केवल संबंधित वित्तीय वर्ष (Financial Year) के लिए मान्य होते हैं। पुराना वित्तीय प्रमाण पत्र लगाने पर अभ्यर्थी को स्वतः सामान्य (UR) श्रेणी में डाल दिया जाता है।
 - **डिजिटल हस्ताक्षर व बारकोड:** हस्तलिखित (Manual) प्रमाण पत्र अब अमान्य हो चुके हैं। केवल RSMS अथवा डिजिटल हस्ताक्षरयुक्त e-District प्रमाण पत्र ही मान्य हैं।
+- **मूल निवासी प्रमाण पत्र (Domicile):** राज्य स्तरीय भर्तियों (जैसे MP Police, MP Patwari, Sub-Inspector) में वैध मध्य प्रदेश मूल निवासी प्रमाण पत्र का पंजीयन क्रमांक आवश्यक होता है।
 
 ---
 
@@ -1672,9 +1675,10 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 फॉर्म की अंतिम तिथि (Last Date) के निकट सर्वर पर अत्यधिक लोड होने के कारण फीस भुगतान में सबसे ज्यादा विफलताएं दर्ज की जाती हैं।
 
 ### भुगतान संबंधी सुरक्षित कदम:
-1. **कभी भी अंतिम 24 घंटे का इंतजार न करें:** फॉर्म भरने के तुरंत बाद फीस जमा करें।
+1. **कभी भी अंतिम 24 घंटे का इंतजार न करें:** फॉर्म भरने के तुरंत बाद फीस जमा करें। अंतिम दिन बैंक गेटवे अक्सर टाइमआउट हो जाते हैं।
 2. **Pending Transactions:** यदि आपके खाते से पैसे कट गए हैं लेकिन पोर्टल पर "Payment Pending" या "Unpaid" दिख रहा है, तो तुरंत दोबारा भुगतान न करें। कम से कम 24 घंटे तक बैंक रिकॉन्सिलिएशन का इंतजार करें अथवा Verify Payment बटन पर क्लिक करें।
 3. **नेट बैंकिंग व UPI सावधानी:** ऑनलाइन भुगतान के दौरान बैक (Back) या रिफ्रेश (Refresh) बटन कभी न दबाएं।
+4. **ट्रांजैक्शन आईडी सुरक्षित रखें:** बैंक से प्राप्त SMS, UTR नंबर और गेटवे रेफरेंस नंबर को तुरंत स्क्रीनशॉट लेकर सेव करें।
 
 ---
 
@@ -1686,6 +1690,7 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 - आवेदन पत्र का फाइनल सबमिशन होते ही उसकी PDF फाइल को अपने Google Drive अथवा व्यक्तिगत ईमेल पर सुरक्षित सेव करें।
 - एप्लीकेशन नंबर, रोल नंबर जनरेशन और पासवर्ड को अपनी निजी डायरी में नोट करें।
 - फिजिकल डॉक्यूमेंट वेरिफिकेशन (DV) के समय आवेदन पत्र की 2 हार्ड कॉपी अनिवार्य रूप से प्रस्तुत करनी होती है।
+- एडमिट कार्ड जारी होते ही उसकी 2 प्रतियां और पहचान पत्र की फोटोकॉपी पहले से तैयार रखें।
 
 ---
 
@@ -1694,6 +1699,171 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 एक सरकारी नौकरी के फॉर्म की कीमत सिर्फ ₹100 या ₹500 नहीं होती, बल्कि उसके पीछे आपकी पूरी लगन और परिवार की उम्मीदें जुड़ी होती हैं। यदि आपके पास अच्छा कंप्यूटर, स्कैनर या विश्वसनीय इंटरनेट नहीं है, तो कैफे के चक्कर काटने या साइबर कैफे वालों की जल्दबाजी का शिकार होने से बचें।
 
 आप **NP Job Portal** के संचालक **Nitish Khobragade (मो. 8982324497)** से सीधे संपर्क करके घर बैठे व्हाट्सएप पर अपने दस्तावेज भेजकर बिना किसी गलती के 100% सुरक्षित और प्रमाणित ऑनलाइन फॉर्म भरवा सकते हैं। फॉर्म का फाइनल प्रिंटआउट और पेमेंट रसीद आपको सीधे व्हाट्सएप पर उपलब्ध करा दी जाती है।`
+  },
+  {
+    id: 'mp-online-kiosk-csc-form-jaruri-dastavej',
+    slug: 'mp-online-kiosk-csc-form-jaruri-dastavej',
+    title: 'MP ऑनलाइन कियोस्क व CSC पर फॉर्म भरवाने के जरूरी दस्तावेज: 2026 संपूर्ण चेकलिस्ट गाइड',
+    excerpt: 'एमपी ऑनलाइन पोर्टल या सीएससी केंद्र से कोई भी फॉर्म भरवाते समय कौन-कौन से मूल दस्तावेज, आईडी प्रूफ एवं प्रमाण पत्र आवश्यक होते हैं? पढ़ें पूरी गाइड।',
+    category: 'Gov Schemes',
+    author: {
+      name: 'Nitish Khobragade',
+      role: 'Kiosk & CSC Services Director',
+      phone: '8982324497'
+    },
+    bannerUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=1080&auto=format&fit=crop&q=80',
+    status: 'published',
+    tags: ['MP Online', 'CSC', 'Documents Checklist', 'Samagra KYC', 'Aadhar Card'],
+    readingTimeMinutes: 8,
+    views: 3890,
+    seoKeywords: ['MP Online Documents Required', 'CSC Portal Checklist', 'Samagra eKYC', 'MP Rojgar Panjiyan Documents'],
+    createdAt: Date.now() - 86400000 * 3,
+    publishedAt: Date.now() - 86400000 * 3,
+    content: `## प्रस्तावना: दस्तावेज तैयार न होने पर होने वाली परेशानियां
+
+मध्य प्रदेश में किसी भी सरकारी भर्ती, कॉलेज प्रवेश (UG/PG Counselling), छात्रवृत्ति (Scholarship) अथवा सरकारी प्रमाण पत्र के आवेदन के लिए MP Online कियोस्क या जन सेवा केंद्र (CSC) जाना पड़ता है। लेकिन अक्सर देखा जाता है कि छात्र जरूरी दस्तावेज साथ नहीं लाते, जिसके कारण बार-बार चक्कर काटने पड़ते हैं और अंतिम तिथि निकल जाने का जोखिम बना रहता है।
+
+इस विशेष गाइड में **Nitish Khobragade (NP Job Portal - 8982324497)** आपको उन सभी अनिवार्य दस्तावेजों की व्यापक चेकलिस्ट बता रहे हैं, जिन्हें फॉर्म भरवाने से पहले अपने पास तैयार रखना चाहिए।
+
+---
+
+## 1. व्यक्तिगत पहचान एवं आधार सत्यापन दस्तावेज
+
+1. **आधार कार्ड (Aadhar Card):**
+   - आधार में आपका चालू मोबाइल नंबर लिंक होना अनिवार्य है क्योंकि ई-केवाईसी (e-KYC) के समय OTP उसी नंबर पर आता है।
+   - आधार में दर्ज नाम व जन्मतिथि 10वीं मार्कशीट से शत-प्रतिशत मेल खानी चाहिए।
+2. **समग्र आईडी (Samagra ID - मध्य प्रदेश मूल निवासियों हेतु):**
+   - 9 अंकों की सदस्य समग्र आईडी एवं 8 अंकों की परिवार समग्र आईडी।
+   - समग्र पोर्टल पर e-KYC पूर्ण होना आवश्यक है।
+3. **वोटर आईडी / ड्राइविंग लाइसेंस / पैन कार्ड:**
+   - वैकल्पिक पहचान पत्र के रूप में उपयोगी।
+
+---
+
+## 2. शैक्षणिक प्रमाण पत्र (Educational Qualification)
+
+- **10वीं (हाई स्कूल) अंकसूची:** जन्मतिथि और मूल नाम सत्यापन हेतु सबसे प्राथमिक दस्तावेज।
+- **12वीं (हायर सेकेंडरी) अंकसूची:** विषयवार अंक, रोल नंबर और उत्तीर्ण वर्ष का विवरण।
+- **स्नातक (Graduation) की समस्त सेमेस्टर की अंकसूचियां एवं डिग्री/प्रोविजनल सर्टिफिकेट।**
+- **कंप्यूटर डिप्लोमा (CPCT / DCA / PGDCA):** लिपिकीय एवं शासकीय ग्रुप 4 पदों के लिए।
+- **ITI / पॉलिटेक्निक डिप्लोमा / B.Ed / D.El.Ed:** संबंधित तकनीकी एवं शिक्षक भर्ती हेतु।
+
+---
+
+## 3. आरक्षण एवं निवास संबंधी प्रमाण पत्र (Category & Domicile)
+
+1. **डिजिटल जाति प्रमाण पत्र (Digital Caste Certificate):**
+   - SC, ST, OBC वर्ग के अभ्यर्थियों हेतु अनुविभागीय अधिकारी (SDO) द्वारा जारी डिजिटल प्रमाण पत्र।
+   - OBC नॉन-क्रीमी लेयर के लिए चालू वित्तीय वर्ष का आय प्रमाण पत्र।
+2. **EWS प्रमाण पत्र (Economically Weaker Section):**
+   - सक्षम राजस्व अधिकारी (तहसीलदार / SDO) द्वारा जारी चालू सत्र का प्रमाण पत्र।
+3. **मूल निवासी प्रमाण पत्र (MP Domicile Certificate):**
+   - मध्य प्रदेश का स्थायी निवासी प्रमाण पत्र (RSMS पोर्टल जनरेटेड)।
+4. **दिव्यांगता प्रमाण पत्र (PWD / UDID Card):**
+   - न्यूनतम 40% दिव्यांगता का जिला मेडिकल बोर्ड द्वारा जारी प्रमाण पत्र।
+
+---
+
+## 4. रोजगार पंजीयन एवं स्पेशल प्रोफाइल्स (MP Rojgar Panjiyan)
+
+मध्य प्रदेश की किसी भी शासकीय भर्ती (MPESB व्यापम) में आवेदन करने के लिए **जीवित रोजगार पंजीयन (Active Rojgar Panjiyan)** होना अनिवार्य शर्त है:
+- रोजगार पंजीयन नंबर एवं नवीनीकरण माह (Renewal Month)।
+- MPESB प्रोफाइल पंजीयन (Candidate Profile ID एवं पासवर्ड)।
+- प्रोफाइल में अद्यतन मोबाइल नंबर एवं ईमेल आईडी।
+
+---
+
+## 5. डिजिटल स्कैन कॉपी (फोटो, हस्ताक्षर व घोषणा पत्र)
+
+- **पासपोर्ट साइज फोटो:** सफेद बैकग्राउंड, 3 माह से अधिक पुरानी न हो, नीचे नाम व तारीख (DOP) अंकित।
+- **हस्ताक्षर (Signature):** सफेद कागज पर काली स्याही से साफ दस्तखत।
+- **हस्तलिखित घोषणा पत्र (Handwritten Declaration):** MPESB या SSC के प्रारूप पर अपनी हैंडराइटिंग में लिखा हुआ डिक्लेरेशन।
+
+---
+
+## घर बैठे MP Online व CSC सेवाएं प्राप्त करें
+
+अब आपको धूप, बारिश या ठंड में कियोस्क की लंबी लाइनों में खड़े होने की बिल्कुल आवश्यकता नहीं है। 
+
+**NP Job Portal (Nitish Khobragade - 8982324497)** के माध्यम से आप अपने सभी दस्तावेज घर बैठे व्हाट्सएप पर भेजकर:
+- किसी भी भर्ती का ऑनलाइन फॉर्म
+- रोजगार पंजीयन नया / नवीनीकरण
+- समग्र e-KYC
+- एडमिट कार्ड व रिजल्ट
+का काम सुरक्षित और 100% शुद्धता के साथ करवा सकते हैं। कार्य पूर्ण होने पर अधिकृत ऑनलाइन पावती सीधे आपके व्हाट्सएप पर भेज दी जाती है।`
+  },
+  {
+    id: 'photo-signature-resize-background-guide',
+    slug: 'photo-signature-resize-background-guide',
+    title: 'फोटो और हस्ताक्षर का साइज व वाइट बैकग्राउंड कैसे सेट करें: 100% स्वीकार्य फॉर्म अपलोड गाइड',
+    excerpt: 'सरकारी फॉर्म में फोटो 20-50 KB और सिग्नेचर 10-20 KB में कैसे बनाएं? मोबाइल और कंप्यूटर से वाइट बैकग्राउंड तैयार करने का सबसे आसान व सुरक्षित तरीका।',
+    category: 'Tech Tips',
+    author: {
+      name: 'Nitish Khobragade',
+      role: 'Digital Media & Form Optimization Specialist',
+      phone: '8982324497'
+    },
+    bannerUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1080&auto=format&fit=crop&q=80',
+    status: 'published',
+    tags: ['Photo Resize', 'Signature Optimization', 'White Background', 'SSC Photo Rules', 'Vyapam Template'],
+    readingTimeMinutes: 7,
+    views: 4120,
+    seoKeywords: ['Photo Resizer KB', 'Signature Size Converter', 'SSC Photo Maker', 'White Background Photo Free'],
+    createdAt: Date.now() - 86400000 * 4,
+    publishedAt: Date.now() - 86400000 * 4,
+    content: `## फोटो-सिग्नेचर की तकनीकी समस्याएं और फॉर्म रिजेक्शन
+
+SSC, UPSC, MPESB, Railway, IBPS और State Police के ऑनलाइन पोर्टल पर आवेदन करते समय सबसे जटिल चरण होता है: **फोटोग्राफ और हस्ताक्षर को तय पिक्सल (Pixels) और फाइल साइज (KB) में अपलोड करना।**
+
+यदि फोटो की चौड़ाई, ऊंचाई या KB सीमा पोर्टल के नियमों से 1 KB भी अधिक या कम हो जाती है, तो सिस्टम "Invalid File Dimension" या "File Size Exceeded" का एरर देने लगता है। कई छात्र साइबर कैफे में घंटों परेशान होते हैं या गलत ऐप से फोटो को अत्यधिक कंप्रेस कर देते हैं, जिससे चेहरा धुंधला हो जाता है और फॉर्म रिजेक्ट हो जाता है।
+
+इस गाइड में **Nitish Khobragade (8982324497)** आपको मोबाइल और कंप्यूटर दोनों से फोटो-सिग्नेचर को मानक प्रारूप में तैयार करने के स्टेप्स सिखाएंगे।
+
+---
+
+## 1. प्रमुख भर्ती आयोगों के फोटो-हस्ताक्षर मानक
+
+| आयोग / पोर्टल | फोटो साइज (KB) | फोटो पिक्सल (Dimensions) | हस्ताक्षर साइज (KB) | हस्ताक्षर पिक्सल | बैकग्राउंड |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **SSC (Staff Selection)** | 20 KB से 50 KB | 3.5 cm x 4.5 cm (350x450 px) | 10 KB से 20 KB | 4.0 cm x 2.0 cm (400x200 px) | सादा सफेद |
+| **MPESB (व्यापम टेम्पलेट)** | टेम्पलेट में सम्मिलित | 200 x 230 DPI | टेम्पलेट में सम्मिलित | 140 x 60 px | सफेद / लाइट |
+| **UPSC सिविल सेवा** | 20 KB से 300 KB | 350 x 350 पिक्सल न्यूनतम | 20 KB से 300 KB | 350 x 350 पिक्सल न्यूनतम | हल्का / सफेद |
+| **Railway (RRB)** | 30 KB से 70 KB | 320 x 240 पिक्सल | 30 KB से 70 KB | 160 x 560 पिक्सल | सफेद |
+| **IBPS बैंक भर्ती** | 20 KB से 50 KB | 200 x 230 पिक्सल | 10 KB से 20 KB | 140 x 60 पिक्सल | सादा सफेद |
+
+---
+
+## 2. मोबाइल से सफेद बैकग्राउंड फोटो कैसे बनाएं?
+
+1. **प्राकृतिक रोशनी में फोटो लें:** किसी सफेद दीवार के सामने खड़े हों जहां चेहरे पर सीधी रोशनी आ रही हो (छाया न पड़े)।
+2. **फ्री बैकग्राउंड रिमूवर टूल्स:** आप किसी भी सुरक्षित फ्री टूल (जैसे Adobe Express Free Background Remover या Canva) का उपयोग करके बैकग्राउंड को बिल्कुल प्योर व्हाइट (#FFFFFF) कर सकते हैं।
+3. **फोटो पर नाम व दिनांक (DOP) डालना:**
+   - कई परीक्षाओं में फोटो के निचले 15% हिस्से पर सफेद पट्टी बनाकर उस पर काले अक्षरों में अभ्यर्थी का नाम और फोटो की तारीख (जैसे: "RAMESH PATEL / DOP: 15/09/2026") लिखना अनिवार्य होता है।
+   - यह कार्य आप अपने फोन के डिफ़ॉल्ट इमेज एडिटर या Paint टूल से 1 मिनट में कर सकते हैं।
+
+---
+
+## 3. बिना क्वालिटी खोए KB कम (Compress) करने के 3 आसान नियम
+
+1. **KB कम करते समय रेजोल्यूशन न घटाएं:** इमेज की चौड़ाई और ऊंचाई को आनुपातिक (Aspect Ratio Locked) रखें।
+2. **DPI सेटिंग:** सरकारी दस्तावेजों के लिए 200 से 300 DPI (Dots Per Inch) आदर्श माना जाता है।
+3. **फॉर्मेट हमेशा JPEG/JPG:** लगभग सभी सरकारी पोर्टल केवल .jpg या .jpeg फॉर्मेट स्वीकार करते हैं। कभी भी .png या .webp फाइल को सीधे रीनेम न करें, बल्कि उसे वास्तविक रूप से JPEG में कनवर्ट करें।
+
+---
+
+## 4. हस्ताक्षर (Signature) अपलोड करने के महत्वपूर्ण नियम
+
+- हमेशा **सफेद बिना लाइन वाले (Plain White A4)** कागज पर दस्तखत करें। रूल्ड (लाइनदार) कॉपी पर किए गए हस्ताक्षर तुरंत अमान्य कर दिए जाते हैं।
+- गहरे काले (Black) या गहरे नीले (Dark Blue) जेल या बॉलपेन का उपयोग करें।
+- हस्ताक्षर कभी भी ALL CAPITAL LETTERS में न करें। हमेशा स्वाभाविक रनिंग हैंडराइटिंग (Running Hand) में ही हस्ताक्षर करें।
+
+---
+
+## फोटो रिसाइजिंग एवं टेम्पलेट सेट करवाने हेतु संपर्क करें
+
+यदि आपसे फोटो या सिग्नेचर का साइज सेट नहीं हो रहा है, या व्यापम की कम्बाइंड प्रोफाईल टेम्पलेट ठीक से फिट नहीं हो रही है, तो बिल्कुल घबराएं नहीं।
+
+आप अपने साधारण फोन से खींची गई फोटो और हस्ताक्षर सीधे **Nitish Khobragade (NP Job Portal - 8982324497)** को व्हाट्सएप करें। हम आपकी फोटो को नियमों के अनुसार परफेक्ट व्हाइट बैकग्राउंड, सही KB और सही पिक्सल में सेट करके आपका फॉर्म त्रुटिरहित भर देंगे।`
   },
   {
     id: 'mp-police-constable-2026-exam-strategy',
@@ -1710,7 +1880,7 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
     status: 'published',
     tags: ['MP Police', 'Constable', 'Exam Pattern', 'Physical Test', 'Syllabus'],
     readingTimeMinutes: 9,
-    views: 2980,
+    views: 5120,
     seoKeywords: ['MP Police Constable 2026', 'MP Police Syllabus', 'Physical Test PET', 'MP Police Cut Off'],
     createdAt: Date.now() - 86400000 * 3,
     publishedAt: Date.now() - 86400000 * 3,
@@ -1741,7 +1911,7 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
 नए नियमों के अनुसार फिजिकल टेस्ट अब केवल क्वालीफाइंग नहीं है, बल्कि इसके अंक आपकी फाइनल मेरिट तय करते हैं:
 
 ### (A) 800 मीटर दौड़ (अधिकतम 40 अंक)
-- 124 सेकंड से कम समय में दौड़ पूरी करने पर पूरे 40 अंक मिलते हैं।
+- 124 सेकंड (2 मिनट 4 सेकंड) से कम समय में दौड़ पूरी करने पर पूरे 40 अंक मिलते हैं।
 - 198 सेकंड से अधिक समय लेने पर अभ्यर्थी को अयोग्य (Disqualified) घोषित कर दिया जाता है।
 
 ### (B) लंबी कूद / Long Jump (अधिकतम 30 अंक)
@@ -1793,7 +1963,7 @@ NP Job Portal के संचालक एवं ऑनलाइन फॉर�
     status: 'published',
     tags: ['CPCT', 'MPESB Group 4', 'Typing Test', 'Assistant Grade 3', 'Hindi Typing'],
     readingTimeMinutes: 7,
-    views: 2450,
+    views: 3450,
     seoKeywords: ['CPCT Exam Pattern', 'MP CPCT Syllabus', 'Hindi Typing Speed', 'Remington Gail Typing'],
     createdAt: Date.now() - 86400000 * 5,
     publishedAt: Date.now() - 86400000 * 5,
@@ -1844,6 +2014,74 @@ CPCT परीक्षा को दो मुख्य भागों मे�
 CPCT का आयोजन मध्य प्रदेश स्टेट इलेक्ट्रॉनिक्स डेवलपमेंट कॉर्पोरेशन (MPSEDC) द्वारा हर दो माह में किया जाता है। आवेदन करते समय 10वीं मार्कशीट, 12वीं मार्कशीट एवं पासपोर्ट साइज फोटो अपलोड करनी होती है।
 
 यदि आपको CPCT फॉर्म भरने, परीक्षा तिथि चुनने या MP Online पोर्टल पर रोजगार पंजीयन व प्रोफाइल से CPCT स्कोर कार्ड लिंक करने में किसी प्रकार की कठिनाई आ रही है, तो आप **NP Job Portal (Nitish Khobragade - 8982324497)** की विशेषज्ञ सेवाओं का लाभ उठा सकते हैं।`
+  },
+  {
+    id: 'rojgar-panjiyan-mp-online-renewal-guide',
+    slug: 'rojgar-panjiyan-mp-online-renewal-guide',
+    title: 'मध्य प्रदेश रोजगार पंजीयन (MP Rojgar Panjiyan) 2026: नवीनीकरण, e-KYC एवं प्रोफाइल संशोधन संपूर्ण नियम',
+    excerpt: 'एमपी रोजगार पंजीयन की 3 वर्ष की वैधता समाप्त होने पर रिन्यूअल कैसे करें? समग्र e-KYC एवं आधार सत्यापन के साथ रोजगार कार्ड डाउनलोड करने का पूरा तरीका।',
+    category: 'Gov Schemes',
+    author: {
+      name: 'Nitish Khobragade',
+      role: 'MP Employment Portal Consultant',
+      phone: '8982324497'
+    },
+    bannerUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1080&auto=format&fit=crop&q=80',
+    status: 'published',
+    tags: ['Rojgar Panjiyan', 'MP Employment Portal', 'Renewal', 'Samagra eKYC', 'Vyapam Rules'],
+    readingTimeMinutes: 8,
+    views: 3780,
+    seoKeywords: ['MP Rojgar Panjiyan Renewal', 'Employment Registration MP', 'Samagra ID Rojgar Portal', 'Rojgar Card Download'],
+    createdAt: Date.now() - 86400000 * 6,
+    publishedAt: Date.now() - 86400000 * 6,
+    content: `## MP रोजगार पंजीयन का महत्व एवं 3 वर्ष की वैधता नियम
+
+मध्य प्रदेश शासन के तकनीकी शिक्षा एवं कौशल विकास विभाग द्वारा संचालित रोजगार पोर्टल पर पंजीकृत होना राज्य के प्रत्येक बेरोजगार युवा के लिए कानूनी एवं अनिवार्य आवश्यकता है। MPESB (व्यापम) की किसी भी भर्ती परीक्षा (जैसे MP Police, पटवारी, वनरक्षक, जेल प्रहरी, वर्ग 1/2/3 शिक्षक) में आवेदन करते समय **जीवित (Active) रोजगार पंजीयन क्रमांक** दर्ज करना अनिवार्य होता है।
+
+यदि आपका रोजगार पंजीयन एक्सपायर हो चुका है और आपने परीक्षा का फॉर्म भर दिया, तो दस्तावेज सत्यापन (DV) के समय आपको सीधे अपात्र (Ineligible) घोषित कर दिया जाता है। इस गाइड में **Nitish Khobragade (8982324497)** आपको रोजगार पंजीयन के नए नियमों और नवीनीकरण प्रक्रिया की जानकारी दे रहे हैं।
+
+---
+
+## 1. नया रोजगार पंजीयन नियम 2026: समग्र e-KYC की अनिवार्यता
+
+मध्य प्रदेश रोजगार पोर्टल को अब समग्र पोर्टल (Samagra Portal) से शत-प्रतिशत जोड़ दिया गया है:
+- अब नाम, पिता का नाम, जन्मतिथि और पता मैन्युअल रूप से टाइप नहीं किया जा सकता।
+- यह सारा डाटा सीधे आपकी **समग्र आईडी और आधार कार्ड से स्वतः फैच (Auto Fetch)** होता है।
+- इसलिए रोजगार पंजीयन करने या रिन्यू करने से पहले अपनी समग्र आईडी में e-KYC पूरा होना अत्यंत आवश्यक है।
+
+---
+
+## 2. रोजगार पंजीयन नवीनीकरण (Renewal) का सही समय
+
+- **3 वर्ष की वैधता:** सामान्य रोजगार पंजीयन जारी होने की तिथि से ठीक 3 वर्ष के लिए मान्य होता है।
+- **रिन्यूअल माह (Renewal Month):** पंजीयन पर्ची के निचले भाग में "Next Renewal Month" स्पष्ट लिखा होता है।
+- **ग्रेस पीरियड (Grace Period):** तय माह के समाप्त होने के पश्चात उम्मीदवार को 1 माह का अतिरिक्त समय (Grace Period) दिया जाता है। यदि इस अवधि में भी रिन्यूअल नहीं कराया गया, तो पुराना पंजीयन हमेशा के लिए लैप्स हो जाता है और वरिष्ठता (Seniority) समाप्त हो जाती है।
+
+---
+
+## 3. रोजगार पंजीयन में शैक्षणिक योग्यता (Education) कैसे अपडेट करें?
+
+यदि आपने हाल ही में ग्रेजुएशन, पोस्ट ग्रेजुएशन, CPCT या कोई कंप्यूटर डिप्लोमा पूरा किया है, तो उसे प्रोफाइल में जोड़ना जरूरी है:
+1. पोर्टल पर अपने रजिस्टर्ड मोबाइल नंबर और पासवर्ड से लॉगिन करें।
+2. "शिक्षा संबंधी जानकारी जोड़ें (Add Education)" विकल्प पर क्लिक करें।
+3. बोर्ड/विश्वविद्यालय, रोल नंबर, उत्तीर्ण वर्ष और प्राप्त प्रतिशत दर्ज कर सबमिट करें।
+4. अद्यतन रोजगार पंजीयन कार्ड की नई रंगीन प्रति डाउनलोड करें।
+
+---
+
+## 4. पासवर्ड भूल जाने या मोबाइल नंबर बंद होने पर क्या करें?
+
+अक्सर छात्रों का वह मोबाइल नंबर बंद हो जाता है जो उन्होंने 3 साल पहले रोजगार पंजीयन में दर्ज किया था:
+- आप "Forgot Password" पर जाकर समग्र आईडी और आधार नंबर दर्ज करके ओटीपी मंगा सकते हैं।
+- यदि फिर भी समस्या आए तो जिला रोजगार कार्यालय (District Employment Exchange) के हेल्पडेस्क पर ई-मेल किया जा सकता है।
+
+---
+
+## घर बैठे तुरंत रोजगार पंजीयन व नवीनीकरण करवाएं
+
+यदि आपका रोजगार पंजीयन समाप्त हो रहा है या आपको समग्र e-KYC व शैक्षणिक योग्यता जोड़ने में कोई तकनीकी समस्या आ रही है, तो आप **NP Job Portal (Nitish Khobragade - 8982324497)** से संपर्क करें।
+
+व्हाट्सएप पर अपनी समग्र आईडी और आधार कार्ड भेजकर मात्र 15 मिनट में अपना नया या नवीनीकृत रोजगार कार्ड प्राप्त करें।`
   }
 ];
 
@@ -1872,29 +2110,55 @@ export async function getBlogPosts(statusFilter: 'published' | 'all' = 'publishe
 
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
   const normalizedSlug = slug.toLowerCase().trim();
+
+  // Alias lookup map
+  const aliases: Record<string, string> = {
+    'sarkari-form-bhart-samay-5-galatiyan': 'government-form-filling-top-5-mistakes',
+    'government-form-filling-top-5-mistakes': 'sarkari-form-bhart-samay-5-galatiyan',
+    'mp-police-constable-2026-exam-strategy': 'mp-police-constable-2026-exam-strategy',
+    'mp-cpct-scorecard-importance-guide': 'mp-cpct-scorecard-importance-guide',
+    'mp-online-kiosk-csc-form-jaruri-dastavej': 'mp-online-kiosk-csc-form-jaruri-dastavej',
+    'photo-signature-resize-background-guide': 'photo-signature-resize-background-guide',
+    'rojgar-panjiyan-mp-online-renewal-guide': 'rojgar-panjiyan-mp-online-renewal-guide'
+  };
+
+  const targetSlug = aliases[normalizedSlug] || normalizedSlug;
+
   try {
     const docRef = doc(db, 'blogs', normalizedSlug);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      return { ...(snap.data() as BlogPost), id: snap.id };
+      const data = snap.data() as BlogPost;
+      if (data.content && data.content.trim().length > 100) {
+        return { ...data, id: snap.id };
+      }
     }
+
     const col = collection(db, 'blogs');
-    const q = query(col, where('slug', '==', normalizedSlug));
+    const q = query(col, where('slug', 'in', [normalizedSlug, targetSlug]));
     const querySnap = await getDocs(q);
     if (!querySnap.empty) {
       const data = querySnap.docs[0].data() as BlogPost;
-      const seedMatch = SEED_BLOG_POSTS.find(b => b.slug.toLowerCase() === normalizedSlug || b.id === normalizedSlug);
+      const seedMatch = SEED_BLOG_POSTS.find(
+        (b) => b.slug.toLowerCase() === normalizedSlug || b.id === normalizedSlug || b.slug.toLowerCase() === targetSlug || b.id === targetSlug
+      );
       return {
         ...data,
         id: querySnap.docs[0].id,
-        content: (data.content && data.content.trim().length > 50) ? data.content : (seedMatch?.content || data.content || '')
+        content: (data.content && data.content.trim().length > 100) ? data.content : (seedMatch?.content || data.content || '')
       };
     }
   } catch (err) {
     console.warn('Error fetching blog post by slug from Firestore:', err);
   }
-  const match = SEED_BLOG_POSTS.find((b) => b.slug.toLowerCase() === normalizedSlug || b.id === normalizedSlug);
-  return match || null;
+
+  const match = SEED_BLOG_POSTS.find(
+    (b) => b.slug.toLowerCase() === normalizedSlug || b.id === normalizedSlug || b.slug.toLowerCase() === targetSlug || b.id === targetSlug
+  );
+  if (match) return match;
+
+  // Fallback to first high-quality blog if slug not found
+  return SEED_BLOG_POSTS[0] || null;
 }
 
 export async function saveBlogPost(blog: Partial<BlogPost>): Promise<string> {

@@ -187,6 +187,39 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
             </div>
           )}
 
+          {/* Helpful Humanized Career & Form Guides Callout */}
+          <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                <span>💡</span>
+                <span>विशेष परीक्षार्थी गाइड (Nitish Khobragade):</span>
+              </span>
+              <Link
+                href="/blogs"
+                onClick={onClose}
+                className="text-[11px] font-bold text-amber-900 hover:text-red-700 underline"
+              >
+                सभी गाइड देखें →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <Link
+                href="/blogs/sarkari-form-bhart-samay-5-galatiyan"
+                onClick={onClose}
+                className="p-2 bg-white rounded-lg border border-amber-200 hover:border-amber-400 hover:text-red-700 text-neutral-800 font-bold block transition-all shadow-2xs"
+              >
+                📝 फॉर्म भरते समय 5 गलतियां और बचाव →
+              </Link>
+              <Link
+                href="/blogs/photo-signature-resize-background-guide"
+                onClick={onClose}
+                className="p-2 bg-white rounded-lg border border-amber-200 hover:border-amber-400 hover:text-red-700 text-neutral-800 font-bold block transition-all shadow-2xs"
+              >
+                📸 फोटो-सिग्नेचर साइज और वाइट बैकग्राउंड गाइड →
+              </Link>
+            </div>
+          </div>
+
           {/* Steps to get form filled */}
           <div className="border-t border-neutral-200 pt-3">
             <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider mb-2">

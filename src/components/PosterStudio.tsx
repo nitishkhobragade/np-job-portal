@@ -5,32 +5,33 @@ import html2canvas from 'html2canvas';
 import { toPng } from 'html-to-image';
 import {
   Download,
+  Share2,
   Copy,
   Check,
-  Share2,
+  RotateCcw,
+  Palette,
+  User,
+  Sliders,
+  Sparkles,
   Eye,
   ZoomIn,
   ZoomOut,
-  Sliders,
-  RotateCcw,
-  ShieldCheck,
+  Type,
   Upload,
   Trash2,
-  QrCode,
-  User,
-  Palette,
-  Type,
-  ArrowLeft,
   Search,
-  Sparkles,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft,
+  LayoutGrid,
+  Globe,
+  HardDrive
 } from 'lucide-react';
 import { JobPostDetail, PostRecord } from '../types';
 import { OWNER_INFO } from '../data/portalData';
 import { JobPoster, PosterTheme, TitleScale } from './JobPoster';
 import { CharacterType } from './CandidateCharacter';
-import { updateJob } from '../lib/firebase';
 import { WHATSAPP_CHANNEL_URL } from '../lib/qrCodeHelper';
+import { updateJob } from '../lib/firebase';
 
 interface PosterStudioProps {
   job: JobPostDetail | PostRecord;
@@ -39,8 +40,11 @@ interface PosterStudioProps {
   isModal?: boolean;
   initialEditableMode?: boolean;
   isAdmin?: boolean;
-  onJobUpdated?: (updatedJob: PostRecord) => void;
+  onJobUpdated?: (updated: PostRecord) => void;
 }
+
+export type DownloadResolution = '1080x1350' | '1440x1800' | '2160x2700' | '1080x1920' | '1440x2560';
+export type DownloadSizeTarget = 'under_500kb' | 'under_1mb' | 'max_lossless';
 
 export const PosterStudio: React.FC<PosterStudioProps> = ({
   job,
@@ -53,12 +57,16 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 }) => {
   const posterRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
 
   // Aspect ratio: 'feed' (4:5 - 1080x1350) or 'story' (9:16 - 1080x1920)
   const [aspectRatio, setAspectRatio] = useState<'feed' | 'story'>('feed');
   const [zoomLevel, setZoomLevel] = useState<number>(0.38);
+
+  // Download Config State
+  const [downloadResolution, setDownloadResolution] = useState<DownloadResolution>('1080x1350');
+  const [downloadSizeTarget, setDownloadSizeTarget] = useState<DownloadSizeTarget>('under_500kb');
 
   // Admin authorization state
   const [isAdminState] = useState<boolean>(() => {
@@ -76,6 +84,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const [showCustomizer, setShowCustomizer] = useState<boolean>(
     initialEditableMode && isAdminState
   );
+  const [activeTab, setActiveTab] = useState<'headline' | 'tiles' | 'theme' | 'branding' | 'download'>('headline');
 
   // Canvas target dimensions
   const targetWidth = 1080;
@@ -91,27 +100,91 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const defaultDept = postRec ? postRec.dept : detailRec?.department || '';
   const defaultPosts = String(job.totalPosts || 'विज्ञप्ति अनुसार');
   const defaultLastDate = postRec ? postRec.dates?.end || '' : detailRec?.lastDate || '';
+  const defaultStartDate = postRec ? postRec.dates?.start || '' : detailRec?.startDate || '';
   const defaultFeeGen = postRec ? postRec.fee?.gen || '₹500/-' : detailRec?.feeGeneral || '₹500/-';
   const defaultFeeRes = postRec ? postRec.fee?.reserved || '₹250/-' : detailRec?.feeReserved || '₹250/-';
   const defaultEligibility = postRec ? postRec.eligibility || '' : detailRec?.qualificationSummary || '';
+  const defaultMinAge = postRec ? postRec.minAge || '18 वर्ष' : detailRec?.minAge || '18 वर्ष';
+  const defaultMaxAge = postRec ? postRec.maxAge || '33 वर्ष' : detailRec?.maxAge || '33 वर्ष';
+
   const posterConfig = postRec?.posterConfig;
 
   // Visual Customizer Controls with State Persistence
   const [theme, setTheme] = useState<PosterTheme>(posterConfig?.theme || 'classic');
   const [characterType, setCharacterType] = useState<CharacterType>(posterConfig?.characterType || 'male');
   const [customCharacterUrl, setCustomCharacterUrl] = useState<string>(posterConfig?.customCharacterUrl || '');
+  const [characterScale, setCharacterScale] = useState<'normal' | 'large' | 'xlarge'>('normal');
   const [titleScale, setTitleScale] = useState<TitleScale>(posterConfig?.titleScale || 'md');
-  const [showQrCode, setShowQrCode] = useState<boolean>(posterConfig?.showQrCode !== undefined ? posterConfig.showQrCode : true);
+  const [showQrCode, setShowQrCode] = useState<boolean>(
+    posterConfig?.showQrCode !== undefined ? posterConfig.showQrCode : true
+  );
 
   // Content Customizer Controls
   const [customHeadline, setCustomHeadline] = useState<string>(
     posterConfig?.headline || `${defaultShortTitle} भर्ती 2026`
   );
+  const [customDeptSubtitle, setCustomDeptSubtitle] = useState<string>(
+    posterConfig?.customDeptSubtitle || defaultDept
+  );
+  const [customRoleSubtitle, setCustomRoleSubtitle] = useState<string>(
+    posterConfig?.customRoleSubtitle || 'ऑनलाइन भर्ती विज्ञापन 2026'
+  );
   const [customPosts, setCustomPosts] = useState<string>(posterConfig?.customPosts || defaultPosts);
   const [customLastDate, setCustomLastDate] = useState<string>(posterConfig?.customLastDate || defaultLastDate);
-  const [customFeeAlert, setCustomFeeAlert] = useState<string>(posterConfig?.customFeeAlert || `${defaultFeeGen} / ${defaultFeeRes}`);
-  const [customNote, setCustomNote] = useState<string>(
+  const [customFeeAlert, setCustomFeeAlert] = useState<string>(
+    posterConfig?.customFeeAlert || `${defaultFeeGen} / ${defaultFeeRes}`
+  );
+  const [customNote] = useState<string>(
     posterConfig?.note || 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
+  );
+
+  // Granular 4-Tile Controls
+  const [customTile1Label, setCustomTile1Label] = useState<string>(
+    posterConfig?.customTile1Label || 'शैक्षणिक योग्यता'
+  );
+  const [customTile1Value, setCustomTile1Value] = useState<string>(
+    posterConfig?.customTile1Value || defaultEligibility || '10वीं / 12वीं अथवा स्नातक पास'
+  );
+  const [customTile2Label, setCustomTile2Label] = useState<string>(
+    posterConfig?.customTile2Label || 'आयु सीमा'
+  );
+  const [customTile2Value, setCustomTile2Value] = useState<string>(
+    posterConfig?.customTile2Value || `${defaultMinAge} से ${defaultMaxAge}`
+  );
+  const [customTile2Sub, setCustomTile2Sub] = useState<string>(
+    posterConfig?.customTile2Sub || 'नियमानुसार आयु में छूट लागू'
+  );
+  const [customTile3Label, setCustomTile3Label] = useState<string>(
+    posterConfig?.customTile3Label || 'आवेदन प्रारंभ'
+  );
+  const [customTile3Value, setCustomTile3Value] = useState<string>(
+    posterConfig?.customTile3Value || defaultStartDate || 'प्रारंभ हो चुका है'
+  );
+  const [customTile3Sub, setCustomTile3Sub] = useState<string>(
+    posterConfig?.customTile3Sub || 'ऑनलाइन पोर्टल खुला है'
+  );
+  const [customTile4Label, setCustomTile4Label] = useState<string>(
+    posterConfig?.customTile4Label || 'अंतिम तिथि'
+  );
+  const [customTile4Value, setCustomTile4Value] = useState<string>(
+    posterConfig?.customTile4Value || defaultLastDate || 'शीघ्र घोषित'
+  );
+  const [customTile4Sub, setCustomTile4Sub] = useState<string>(
+    posterConfig?.customTile4Sub || 'अंतिम तिथि से पूर्व भरें'
+  );
+
+  // Granular Branding Controls
+  const [customWebsiteUrl, setCustomWebsiteUrl] = useState<string>(
+    posterConfig?.customWebsiteUrl || 'WWW.NPJOBPORTAL.COM'
+  );
+  const [customWebsiteTagline, setCustomWebsiteTagline] = useState<string>(
+    posterConfig?.customWebsiteTagline || 'घर बैठे सुरक्षित ऑनलाइन फॉर्म भरवाएं • विश्वसनीय सेवा केंद्र'
+  );
+  const [customBottomCallout, setCustomBottomCallout] = useState<string>(
+    posterConfig?.customBottomCallout || `${defaultShortTitle} शुरू - जल्दी आवेदन करें!`
+  );
+  const [customOwnerCallout, setCustomOwnerCallout] = useState<string>(
+    `संचालक: ${OWNER_INFO.name} (${OWNER_INFO.phone})`
   );
 
   // AI Character & Logo Selector State
@@ -149,7 +222,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>('');
   const [isAiRegenerating, setIsAiRegenerating] = useState<boolean>(false);
 
-  const handleSelectAiAvatar = (avatar: typeof AI_AVATARS[0]) => {
+  const handleSelectAiAvatar = (avatar: (typeof AI_AVATARS)[0]) => {
     setSelectedAvatarId(avatar.id);
     setCharacterType(avatar.type);
     setCustomCharacterUrl(avatar.type === 'custom' ? avatar.url : '');
@@ -158,7 +231,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const handleAiRegenerate = () => {
     setIsAiRegenerating(true);
     setTimeout(() => {
-      // Dynamic AI rotation / avatar assignment based on prompt or category
       const q = aiSearchPrompt.toLowerCase().trim();
       let picked = AI_AVATARS[0];
       if (q.includes('female') || q.includes('bank') || q.includes('महिला') || q.includes('officer')) {
@@ -178,7 +250,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     }, 400);
   };
 
-  // Poster Mode: 'auto' (high-impact viral engine) vs 'custom' (uploaded banner compressed to ~100KB)
+  // Poster Mode: 'auto' vs 'custom'
   const initialUseCustom = Boolean(postRec?.useCustomPoster || detailRec?.useCustomPoster);
   const initialCustomUrl = postRec?.customPosterUrl || detailRec?.customPosterUrl || '';
   const [posterMode, setPosterMode] = useState<'auto' | 'custom'>(initialUseCustom ? 'custom' : 'auto');
@@ -189,7 +261,18 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const characterInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle Custom Character Cut-out Upload (Option C)
+  // Handle aspect ratio toggle and adjust resolution default cleanly
+  const handleAspectRatioChange = (ratio: 'feed' | 'story') => {
+    setAspectRatio(ratio);
+    if (ratio === 'story') {
+      setZoomLevel(0.30);
+      setDownloadResolution('1080x1920');
+    } else {
+      setZoomLevel(0.38);
+      setDownloadResolution('1080x1350');
+    }
+  };
+
   const handleCharacterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -205,7 +288,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Handle Full Custom Image Upload & Compression (~100KB target)
   const handleCustomImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -221,15 +303,15 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
 
-          const targetWidth = 1080;
-          const scale = targetWidth / img.width;
-          const targetHeight = Math.round(img.height * scale);
+          const tW = 1080;
+          const scale = tW / img.width;
+          const tH = Math.round(img.height * scale);
 
-          canvas.width = targetWidth;
-          canvas.height = targetHeight;
+          canvas.width = tW;
+          canvas.height = tH;
 
           if (ctx) {
-            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+            ctx.drawImage(img, 0, 0, tW, tH);
             let quality = 0.82;
             let webpDataUrl = canvas.toDataURL('image/webp', quality);
             let sizeInKb = Math.round((webpDataUrl.length * 3) / 4 / 1024);
@@ -259,7 +341,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     }
   };
 
-  // Save Settings to Firestore (Persisting posterConfig)
+  // Save Settings to Firestore (Persisting all granular posterConfig fields)
   const handleSavePosterPreference = async () => {
     if (!job.id || !isAdminState) return;
 
@@ -269,21 +351,32 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
       const configToPersist = {
         headline: customHeadline,
-        keyPoints: [
-          `कुल पद: ${customPosts}`,
-          `अंतिम तिथि: ${customLastDate}`,
-          `शैक्षणिक योग्यता: ${defaultEligibility.slice(0, 60)}`
-        ],
-        note: customNote,
+        customDeptSubtitle,
+        customRoleSubtitle,
+        customPosts,
+        customLastDate,
+        customFeeAlert,
         theme,
         characterType,
         customCharacterUrl,
         titleScale,
         aspectRatio,
-        customPosts,
-        customLastDate,
-        customFeeAlert,
-        showQrCode
+        showQrCode,
+        customTile1Label,
+        customTile1Value,
+        customTile2Label,
+        customTile2Value,
+        customTile2Sub,
+        customTile3Label,
+        customTile3Value,
+        customTile3Sub,
+        customTile4Label,
+        customTile4Value,
+        customTile4Sub,
+        customWebsiteUrl,
+        customWebsiteTagline,
+        customBottomCallout,
+        note: customNote
       };
 
       await updateJob(job.id, {
@@ -317,19 +410,34 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     setTitleScale('md');
     setShowQrCode(true);
     setCustomHeadline(`${defaultShortTitle} भर्ती 2026`);
+    setCustomDeptSubtitle(defaultDept);
+    setCustomRoleSubtitle('ऑनलाइन भर्ती विज्ञापन 2026');
     setCustomPosts(defaultPosts);
     setCustomLastDate(defaultLastDate);
     setCustomFeeAlert(`${defaultFeeGen} / ${defaultFeeRes}`);
-    setCustomNote('घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।');
+    setCustomTile1Label('शैक्षणिक योग्यता');
+    setCustomTile1Value(defaultEligibility || '10वीं / 12वीं अथवा स्नातक पास');
+    setCustomTile2Label('आयु सीमा');
+    setCustomTile2Value(`${defaultMinAge} से ${defaultMaxAge}`);
+    setCustomTile2Sub('नियमानुसार आयु में छूट लागू');
+    setCustomTile3Label('आवेदन प्रारंभ');
+    setCustomTile3Value(defaultStartDate || 'प्रारंभ हो चुका है');
+    setCustomTile3Sub('ऑनलाइन पोर्टल खुला है');
+    setCustomTile4Label('अंतिम तिथि');
+    setCustomTile4Value(defaultLastDate || 'शीघ्र घोषित');
+    setCustomTile4Sub('अंतिम तिथि से पूर्व भरें');
+    setCustomWebsiteUrl('WWW.NPJOBPORTAL.COM');
+    setCustomWebsiteTagline('घर बैठे सुरक्षित ऑनलाइन फॉर्म भरवाएं • विश्वसनीय सेवा केंद्र');
+    setCustomBottomCallout(`${defaultShortTitle} शुरू - जल्दी आवेदन करें!`);
   };
 
   // WhatsApp Message Generator
   const generateWhatsAppMessage = () => {
     return (
       `📢 *${customHeadline || defaultTitle}*\n` +
-      `🏢 विभाग: ${defaultDept}\n` +
+      `🏢 विभाग: ${customDeptSubtitle || defaultDept}\n` +
       `👥 कुल पद: *${customPosts}*\n` +
-      `🎓 शैक्षणिक योग्यता: ${defaultEligibility || 'विज्ञप्ति अनुसार'}\n` +
+      `🎓 योग्यता: ${customTile1Value || defaultEligibility || 'विज्ञप्ति अनुसार'}\n` +
       `📅 आवेदन की अंतिम तिथि: *${customLastDate}*\n` +
       `💰 आवेदन शुल्क: ${customFeeAlert}\n\n` +
       `📲 *व्हाट्सएप चैनल फॉलो करें:* ${WHATSAPP_CHANNEL_URL}\n\n` +
@@ -355,15 +463,17 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
     }
   };
 
+  // Advanced Download Engine with Precise Resolution & Target File Size Control
   const handleDownloadPoster = async () => {
     if (!posterRef.current) return;
     try {
       setIsDownloading(true);
-      setDownloadSuccess(false);
+      setDownloadSuccessMsg(null);
 
-      let dataUrl = '';
+      // 1. Capture base canvas at high fidelity
+      let sourceCanvas: HTMLCanvasElement;
       try {
-        const canvas = await html2canvas(posterRef.current, {
+        sourceCanvas = await html2canvas(posterRef.current, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
@@ -372,30 +482,75 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           scrollX: 0,
           scrollY: 0
         });
-        dataUrl = canvas.toDataURL('image/png', 1.0);
       } catch {
-        dataUrl = await toPng(posterRef.current, {
+        const rawUrl = await toPng(posterRef.current, {
           cacheBust: true,
           quality: 1,
           pixelRatio: 2,
           width: targetWidth,
           height: targetHeight
         });
+        const img = new window.Image();
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.src = rawUrl;
+        });
+        sourceCanvas = document.createElement('canvas');
+        sourceCanvas.width = targetWidth * 2;
+        sourceCanvas.height = targetHeight * 2;
+        const ctx = sourceCanvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
       }
 
-      if (!dataUrl) {
-        throw new Error('Canvas export failed');
+      // 2. Parse selected target dimensions
+      const [reqW, reqH] = downloadResolution.split('x').map(Number);
+
+      // 3. Render offscreen canvas with target resolution and high bicubic smoothing
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = reqW;
+      finalCanvas.height = reqH;
+      const ctx = finalCanvas.getContext('2d');
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(sourceCanvas, 0, 0, reqW, reqH);
       }
 
+      // 4. Compress to target file size
+      let exportDataUrl = '';
+      let ext = 'jpg';
+
+      if (downloadSizeTarget === 'max_lossless') {
+        exportDataUrl = finalCanvas.toDataURL('image/png', 1.0);
+        ext = 'png';
+      } else {
+        const maxBytes = downloadSizeTarget === 'under_500kb' ? 500 * 1024 : 1000 * 1024;
+        let quality = downloadSizeTarget === 'under_500kb' ? 0.85 : 0.94;
+        exportDataUrl = finalCanvas.toDataURL('image/jpeg', quality);
+
+        // Iterative compression loop to guarantee < 500KB or < 1MB
+        let attempts = 0;
+        while ((exportDataUrl.length * 3) / 4 > maxBytes && quality > 0.45 && attempts < 8) {
+          quality -= 0.07;
+          exportDataUrl = finalCanvas.toDataURL('image/jpeg', quality);
+          attempts++;
+        }
+      }
+
+      const finalSizeKb = Math.round((exportDataUrl.length * 3) / 4 / 1024);
+
+      // 5. Trigger clean browser download
       const link = document.createElement('a');
-      link.download = `NP_Job_Poster_${aspectRatio === 'story' ? '9x16_Story' : '4x5_Feed'}_${job.id || 'recruitment'}.png`;
-      link.href = dataUrl;
+      link.download = `NP_Job_Poster_${reqW}x${reqH}_${downloadSizeTarget}_${job.id || 'recruitment'}.${ext}`;
+      link.href = exportDataUrl;
       link.click();
 
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 4000);
+      setDownloadSuccessMsg(`पोस्टर डाउनलोड हुआ: ${reqW}×${reqH} px, ~${finalSizeKb} KB (${ext.toUpperCase()})`);
+      setTimeout(() => setDownloadSuccessMsg(null), 5000);
     } catch (err) {
       console.error('Error downloading poster:', err);
+      setDownloadSuccessMsg('डाउनलोड में त्रुटि आई!');
+      setTimeout(() => setDownloadSuccessMsg(null), 4000);
     } finally {
       setIsDownloading(false);
     }
@@ -451,7 +606,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="w-4 h-4 text-amber-400" />
-            <span>← वापस पोस्ट सूची में जाएं (Back to Posts)</span>
+            <span>← वापस पोस्ट सूची में जाएं</span>
           </button>
 
           {isAdminState && (
@@ -476,7 +631,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                हाई-इम्पैक्ट सोशल मीडिया पोस्टर स्टूडियो
+                हाई-इम्पैक्ट सोशल मीडिया पोस्टर स्टूडियो 2.0
                 <span className="text-amber-400 text-xs font-mono font-bold bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
                   {aspectRatio === 'feed' ? '1080×1350 (4:5 Feed)' : '1080×1920 (9:16 Story)'}
                 </span>
@@ -484,7 +639,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             </div>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            वैकेंसी अपडेट स्टाइल: 3D हेडर, 2x2 वाइब्रेंट टाइल्स, कैंडिडेट कट-आउट व व्हाट्सएप QR कोड
+            वैकेंसी अपडेट स्टाइल: बड़े बोल्ड 3D हेडर, 4 हाई-कंट्रास्ट टाइल्स, कैंडिडेट कट-आउट व सुरक्षित डाउनलोड
           </p>
         </div>
 
@@ -494,10 +649,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-700 text-xs font-bold">
             <button
               type="button"
-              onClick={() => {
-                setAspectRatio('feed');
-                setZoomLevel(0.38);
-              }}
+              onClick={() => handleAspectRatioChange('feed')}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                 aspectRatio === 'feed'
                   ? 'bg-amber-400 text-slate-950 font-black shadow-md'
@@ -508,10 +660,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setAspectRatio('story');
-                setZoomLevel(0.30);
-              }}
+              onClick={() => handleAspectRatioChange('story')}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                 aspectRatio === 'story'
                   ? 'bg-amber-400 text-slate-950 font-black shadow-md'
@@ -533,7 +682,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               }`}
             >
               <Sliders className="w-4 h-4" />
-              <span>{showCustomizer ? 'कस्टमाइज़र छुपाएं' : 'पोस्टर कस्टमाइज़ करें'}</span>
+              <span>{showCustomizer ? 'कस्टमाइज़र छुपाएं' : 'फुल पोस्टर डिज़ाइन कंट्रोल'}</span>
             </button>
           )}
 
@@ -584,29 +733,24 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs sm:text-sm font-bold text-white transition-all shadow-xs"
           >
             <Share2 className="w-4 h-4" />
-            <span>1-क्लिक व्हाट्सएप शेयर</span>
+            <span>1-क्लिक शेयर</span>
           </a>
 
-          {/* HD Download PNG Button */}
+          {/* Download Button */}
           <button
             onClick={handleDownloadPoster}
             disabled={isDownloading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs sm:text-sm font-black transition-all shadow-lg hover:shadow-amber-500/20 disabled:opacity-60"
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs sm:text-sm font-black transition-all shadow-lg hover:shadow-amber-500/20 disabled:opacity-60 cursor-pointer"
           >
             {isDownloading ? (
               <>
                 <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                <span>डाउनलोड हो रहा है...</span>
-              </>
-            ) : downloadSuccess ? (
-              <>
-                <Check className="w-4 h-4 text-slate-950" />
-                <span>डाउनलोड पूर्ण!</span>
+                <span>एक्सपोर्ट हो रहा है...</span>
               </>
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                <span>HD पोस्टर (PNG) डाउनलोड</span>
+                <span>पोस्टर डाउनलोड ({downloadResolution})</span>
               </>
             )}
           </button>
@@ -622,14 +766,27 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
         </div>
       </div>
 
-      {/* 2. ADMIN CUSTOMIZATION TOOLBAR */}
+      {/* Download Result Banner */}
+      {downloadSuccessMsg && (
+        <div className="mt-3 p-3 bg-emerald-950/80 border border-emerald-500/60 rounded-xl text-emerald-200 text-xs sm:text-sm font-bold flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span>{downloadSuccessMsg}</span>
+          </div>
+          <span className="text-[11px] bg-emerald-900 px-2 py-0.5 rounded text-white font-mono">
+            {downloadSizeTarget.toUpperCase()}
+          </span>
+        </div>
+      )}
+
+      {/* 2. ADMIN CUSTOMIZATION TOOLBAR - ADVANCED CONTROLS */}
       {isAdminState && showCustomizer && (
-        <div className="mt-4 p-4 bg-slate-800/90 border border-amber-500/40 rounded-xl space-y-4">
+        <div className="mt-4 p-4 bg-slate-800/95 border border-amber-500/40 rounded-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-700 gap-2">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-amber-400" />
               <span className="font-bold text-sm text-amber-300">
-                पोस्टर नियंत्रक एवं डिज़ाइन टूलबार (Admin Toolbar)
+                पोस्टर पूर्ण नियंत्रण एवं डिज़ाइन स्टूडियो (Full Control Studio)
               </span>
             </div>
 
@@ -653,300 +810,808 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               <button
                 type="button"
                 onClick={handleResetDefaults}
-                className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1 px-2 py-1 bg-slate-900 rounded"
+                className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1 px-2 py-1 bg-slate-900 rounded cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" /> रीसेट
               </button>
             </div>
           </div>
 
-          {/* AI SEARCH & PROMPT LOGO / CHARACTER SELECTOR */}
-          <div className="bg-gradient-to-r from-purple-950/50 via-slate-900 to-indigo-950/50 border border-purple-500/40 p-3.5 rounded-xl space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <label className="text-purple-200 font-black text-xs flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
-                <span>AI सर्च व प्रॉम्प्ट लोगो / कैरेक्टर चयनकर्ता (AI Character Selector):</span>
-              </label>
-              <span className="text-[11px] text-purple-300 font-medium">
-                4 त्वरित अवतार + AI री-जनरेट विकल्प
-              </span>
-            </div>
+          {/* STUDIO TAB NAVIGATION */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-b border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setActiveTab('headline')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === 'headline'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750'
+              }`}
+            >
+              <Type className="w-3.5 h-3.5" />
+              <span>1. 3D हेडर व पद संख्या</span>
+            </button>
 
-            {/* Input Prompt Box */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={aiSearchPrompt}
-                  onChange={(e) => setAiSearchPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAiRegenerate();
-                  }}
-                  placeholder="कस्टम कैरेक्टर या लोगो सर्च करें (उदा. 'MP Police Constable Cartoon', 'Female Bank Officer', 'Railway Engineer')..."
-                  className="w-full bg-slate-950 border border-purple-500/40 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-purple-400"
-                />
-                <Search className="w-3.5 h-3.5 text-purple-400 absolute right-3 top-1/2 -translate-y-1/2" />
-              </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tiles')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === 'tiles'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>2. 4-टाइल कस्टमाइज़र</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={handleAiRegenerate}
-                disabled={isAiRegenerating}
-                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 shadow-md cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isAiRegenerating ? 'animate-spin' : ''}`} />
-                <span>{isAiRegenerating ? 'जनरेटिंग...' : '🔄 AI री-जनरेट करें'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('theme')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === 'theme'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750'
+              }`}
+            >
+              <Palette className="w-3.5 h-3.5" />
+              <span>3. थीम व AI कैरेक्टर</span>
+            </button>
 
-            {/* 4 Instant Selectable Preset Avatars */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              {AI_AVATARS.map((av) => {
-                const isSelected = selectedAvatarId === av.id || (av.type === 'custom' && customCharacterUrl === av.url) || (av.type !== 'custom' && characterType === av.type);
-                return (
-                  <button
-                    key={av.id}
-                    type="button"
-                    onClick={() => handleSelectAiAvatar(av)}
-                    className={`p-2 rounded-xl border text-left transition-all flex items-center gap-2.5 cursor-pointer ${
-                      isSelected
-                        ? 'bg-purple-900/60 border-purple-400 text-white font-black shadow-md ring-1 ring-purple-400'
-                        : 'bg-slate-950/70 border-slate-700/80 text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center">
-                      {av.type === 'custom' ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={av.url} alt={av.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-base">{av.id === 'tech' ? '💻' : '👩‍💼'}</span>
-                      )}
-                    </div>
-                    <div className="truncate">
-                      <div className="text-[11px] font-bold truncate leading-tight text-white">
-                        {av.badge}
-                      </div>
-                      <div className="text-[9px] text-purple-300 truncate">
-                        {av.title}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('branding')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === 'branding'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>4. ब्रांडिंग व QR कोड</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('download')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === 'download'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750'
+              }`}
+            >
+              <HardDrive className="w-3.5 h-3.5" />
+              <span>5. डाउनलोड साइज़ & पिक्सल सेटिंग्स</span>
+            </button>
           </div>
 
-          {/* VISUAL DESIGN CONTROLS (Theme, Character, Headline Scale, QR Code) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-900/90 border border-slate-700 p-3 rounded-xl text-xs">
-            {/* Theme Switcher */}
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                <Palette className="w-3.5 h-3.5 text-amber-400" />
-                <span>थीम चुनें (Theme Style):</span>
-              </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setTheme('classic')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    theme === 'classic'
-                      ? 'bg-blue-900/60 border-amber-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">🎨 Classic Vacancy</span>
-                  <span className="text-[9px] text-amber-300 font-medium">ब्लू/गोल्ड 3D</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTheme('navy')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    theme === 'navy'
-                      ? 'bg-blue-950 border-amber-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">⚓ Royal Navy</span>
-                  <span className="text-[9px] text-cyan-300 font-medium">नेवी एवं गोल्ड</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTheme('emerald')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    theme === 'emerald'
-                      ? 'bg-emerald-950 border-emerald-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">🌲 Emerald Green</span>
-                  <span className="text-[9px] text-emerald-300 font-medium">हरा एवं मिंट</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTheme('crimson')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    theme === 'crimson'
-                      ? 'bg-rose-950 border-amber-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">🔥 Crimson Festive</span>
-                  <span className="text-[9px] text-rose-300 font-medium">रेड एवं गोल्ड</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Character Selector */}
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-amber-400" />
-                <span>कैंडिडेट कट-आउट (Character):</span>
-              </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCharacterType('male')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    characterType === 'male'
-                      ? 'bg-blue-900/60 border-amber-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">👨‍🎓 Male Aspirant</span>
-                  <span className="text-[9px] text-slate-400">स्मार्ट स्टूडेंट</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCharacterType('female')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    characterType === 'female'
-                      ? 'bg-purple-900/60 border-amber-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">👩‍💼 Female Officer</span>
-                  <span className="text-[9px] text-slate-400">टैबलेट/ब्लूप्रिंट</span>
-                </button>
-
-                <div className="relative">
-                  <input
-                    ref={characterInputRef}
-                    type="file"
-                    accept="image/png,image/webp"
-                    onChange={handleCharacterUpload}
-                    className="hidden"
-                    id="character-upload-input"
-                  />
-                  <label
-                    htmlFor="character-upload-input"
-                    className={`block p-1.5 rounded-lg border text-left cursor-pointer transition-all ${
-                      characterType === 'custom'
-                        ? 'bg-amber-900/60 border-amber-400 text-white font-black'
-                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                    }`}
-                  >
-                    <span className="text-[11px] block truncate">📤 Custom PNG</span>
-                    <span className="text-[9px] text-amber-300 font-medium">कट-आउट अपलोड</span>
+          {/* TAB 1: HEADLINE & VACANCIES */}
+          {activeTab === 'headline' && (
+            <div className="space-y-3 text-xs animate-in fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-slate-300 font-bold mb-1">
+                    3D मुख्य शीर्षक (Large Bold Headline):
                   </label>
+                  <input
+                    type="text"
+                    value={customHeadline}
+                    onChange={(e) => setCustomHeadline(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold text-sm focus:border-amber-400"
+                  />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setCharacterType('none')}
-                  className={`p-1.5 rounded-lg border text-left transition-all ${
-                    characterType === 'none'
-                      ? 'bg-slate-700 border-amber-400 text-white font-black'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span className="text-[11px] block">🚫 No Character</span>
-                  <span className="text-[9px] text-slate-400">फुल चौड़ाई टाइल्स</span>
-                </button>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    हेडलाइन फॉन्ट साइज़ (Font Size Scaler):
+                  </label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(['sm', 'md', 'lg', 'xl'] as TitleScale[]).map((sz) => (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setTitleScale(sz)}
+                        className={`py-2 rounded-lg border text-center font-bold text-xs uppercase transition-all ${
+                          titleScale === sz
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                            : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">विभाग / उप-शीर्षक (Department Subtitle):</label>
+                  <input
+                    type="text"
+                    value={customDeptSubtitle}
+                    onChange={(e) => setCustomDeptSubtitle(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">कुल पद हाइलाइट (Total Posts):</label>
+                  <input
+                    type="text"
+                    value={customPosts}
+                    onChange={(e) => setCustomPosts(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-black text-amber-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">पद का नाम (Role / Designation):</label>
+                  <input
+                    type="text"
+                    value={customRoleSubtitle}
+                    onChange={(e) => setCustomRoleSubtitle(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">आवेदन शुल्क अलर्ट (Fee Alert):</label>
+                  <input
+                    type="text"
+                    value={customFeeAlert}
+                    onChange={(e) => setCustomFeeAlert(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">अंतिम तिथि हाइलाइट (Last Date):</label>
+                  <input
+                    type="text"
+                    value={customLastDate}
+                    onChange={(e) => setCustomLastDate(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-rose-300 font-bold"
+                  />
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Headline Text Scaler */}
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                <Type className="w-3.5 h-3.5 text-amber-400" />
-                <span>हेडलाइन टेक्स्ट साइज़:</span>
-              </label>
-              <div className="grid grid-cols-4 gap-1">
-                {(['sm', 'md', 'lg', 'xl'] as TitleScale[]).map((sz) => (
+          {/* TAB 2: 4-TILE CUSTOMIZER */}
+          {activeTab === 'tiles' && (
+            <div className="space-y-3 text-xs animate-in fade-in">
+              <p className="text-amber-300 font-semibold">
+                पोस्टर के 4 मुख्य टाइल्स में टेक्स्ट को अपनी इच्छानुसार बदलें (प्रत्येक शब्द छोटे डिवाइस पर भी पूर्णतः पठनीय रहेगा):
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Tile 1 */}
+                <div className="bg-slate-900 border border-teal-500/50 p-3 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-teal-300 font-bold">
+                    <span>टाइल 1: शैक्षणिक योग्यता (Qualification)</span>
+                    <span className="text-[10px] bg-teal-950 px-2 py-0.5 rounded border border-teal-700">ग्रीन/टीयल टाइल</span>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">टाइल शीर्षक (Label):</label>
+                    <input
+                      type="text"
+                      value={customTile1Label}
+                      onChange={(e) => setCustomTile1Label(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">योग्यता विवरण (Value):</label>
+                    <input
+                      type="text"
+                      value={customTile1Value}
+                      onChange={(e) => setCustomTile1Value(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Tile 2 */}
+                <div className="bg-slate-900 border border-fuchsia-500/50 p-3 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-fuchsia-300 font-bold">
+                    <span>टाइल 2: आयु सीमा (Age Limit)</span>
+                    <span className="text-[10px] bg-fuchsia-950 px-2 py-0.5 rounded border border-fuchsia-700">पर्पल/पिंक टाइल</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">टाइल शीर्षक:</label>
+                      <input
+                        type="text"
+                        value={customTile2Label}
+                        onChange={(e) => setCustomTile2Label(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">आयु सीमा (Value):</label>
+                      <input
+                        type="text"
+                        value={customTile2Value}
+                        onChange={(e) => setCustomTile2Value(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">छूट नोट (Sub-note):</label>
+                    <input
+                      type="text"
+                      value={customTile2Sub}
+                      onChange={(e) => setCustomTile2Sub(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Tile 3 */}
+                <div className="bg-slate-900 border border-amber-500/50 p-3 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-amber-300 font-bold">
+                    <span>टाइल 3: आवेदन प्रारंभ (Starting Date)</span>
+                    <span className="text-[10px] bg-amber-950 px-2 py-0.5 rounded border border-amber-700">ऑरेंज/एम्बर टाइल</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">टाइल शीर्षक:</label>
+                      <input
+                        type="text"
+                        value={customTile3Label}
+                        onChange={(e) => setCustomTile3Label(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">प्रारंभ तिथि (Value):</label>
+                      <input
+                        type="text"
+                        value={customTile3Value}
+                        onChange={(e) => setCustomTile3Value(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">उप-नोट (Sub-note):</label>
+                    <input
+                      type="text"
+                      value={customTile3Sub}
+                      onChange={(e) => setCustomTile3Sub(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Tile 4 */}
+                <div className="bg-slate-900 border border-cyan-500/50 p-3 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-cyan-300 font-bold">
+                    <span>टाइल 4: अंतिम तिथि (Last Date)</span>
+                    <span className="text-[10px] bg-cyan-950 px-2 py-0.5 rounded border border-cyan-700">रॉयल ब्लू/क्यान टाइल</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">टाइल शीर्षक:</label>
+                      <input
+                        type="text"
+                        value={customTile4Label}
+                        onChange={(e) => setCustomTile4Label(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">अंतिम तिथि (Value):</label>
+                      <input
+                        type="text"
+                        value={customTile4Value}
+                        onChange={(e) => setCustomTile4Value(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white font-bold text-rose-300"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">अलर्ट नोट (Sub-note):</label>
+                    <input
+                      type="text"
+                      value={customTile4Sub}
+                      onChange={(e) => setCustomTile4Sub(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: THEME & CHARACTER */}
+          {activeTab === 'theme' && (
+            <div className="space-y-4 text-xs animate-in fade-in">
+              {/* Theme Switcher with 6 Styles */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-2 flex items-center gap-1.5">
+                  <Palette className="w-4 h-4 text-amber-400" />
+                  <span>6 प्रीमियम 3D कलर थीम्स (Select Theme Style):</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   <button
-                    key={sz}
                     type="button"
-                    onClick={() => setTitleScale(sz)}
-                    className={`py-2 rounded-lg border text-center font-bold text-xs uppercase transition-all ${
-                      titleScale === sz
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
-                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    onClick={() => setTheme('classic')}
+                    className={`p-2 rounded-xl border text-left transition-all ${
+                      theme === 'classic'
+                        ? 'bg-blue-900 border-amber-400 text-white font-black ring-2 ring-amber-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
                     }`}
                   >
-                    {sz}
+                    <span className="text-xs block font-bold">🎨 Classic Vacancy</span>
+                    <span className="text-[10px] text-amber-300">ब्लू / गोल्ड 3D</span>
                   </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-2">
-                शीर्षक के अनुसार फॉन्ट का आकार छोटा/बड़ा करें
-              </p>
-            </div>
 
-            {/* QR Code & Auto Mode Toggle */}
-            <div className="flex flex-col justify-between">
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                  <QrCode className="w-3.5 h-3.5 text-amber-400" />
-                  <span>व्हाट्सएप QR कोड:</span>
-                </label>
+                  <button
+                    type="button"
+                    onClick={() => setTheme('navy')}
+                    className={`p-2 rounded-xl border text-left transition-all ${
+                      theme === 'navy'
+                        ? 'bg-blue-950 border-amber-400 text-white font-black ring-2 ring-amber-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs block font-bold">⚓ Royal Navy</span>
+                    <span className="text-[10px] text-cyan-300">नेवी व गोल्ड</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('emerald')}
+                    className={`p-2 rounded-xl border text-left transition-all ${
+                      theme === 'emerald'
+                        ? 'bg-emerald-950 border-emerald-400 text-white font-black ring-2 ring-emerald-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs block font-bold">🌲 Emerald Green</span>
+                    <span className="text-[10px] text-emerald-300">हरा व मिंट</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('crimson')}
+                    className={`p-2 rounded-xl border text-left transition-all ${
+                      theme === 'crimson'
+                        ? 'bg-rose-950 border-amber-400 text-white font-black ring-2 ring-amber-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs block font-bold">🔥 Crimson Festive</span>
+                    <span className="text-[10px] text-rose-300">रेड व गोल्ड</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('purple')}
+                    className={`p-2 rounded-xl border text-left transition-all ${
+                      theme === 'purple'
+                        ? 'bg-purple-950 border-amber-400 text-white font-black ring-2 ring-amber-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs block font-bold">👑 Purple Royale</span>
+                    <span className="text-[10px] text-fuchsia-300">बैंगनी व गोल्ड</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('cyber')}
+                    className={`p-2 rounded-xl border text-left transition-all ${
+                      theme === 'cyber'
+                        ? 'bg-slate-950 border-cyan-400 text-cyan-300 font-black ring-2 ring-cyan-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs block font-bold">⚡ Cyber Dark</span>
+                    <span className="text-[10px] text-cyan-300">हाई-टेक डार्क</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Character Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-amber-400" />
+                    <span>कैंडिडेट कट-आउट (Candidate Avatar):</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCharacterType('male')}
+                      className={`p-2 rounded-xl border text-left transition-all ${
+                        characterType === 'male'
+                          ? 'bg-blue-900 border-amber-400 text-white font-black'
+                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                      }`}
+                    >
+                      <span className="text-xs block">👨‍🎓 Male Aspirant</span>
+                      <span className="text-[10px] text-slate-400">स्मार्ट स्टूडेंट</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCharacterType('female')}
+                      className={`p-2 rounded-xl border text-left transition-all ${
+                        characterType === 'female'
+                          ? 'bg-purple-900 border-amber-400 text-white font-black'
+                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                      }`}
+                    >
+                      <span className="text-xs block">👩‍💼 Female Officer</span>
+                      <span className="text-[10px] text-slate-400">ऑफिसर लुक</span>
+                    </button>
+
+                    <div className="relative">
+                      <input
+                        ref={characterInputRef}
+                        type="file"
+                        accept="image/png,image/webp"
+                        onChange={handleCharacterUpload}
+                        className="hidden"
+                        id="character-upload-input"
+                      />
+                      <label
+                        htmlFor="character-upload-input"
+                        className={`block p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                          characterType === 'custom'
+                            ? 'bg-amber-900 border-amber-400 text-white font-black'
+                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        <span className="text-xs block truncate">📤 Custom PNG</span>
+                        <span className="text-[10px] text-amber-300 font-medium">कट-आउट अपलोड</span>
+                      </label>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setCharacterType('none')}
+                      className={`p-2 rounded-xl border text-left transition-all ${
+                        characterType === 'none'
+                          ? 'bg-slate-700 border-amber-400 text-white font-black'
+                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                      }`}
+                    >
+                      <span className="text-xs block">🚫 No Character</span>
+                      <span className="text-[10px] text-slate-400">फुल चौड़ाई टाइल्स</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Character Scale */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
+                    <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                    <span>कैरेक्टर का आकार (Character Scaling):</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['normal', 'large', 'xlarge'] as const).map((sc) => (
+                      <button
+                        key={sc}
+                        type="button"
+                        onClick={() => setCharacterScale(sc)}
+                        className={`p-2 rounded-xl border text-center font-bold capitalize transition-all ${
+                          characterScale === sc
+                            ? 'bg-amber-400 text-slate-950 font-black'
+                            : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                        }`}
+                      >
+                        {sc === 'normal' ? 'साधारण' : sc === 'large' ? 'बड़ा (+10%)' : 'विशाल (+20%)'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* AI Quick Avatar Presets */}
+                  <div className="pt-2">
+                    <label className="block text-slate-400 text-[11px] mb-1">त्वरित AI अवतार:</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {AI_AVATARS.slice(0, 2).map((av) => (
+                        <button
+                          key={av.id}
+                          type="button"
+                          onClick={() => handleSelectAiAvatar(av)}
+                          className={`px-2 py-1.5 bg-slate-900 hover:bg-slate-750 border rounded-lg text-left text-[11px] truncate flex items-center gap-1.5 ${
+                            selectedAvatarId === av.id ? 'border-amber-400 text-amber-300 font-bold' : 'border-slate-700 text-slate-300'
+                          }`}
+                        >
+                          <span>{av.badge.slice(0, 2)}</span>
+                          <span className="truncate">{av.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Search & Prompt */}
+              <div className="bg-purple-950/40 border border-purple-500/40 p-3 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span className="text-purple-200 font-bold">AI कैरेक्टर सर्च / प्रॉम्प्ट:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={aiSearchPrompt}
+                      onChange={(e) => setAiSearchPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAiRegenerate();
+                      }}
+                      placeholder="उदा. 'MP Police Constable', 'Railway Pilot', 'IT Specialist'..."
+                      className="w-full bg-slate-950 border border-purple-500/40 rounded-lg px-3 py-1.5 text-xs text-white"
+                    />
+                    <Search className="w-3.5 h-3.5 text-purple-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAiRegenerate}
+                    disabled={isAiRegenerating}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold shrink-0 flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isAiRegenerating ? 'animate-spin' : ''}`} />
+                    <span>AI लगाएं</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: BRANDING & QR CODE */}
+          {activeTab === 'branding' && (
+            <div className="space-y-3 text-xs animate-in fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    वेबसाइट ब्रांडिंग URL (Website Banner):
+                  </label>
+                  <input
+                    type="text"
+                    value={customWebsiteUrl}
+                    onChange={(e) => setCustomWebsiteUrl(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-black text-amber-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    ब्रांडिंग टैगलाइन (Tagline):
+                  </label>
+                  <input
+                    type="text"
+                    value={customWebsiteTagline}
+                    onChange={(e) => setCustomWebsiteTagline(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    बॉटम कॉलआउट टेक्स्ट (Bottom Action Callout):
+                  </label>
+                  <input
+                    type="text"
+                    value={customBottomCallout}
+                    onChange={(e) => setCustomBottomCallout(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    संचालक संपर्क सूत्र (Owner Note):
+                  </label>
+                  <input
+                    type="text"
+                    value={customOwnerCallout}
+                    onChange={(e) => setCustomOwnerCallout(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold text-blue-300"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-slate-900 border border-slate-700 rounded-xl">
+                <div>
+                  <span className="font-bold text-white block">व्हाट्सएप चैनल QR कोड कार्ड</span>
+                  <span className="text-slate-400 text-[11px]">पोस्टर के निचले दाएं कोने पर स्कैन करने हेतु बारकोड कार्ड</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowQrCode(!showQrCode)}
-                  className={`w-full py-2 px-3 rounded-lg border text-center font-bold text-xs transition-all flex items-center justify-center gap-2 ${
-                    showQrCode
-                      ? 'bg-emerald-600 text-white border-emerald-400'
-                      : 'bg-slate-800 text-slate-400 border-slate-750'
+                  className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    showQrCode ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
                   }`}
                 >
-                  <Check className={`w-3.5 h-3.5 ${showQrCode ? 'opacity-100' : 'opacity-0'}`} />
-                  <span>{showQrCode ? 'QR कोड दृश्यमान है' : 'QR कोड छिपा हुआ है'}</span>
+                  <Check className={`w-4 h-4 ${showQrCode ? 'opacity-100' : 'opacity-0'}`} />
+                  <span>{showQrCode ? 'QR कोड चालू है' : 'QR कोड बंद है'}</span>
                 </button>
               </div>
+            </div>
+          )}
 
-              {/* Mode Toggle Switch */}
-              <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 font-bold">मोड:</span>
-                <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-700 text-[11px] font-bold">
+          {/* TAB 5: DOWNLOAD & RESOLUTION ENGINE */}
+          {activeTab === 'download' && (
+            <div className="space-y-4 text-xs animate-in fade-in">
+              <div>
+                <label className="block text-amber-300 font-black mb-1.5 flex items-center gap-1.5 text-sm">
+                  <HardDrive className="w-4 h-4 text-amber-400" />
+                  <span>पोस्टर डाउनलोड पिक्सल रिज़ॉल्यूशन (Select Resolution):</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPosterMode('auto')}
-                    className={`px-2 py-1 rounded transition-all ${
-                      posterMode === 'auto'
-                        ? 'bg-amber-400 text-slate-950 font-black'
-                        : 'text-slate-400'
+                    onClick={() => {
+                      setAspectRatio('feed');
+                      setDownloadResolution('1080x1350');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      downloadResolution === '1080x1350'
+                        ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-md'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
                     }`}
                   >
-                    ऑटो-इंजन
+                    <span className="block font-black text-xs">1080 × 1350 px</span>
+                    <span className="text-[10px] opacity-80">4:5 Feed Standard HD</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => setPosterMode('custom')}
-                    className={`px-2 py-1 rounded transition-all ${
-                      posterMode === 'custom'
-                        ? 'bg-amber-400 text-slate-950 font-black'
-                        : 'text-slate-400'
+                    onClick={() => {
+                      setAspectRatio('feed');
+                      setDownloadResolution('1440x1800');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      downloadResolution === '1440x1800'
+                        ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-md'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
                     }`}
                   >
-                    कस्टम पोस्टर
+                    <span className="block font-black text-xs">1440 × 1800 px</span>
+                    <span className="text-[10px] opacity-80">4:5 Feed 2K Quad HD</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAspectRatio('feed');
+                      setDownloadResolution('2160x2700');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      downloadResolution === '2160x2700'
+                        ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-md'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="block font-black text-xs">2160 × 2700 px</span>
+                    <span className="text-[10px] opacity-80">4:5 Feed 4K Ultra HD</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAspectRatio('story');
+                      setDownloadResolution('1080x1920');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      downloadResolution === '1080x1920'
+                        ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-md'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="block font-black text-xs">1080 × 1920 px</span>
+                    <span className="text-[10px] opacity-80">9:16 WhatsApp Story HD</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAspectRatio('story');
+                      setDownloadResolution('1440x2560');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      downloadResolution === '1440x2560'
+                        ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-md'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="block font-black text-xs">1440 × 2560 px</span>
+                    <span className="text-[10px] opacity-80">9:16 WhatsApp Story 2K</span>
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-amber-300 font-black mb-1.5 flex items-center gap-1.5 text-sm">
+                  <Download className="w-4 h-4 text-amber-400" />
+                  <span>टारगेट इमेज साइज़ सीमा (Target File Size Constraint):</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDownloadSizeTarget('under_500kb')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      downloadSizeTarget === 'under_500kb'
+                        ? 'bg-emerald-950/80 border-emerald-400 text-white ring-2 ring-emerald-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs font-black block text-emerald-300">⚡ Under 500 KB (Recommended)</span>
+                    <span className="text-[11px] text-slate-300 mt-0.5 block">
+                      व्हाट्सएप ग्रुप्स व स्टेटस पर तुरंत सेंड करने के लिए सबसे उपयुक्त।
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDownloadSizeTarget('under_1mb')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      downloadSizeTarget === 'under_1mb'
+                        ? 'bg-blue-950/80 border-blue-400 text-white ring-2 ring-blue-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs font-black block text-blue-300">🎯 Under 1 MB (High Quality)</span>
+                    <span className="text-[11px] text-slate-300 mt-0.5 block">
+                      उच्च कंट्रास्ट, फेसबुक व इंस्टाग्राम एचडी पोस्ट के लिए सर्वश्रेष्ठ।
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDownloadSizeTarget('max_lossless')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      downloadSizeTarget === 'max_lossless'
+                        ? 'bg-purple-950/80 border-purple-400 text-white ring-2 ring-purple-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-xs font-black block text-purple-300">💎 Lossless Master (PNG ~2MB)</span>
+                    <span className="text-[11px] text-slate-300 mt-0.5 block">
+                      कियोस्क फ्लेक्स प्रिंटिंग व 100% पिक्सल-परफेक्ट आउटपुट हेतु।
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Direct Download Action Button */}
+              <div className="pt-2 flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-700">
+                <div className="text-xs text-slate-300">
+                  <span>वर्तमान चयन: </span>
+                  <strong className="text-amber-300">{downloadResolution} पिक्सल</strong>
+                  <span> • साइज़: </span>
+                  <strong className="text-emerald-300">
+                    {downloadSizeTarget === 'under_500kb'
+                      ? '< 500 KB'
+                      : downloadSizeTarget === 'under_1mb'
+                      ? '< 1 MB'
+                      : 'Master PNG'}
+                  </strong>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPoster}
+                  disabled={isDownloading}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 rounded-xl font-black text-xs shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{isDownloading ? 'तैयार हो रहा है...' : 'तुरंत डाउनलोड करें'}</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Full Custom Poster Upload (if mode === 'custom') */}
           {posterMode === 'custom' && (
@@ -1000,37 +1665,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               </div>
             </div>
           )}
-
-          {/* Text Customizer Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">हेडलाइन / मुख्य 3D शीर्षक:</label>
-              <input
-                type="text"
-                value={customHeadline}
-                onChange={(e) => setCustomHeadline(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">कुल पद संख्या हाइलाइट:</label>
-              <input
-                type="text"
-                value={customPosts}
-                onChange={(e) => setCustomPosts(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">अंतिम तिथि हाइलाइट:</label>
-              <input
-                type="text"
-                value={customLastDate}
-                onChange={(e) => setCustomLastDate(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
-              />
-            </div>
-          </div>
         </div>
       )}
 
@@ -1041,11 +1675,11 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           <span className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              यह पोस्टर {targetWidth}×{targetHeight} पिक्सल ({aspectRatio === 'feed' ? '4:5 Social Feed' : '9:16 WhatsApp Story'}) में एक्सपोर्ट होगा।
+              यह पोस्टर {targetWidth}×{targetHeight} पिक्सल ({aspectRatio === 'feed' ? '4:5 Social Feed' : '9:16 WhatsApp Story'}) में रेंडर हो रहा है।
             </span>
           </span>
           <span className="text-amber-400 font-semibold flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" /> 100% आधिकारिक मुहर
+            <Check className="w-3.5 h-3.5" /> 100% स्पष्ट एवं पठनीय
           </span>
         </div>
 
@@ -1070,6 +1704,8 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 ref={posterRef}
                 job={job}
                 customHeadline={customHeadline}
+                customDeptSubtitle={customDeptSubtitle}
+                customRoleSubtitle={customRoleSubtitle}
                 customPosts={customPosts}
                 customLastDate={customLastDate}
                 customFeeAlert={customFeeAlert}
@@ -1080,8 +1716,24 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                 theme={theme}
                 characterType={characterType}
                 customCharacterUrl={customCharacterUrl}
+                characterScale={characterScale}
                 titleScale={titleScale}
                 showQrCode={showQrCode}
+                customTile1Label={customTile1Label}
+                customTile1Value={customTile1Value}
+                customTile2Label={customTile2Label}
+                customTile2Value={customTile2Value}
+                customTile2Sub={customTile2Sub}
+                customTile3Label={customTile3Label}
+                customTile3Value={customTile3Value}
+                customTile3Sub={customTile3Sub}
+                customTile4Label={customTile4Label}
+                customTile4Value={customTile4Value}
+                customTile4Sub={customTile4Sub}
+                customWebsiteUrl={customWebsiteUrl}
+                customWebsiteTagline={customWebsiteTagline}
+                customBottomCallout={customBottomCallout}
+                customOwnerCallout={customOwnerCallout}
               />
             </div>
           </div>
@@ -1095,7 +1747,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           </span>
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>अल्ट्रा-HD 2x सुपर शार्प एक्सपोर्ट</span>
+            <span>टारगेट साइज़: {downloadSizeTarget === 'under_500kb' ? '< 500 KB' : downloadSizeTarget === 'under_1mb' ? '< 1 MB' : 'PNG'}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />

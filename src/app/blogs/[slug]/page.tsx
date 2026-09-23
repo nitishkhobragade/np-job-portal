@@ -180,35 +180,109 @@ export default function BlogDetailPage() {
               {/* Main Rich Content */}
               <div className="prose max-w-none text-slate-800 text-sm sm:text-base leading-relaxed space-y-4 my-6">
                 {(blog.content || '').split('\n\n').map((para, idx) => {
+                  const formatInline = (text: string) => {
+                    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+                    return parts.map((part, i) => {
+                      if (part.startsWith('**') && part.endsWith('**')) {
+                        return (
+                          <strong key={i} className="font-extrabold text-slate-900">
+                            {part.slice(2, -2)}
+                          </strong>
+                        );
+                      }
+                      return part;
+                    });
+                  };
+
                   const renderedElement = (() => {
+                    // Headings
                     if (para.startsWith('## ')) {
                       return (
                         <h2 key={idx} className="text-xl sm:text-2xl font-black text-slate-900 pt-5 pb-1.5 border-b-2 border-red-200">
-                          {para.replace('## ', '')}
+                          {formatInline(para.replace('## ', ''))}
                         </h2>
                       );
                     }
                     if (para.startsWith('### ')) {
                       return (
                         <h3 key={idx} className="text-lg sm:text-xl font-bold text-slate-900 pt-4">
-                          {para.replace('### ', '')}
+                          {formatInline(para.replace('### ', ''))}
                         </h3>
                       );
                     }
+
+                    // Tables
+                    if (para.trim().startsWith('|') && para.includes('\n|')) {
+                      const rows = para.trim().split('\n').filter(r => r.trim().startsWith('|'));
+                      if (rows.length >= 2) {
+                        const headerCols = rows[0].split('|').map(c => c.trim()).filter(Boolean);
+                        const dataRows = rows.slice(rows[1].includes('---') ? 2 : 1);
+                        return (
+                          <div key={idx} className="overflow-x-auto my-5 rounded-xl border border-slate-200 shadow-xs">
+                            <table className="w-full text-xs sm:text-sm text-left border-collapse">
+                              <thead className="bg-slate-100 text-slate-900 font-bold border-b border-slate-200">
+                                <tr>
+                                  {headerCols.map((col, cIdx) => (
+                                    <th key={cIdx} className="p-3 border-r border-slate-200 last:border-r-0 whitespace-nowrap">
+                                      {formatInline(col)}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200">
+                                {dataRows.map((r, rIdx) => {
+                                  const cells = r.split('|').map(c => c.trim()).filter(Boolean);
+                                  return (
+                                    <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                                      {cells.map((cell, cellIdx) => (
+                                        <td key={cellIdx} className="p-3 border-r border-slate-200 last:border-r-0">
+                                          {formatInline(cell)}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      }
+                    }
+
+                    // Numbered List
+                    if (/^\d+\.\s/.test(para.trim())) {
+                      const items = para.split('\n').filter(Boolean);
+                      return (
+                        <ol key={idx} className="list-decimal pl-5 space-y-1.5 text-slate-700 my-3">
+                          {items.map((it, i) => (
+                            <li key={i} className="leading-relaxed">
+                              {formatInline(it.replace(/^\d+\.\s+/, ''))}
+                            </li>
+                          ))}
+                        </ol>
+                      );
+                    }
+
+                    // Bulleted List
                     if (para.startsWith('- ') || para.startsWith('* ')) {
-                      const items = para.split('\n');
+                      const items = para.split('\n').filter(Boolean);
                       return (
                         <ul key={idx} className="list-disc pl-5 space-y-1.5 text-slate-700 my-3">
                           {items.map((it, i) => (
-                            <li key={i} className="leading-relaxed">{it.replace(/^[-*]\s+/, '')}</li>
+                            <li key={i} className="leading-relaxed">
+                              {formatInline(it.replace(/^[-*]\s+/, ''))}
+                            </li>
                           ))}
                         </ul>
                       );
                     }
+
+                    // Horizontal Rule
                     if (para.startsWith('---')) {
                       return <hr key={idx} className="my-6 border-slate-200" />;
                     }
-                    return <p key={idx} className="leading-relaxed my-2">{para}</p>;
+
+                    return <p key={idx} className="leading-relaxed my-2">{formatInline(para)}</p>;
                   })();
 
                   // Embed high-conversion banner after 3rd paragraph / section
