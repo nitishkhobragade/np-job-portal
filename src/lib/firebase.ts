@@ -397,6 +397,8 @@ export async function addJob(jobData: Partial<PostRecord>): Promise<string> {
     feePortal: jobData.feePortal || '₹50/-',
     showReservationSection: jobData.showReservationSection !== undefined ? jobData.showReservationSection : !jobData.isTechJob,
     isTechJob: Boolean(jobData.isTechJob || category === 'tech-jobs'),
+    description: jobData.description || '',
+    roleOverview: jobData.roleOverview || '',
     location: jobData.location || '',
     batchEligibility: jobData.batchEligibility || '',
     companyName: jobData.companyName || '',

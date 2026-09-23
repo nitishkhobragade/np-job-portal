@@ -32,6 +32,7 @@ import { TrendingJobsWidget } from '../../../components/TrendingJobsWidget';
 import { RelatedBlogsWidget } from '../../../components/RelatedBlogsWidget';
 import { getJobBySlug } from '../../../lib/firebase';
 import { JobPostDetail } from '../../../types';
+import { getRichJobDescription } from '../../../lib/jobDescriptionHelper';
 
 interface JobPageProps {
   params: Promise<{
@@ -102,7 +103,11 @@ export default function JobDetailPage({ params }: JobPageProps) {
             applyUrl: record.links?.apply || 'https://esb.mp.gov.in',
             notificationPdfUrl: record.links?.notificationPdf || 'https://esb.mp.gov.in',
             syllabusUrl: record.links?.syllabusPdf,
-            officialWebsiteUrl: record.links?.officialSite || 'https://esb.mp.gov.in'
+            officialWebsiteUrl: record.links?.officialSite || 'https://esb.mp.gov.in',
+            description: record.description || record.content || '',
+            roleOverview: record.roleOverview || '',
+            workProfile: record.workProfile || '',
+            selectionProcessText: record.selectionProcessText || ''
           };
           setDynamicJob(synthesized);
         }
@@ -111,6 +116,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
   }, [slug, staticJob]);
 
   const job = staticJob || dynamicJob || getJobDetailBySlug('mp-police-constable-2026');
+  const richDesc = getRichJobDescription(job);
 
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -281,6 +287,62 @@ export default function JobDetailPage({ params }: JobPageProps) {
             <span><strong>पोस्ट दिनांक:</strong> {job.postDate}</span>
             <span><strong>राज्य / स्तर:</strong> {job.state}</span>
             <span><strong>श्रेणी:</strong> {job.category}</span>
+          </div>
+
+          {/* Editorial Job Overview & Description (AI Enriched) */}
+          <div className="p-5 sm:p-7 border-b-2 border-neutral-200 bg-white space-y-5">
+            <div className="flex items-center gap-2 pb-3 border-b border-neutral-100">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center font-black shrink-0">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-neutral-950">
+                  📌 यह भर्ती क्या है और चयनित होने पर क्या कार्य करना होगा?
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  अधिसूचना अनुसार संपूर्ण कार्य विवरण एवं आवश्यक प्राथमिक दस्तावेज
+                </p>
+              </div>
+            </div>
+
+            {/* Description Body */}
+            <div className="text-sm text-neutral-700 leading-relaxed space-y-3 font-normal">
+              {richDesc.aboutParagraphs.map((para, i) => (
+                <p key={i} className="text-justify sm:text-left">
+                  {para}
+                </p>
+              ))}
+            </div>
+
+            {/* Work Profile Box */}
+            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-wider">
+                <Briefcase className="w-4 h-4 text-amber-700" />
+                <span>कार्य प्रोफाइल एवं जिम्मेदारियां (Role Responsibilities):</span>
+              </div>
+              <p className="text-xs sm:text-sm text-neutral-800 leading-relaxed font-medium">
+                {richDesc.workProfile}
+              </p>
+            </div>
+
+            {/* Essential Documents Checklist for Applying */}
+            <div className="pt-2">
+              <h4 className="text-xs font-black text-neutral-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <FileCheck2 className="w-4 h-4 text-emerald-600" />
+                <span>ऑनलाइन फॉर्म हेतु आवश्यक बेसिक दस्तावेज (Must-have Documents):</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {richDesc.basicDocuments.map((doc, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2 p-2.5 rounded-lg bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-800 font-medium"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{doc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* OFFICIAL 2-COLUMN TABLE: IMPORTANT DATES & APPLICATION FEE */}
@@ -675,7 +737,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
             </div>
           </div>
 
-          <PosterStudio job={job} />
+          <PosterStudio job={job} variant="publicShowcase" />
         </section>
 
         {/* Bottom Back Button & Share */}

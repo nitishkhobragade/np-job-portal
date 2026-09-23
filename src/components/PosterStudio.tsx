@@ -40,6 +40,7 @@ interface PosterStudioProps {
   isModal?: boolean;
   initialEditableMode?: boolean;
   isAdmin?: boolean;
+  variant?: 'admin' | 'publicShowcase';
   onJobUpdated?: (updated: PostRecord) => void;
 }
 
@@ -53,6 +54,7 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   isModal = false,
   initialEditableMode = false,
   isAdmin,
+  variant = 'admin',
   onJobUpdated
 }) => {
   const posterRef = useRef<HTMLDivElement>(null);
@@ -593,11 +595,107 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
   return (
     <div
-      className={`w-full bg-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-2xl text-white ${
-        isModal ? 'max-w-6xl mx-auto' : ''
+      className={`w-full text-white transition-all ${
+        variant === 'publicShowcase'
+          ? 'bg-slate-950 border border-slate-800 rounded-2xl p-2.5 sm:p-3.5 shadow-xl'
+          : `bg-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-2xl ${
+              isModal ? 'max-w-6xl mx-auto' : ''
+            }`
       }`}
     >
-      {/* 0. ACTIVE EDITING PERSISTENCE BANNER */}
+      {/* PUBLIC SHOWCASE TOP BAR */}
+      {variant === 'publicShowcase' ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 mb-2.5 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-400 text-slate-950 flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+              NP
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-xs sm:text-sm text-white">
+                  📢 आधिकारिक सोशल मीडिया विज्ञापन पोस्टर
+                </span>
+                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  HD
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                WhatsApp स्टेटस व ग्रुप्स पर शेयर करें • अधिकृत NP Job Portal
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Aspect Ratio Switcher */}
+            <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => handleAspectRatioChange('feed')}
+                className={`px-2 py-1 rounded transition-all cursor-pointer ${
+                  aspectRatio === 'feed'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🖼️ 4:5 Feed
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAspectRatioChange('story')}
+                className={`px-2 py-1 rounded transition-all cursor-pointer ${
+                  aspectRatio === 'story'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                📱 9:16 Story
+              </button>
+            </div>
+
+            {/* Copy Text */}
+            <button
+              onClick={handleCopyText}
+              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+              title="व्हाट्सएप पोस्ट टेक्स्ट कॉपी करें"
+            >
+              {copiedText ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-300">कॉपी हुआ!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-300" />
+                  <span>टेक्स्ट कॉपी</span>
+                </>
+              )}
+            </button>
+
+            {/* 1-Click WhatsApp Share */}
+            <a
+              href={directWhatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition-all flex items-center gap-1 shadow-xs active:scale-95"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>1-क्लिक शेयर</span>
+            </a>
+
+            {/* Direct Download */}
+            <button
+              onClick={handleDownloadPoster}
+              disabled={isDownloading}
+              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-xs font-black transition-all flex items-center gap-1 shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isDownloading ? 'तैयार...' : 'डाउनलोड (HD)'}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 0. ACTIVE EDITING PERSISTENCE BANNER */}
       <div className="bg-gradient-to-r from-amber-950/90 via-slate-900 to-slate-950 border border-amber-500/50 rounded-xl p-3.5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shrink-0">
@@ -796,6 +894,8 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* Download Result Banner */}
       {downloadSuccessMsg && (
@@ -1700,19 +1800,21 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       )}
 
       {/* 3. MAIN STUDIO VIEWPORT */}
-      <div className="mt-5 flex flex-col items-center">
+      <div className={variant === 'publicShowcase' ? 'mt-1 flex flex-col items-center' : 'mt-5 flex flex-col items-center'}>
         {/* Instruction Helper Banner */}
-        <div className="w-full max-w-xl bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2 mb-4 flex items-center justify-between text-xs text-slate-300">
-          <span className="flex items-center gap-2">
-            <Eye className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>
-              यह पोस्टर {targetWidth}×{targetHeight} पिक्सल ({aspectRatio === 'feed' ? '4:5 Social Feed' : '9:16 WhatsApp Story'}) में रेंडर हो रहा है।
+        {variant !== 'publicShowcase' && (
+          <div className="w-full max-w-xl bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2 mb-4 flex items-center justify-between text-xs text-slate-300">
+            <span className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                यह पोस्टर {targetWidth}×{targetHeight} पिक्सल ({aspectRatio === 'feed' ? '4:5 Social Feed' : '9:16 WhatsApp Story'}) में रेंडर हो रहा है।
+              </span>
             </span>
-          </span>
-          <span className="text-amber-400 font-semibold flex items-center gap-1">
-            <Check className="w-3.5 h-3.5" /> 100% स्पष्ट एवं पठनीय
-          </span>
-        </div>
+            <span className="text-amber-400 font-semibold flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" /> 100% स्पष्ट एवं पठनीय
+            </span>
+          </div>
+        )}
 
         {/* Scrollable / Scaled Preview Container */}
         <div ref={previewContainerRef} className="w-full max-w-full py-2 flex flex-col items-center justify-center overflow-x-auto overflow-y-hidden">
@@ -1780,21 +1882,27 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
           </div>
         </div>
 
-        {/* Bottom Feature Badges */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{aspectRatio === 'feed' ? '4:5 इंस्टाग्राम व व्हाट्सएप पोस्ट' : '9:16 व्हाट्सएप स्टेटस व स्टोरी'}</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>टारगेट साइज़: {downloadSizeTarget === 'under_500kb' ? '< 500 KB' : downloadSizeTarget === 'under_1mb' ? '< 1 MB' : 'PNG'}</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>डायनेमिक व्हाट्सएप चैनल QR कोड सहित</span>
-          </span>
-        </div>
+        {/* Bottom Feature Badges or Public Showcase Caption */}
+        {variant === 'publicShowcase' ? (
+          <p className="mt-2 text-center text-[11px] text-slate-400 font-medium">
+            ✨ इस विज्ञापन पोस्टर को अपने WhatsApp Status एवं दोस्तों के साथ शेयर करें। घर बैठे 100% सुरक्षित फॉर्म हेतु संपर्क: <strong className="text-amber-300 font-bold">{OWNER_INFO.name} ({OWNER_INFO.phone})</strong>
+          </p>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{aspectRatio === 'feed' ? '4:5 इंस्टाग्राम व व्हाट्सएप पोस्ट' : '9:16 व्हाट्सएप स्टेटस व स्टोरी'}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>टारगेट साइज़: {downloadSizeTarget === 'under_500kb' ? '< 500 KB' : downloadSizeTarget === 'under_1mb' ? '< 1 MB' : 'PNG'}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>डायनेमिक व्हाट्सएप चैनल QR कोड सहित</span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

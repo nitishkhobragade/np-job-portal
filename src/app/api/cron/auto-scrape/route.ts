@@ -170,6 +170,8 @@ Return pure valid JSON with audited facts:
   "minAge": "string (e.g. 18 वर्ष)",
   "maxAge": "string (e.g. 40 वर्ष)",
   "ageRelaxation": "string",
+  "description": "string (A rich, informative 2-3 paragraph Hindi explanation of what this recruitment is, what work selected candidates do, and why it is beneficial)",
+  "roleOverview": "string (Key duties & responsibilities in Hindi)",
   "applyUrl": "string (official URL)",
   "notificationPdfUrl": "string (official URL)"
 }`;
@@ -240,6 +242,8 @@ Do NOT use generic filler. Write in engaging Hindi-English (Hinglish/Hindi). Adh
         eligibility: auditedFacts.eligibility || auditedFacts.qualification || 'विस्तृत अधिसूचना देखें',
         lastDate: formatDateToDDMMYYYY(auditedFacts.lastDate || '15/10/2026'),
         detailsUrl: `/${year}/${month}/${blogNo}/${slug}`,
+        description: auditedFacts.description || auditedFacts.summary || '',
+        roleOverview: auditedFacts.roleOverview || '',
         content: humanizedArticle,
         publishedAt: Date.now(),
         publishedDate: formatDateToDDMMYYYY(new Date().toISOString()),

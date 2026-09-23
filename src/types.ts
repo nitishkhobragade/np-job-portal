@@ -34,6 +34,10 @@ export interface JobPostDetail {
   state: 'MP' | 'Central' | 'All India';
   category: 'Police' | 'Teaching' | 'Defense' | 'SSC/UPSC' | 'Railway' | 'Banking' | 'Health' | 'Tech/IT' | 'Other';
   qualificationSummary: string;
+  description?: string;
+  roleOverview?: string;
+  workProfile?: string;
+  selectionProcessText?: string;
   isTechJob?: boolean;
   companyName?: string;
   role?: string;
@@ -195,6 +199,10 @@ export interface PostRecord {
 
   // Additional display / backward compatibility fields
   detailsUrl?: string;
+  description?: string;
+  roleOverview?: string;
+  workProfile?: string;
+  selectionProcessText?: string;
   content?: string;
   dates?: {
     start: string;

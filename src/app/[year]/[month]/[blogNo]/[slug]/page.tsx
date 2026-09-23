@@ -19,6 +19,7 @@ import {
   Sparkles,
   ArrowLeft,
   FileCheck2,
+  FileText,
   Home,
   Check
 } from 'lucide-react';
@@ -33,6 +34,7 @@ import { RelatedBlogsWidget } from '../../../../../components/RelatedBlogsWidget
 import { getJobBySlug, getPostByParams } from '../../../../../lib/firebase';
 import { JobPostDetail } from '../../../../../types';
 import { formatDateToDDMMYYYY } from '../../../../../lib/postRouting';
+import { getRichJobDescription } from '../../../../../lib/jobDescriptionHelper';
 
 interface DynamicJobPageProps {
   params: Promise<{
@@ -50,7 +52,6 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
   const staticJob = getJobDetailBySlug(slug);
   const [dynamicJob, setDynamicJob] = useState<JobPostDetail | null>(null);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
-  const [showPosterStudio, setShowPosterStudio] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -127,7 +128,11 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
           officialWebsiteUrl: record.links?.officialSite || 'https://esb.mp.gov.in',
           serviceTagline: `घर बैठे सुरक्षित फॉर्म भरवाएं • ${OWNER_INFO.name} (${OWNER_INFO.phone})`,
           customPosterUrl: record.customPosterUrl,
-          useCustomPoster: record.useCustomPoster
+          useCustomPoster: record.useCustomPoster,
+          description: record.description || record.content || '',
+          roleOverview: record.roleOverview || '',
+          workProfile: record.workProfile || '',
+          selectionProcessText: record.selectionProcessText || ''
         };
         setDynamicJob(synthesized);
       }
@@ -152,6 +157,8 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
     lastDateFee: formatDateToDDMMYYYY(rawJob.lastDateFee || rawJob.lastDate),
     examDate: formatDateToDDMMYYYY(rawJob.examDate),
   };
+
+  const richDesc = getRichJobDescription(job);
 
   const handleSharePage = async () => {
     try {
@@ -327,22 +334,22 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
               <span>ऑफिशियल नोटिफिकेशन PDF</span>
             </a>
 
-            <button
-              onClick={() => setShowPosterStudio(!showPosterStudio)}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl shadow-xs transition-all text-sm active:scale-98 cursor-pointer"
+            <a
+              href={whatsappInquiryUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs transition-all text-sm active:scale-98"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>{showPosterStudio ? 'पोस्टर स्टूडियो बंद करें' : 'WhatsApp पोस्टर बनाएं (HD)'}</span>
-            </button>
+              <MessageCircle className="w-4 h-4 fill-white" />
+              <span>घर बैठे फॉर्म भरवाएं (WhatsApp)</span>
+            </a>
           </div>
         </div>
 
-        {/* Poster Studio Drawer/Container if Toggled */}
-        {showPosterStudio && (
-          <div className="mb-8 scroll-mt-20">
-            <PosterStudio job={job} onClose={() => setShowPosterStudio(false)} />
-          </div>
-        )}
+        {/* Official Social Media Advertisement Poster (Always Open & Scaled, Zero Toggle) */}
+        <div className="mb-8 scroll-mt-20">
+          <PosterStudio job={job} variant="publicShowcase" />
+        </div>
 
         {/* Nitish Khobragade Service Card */}
         <div className="bg-linear-to-r from-emerald-900 via-emerald-800 to-teal-900 rounded-2xl p-6 sm:p-7 text-white shadow-lg mb-8 border border-emerald-700/50">
@@ -388,6 +395,85 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 mb-8">
           {/* Left Column (2 Cols Wide) */}
           <div className="lg:col-span-2 space-y-6">
+            {/* 0. Editorial Job Overview & Description (AI Enriched) */}
+            <div className="bg-white rounded-xl border border-neutral-200 p-5 sm:p-7 shadow-xs space-y-5">
+              <div className="flex items-center gap-2 pb-3 border-b border-neutral-100">
+                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center font-black shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black text-neutral-950">
+                    📌 यह भर्ती क्या है और चयनित होने पर क्या कार्य करना होगा?
+                  </h2>
+                  <p className="text-xs text-neutral-500">
+                    अधिसूचना अनुसार संपूर्ण कार्य विवरण एवं आवश्यक प्राथमिक दस्तावेज
+                  </p>
+                </div>
+              </div>
+
+              {/* Description Body */}
+              <div className="text-sm text-neutral-700 leading-relaxed space-y-3 font-normal">
+                {richDesc.aboutParagraphs.map((para, i) => (
+                  <p key={i} className="text-justify sm:text-left">
+                    {para}
+                  </p>
+                ))}
+              </div>
+
+              {/* Work Profile Box */}
+              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-wider">
+                  <Briefcase className="w-4 h-4 text-amber-700" />
+                  <span>कार्य प्रोफाइल एवं जिम्मेदारियां (Role Responsibilities):</span>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-800 leading-relaxed font-medium">
+                  {richDesc.workProfile}
+                </p>
+              </div>
+
+              {/* Essential Documents Checklist for Applying */}
+              <div className="pt-2">
+                <h4 className="text-xs font-black text-neutral-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <FileCheck2 className="w-4 h-4 text-emerald-600" />
+                  <span>ऑनलाइन फॉर्म हेतु आवश्यक बेसिक दस्तावेज (Must-have Documents):</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {richDesc.basicDocuments.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2 p-2.5 rounded-lg bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-800 font-medium"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selection Process Overview */}
+              {richDesc.selectionStages.length > 0 && (
+                <div className="pt-1">
+                  <h4 className="text-xs font-black text-neutral-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <GraduationCap className="w-4 h-4 text-indigo-600" />
+                    <span>चयन प्रक्रिया के प्रमुख चरण (Selection Stages):</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {richDesc.selectionStages.map((stage, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-950 font-bold text-xs rounded-full flex items-center gap-1.5"
+                      >
+                        <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                          {idx + 1}
+                        </span>
+                        <span>{stage}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 1. Important Dates Card */}
             <div className="bg-white rounded-xl border border-neutral-200 p-5 sm:p-6 shadow-xs">
               <h3 className="text-lg font-black text-neutral-900 mb-4 flex items-center gap-2 pb-2 border-b border-neutral-100">

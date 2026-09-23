@@ -202,6 +202,9 @@ export default function AdminPage() {
   const [formMonth, setFormMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [formBlogNo, setFormBlogNo] = useState<string>('01');
   const [formSlug, setFormSlug] = useState<string>('');
+  const [formDescription, setFormDescription] = useState<string>('');
+  const [formRoleOverview, setFormRoleOverview] = useState<string>('');
+  const [isGeneratingAiDesc, setIsGeneratingAiDesc] = useState<boolean>(false);
   const [reviewedDraftId, setReviewedDraftId] = useState<string | null>(null);
 
   // Custom Poster Engine state for Post form
@@ -601,6 +604,8 @@ export default function AdminPage() {
       showReservationSection: formShowReservation,
       eligibility: formEligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
       qualification: formEligibility || '10वीं / 12वीं अथवा स्नातक उत्तीर्ण',
+      description: formDescription,
+      roleOverview: formRoleOverview,
       links: {
         apply: formApplyLink || 'https://esb.mp.gov.in',
         notificationPdf: formPdfLink || 'https://esb.mp.gov.in',
@@ -691,6 +696,8 @@ export default function AdminPage() {
     setFormExperience('');
     setFormLocation('');
     setFormBatchEligibility('');
+    setFormDescription('');
+    setFormRoleOverview('');
     setFormUseCustomPoster(false);
     setFormCustomPosterUrl('');
     setFormPosterSizeKb(null);
@@ -739,6 +746,8 @@ export default function AdminPage() {
     setFormExperience(p.experience || '');
     setFormLocation(p.location || '');
     setFormBatchEligibility(p.batchEligibility || '');
+    setFormDescription(p.description || p.content || '');
+    setFormRoleOverview(p.roleOverview || '');
     setFormUseCustomPoster(Boolean(p.useCustomPoster && p.customPosterUrl));
     setFormCustomPosterUrl(p.customPosterUrl || '');
     setFormPosterSizeKb(p.customPosterUrl ? Math.round((p.customPosterUrl.length * 3) / 4 / 1024) : null);
@@ -789,10 +798,52 @@ export default function AdminPage() {
     setFormExperience(p.experience || '');
     setFormLocation(p.location || '');
     setFormBatchEligibility(p.batchEligibility || '');
+    setFormDescription(p.description || p.content || draft.rawContent || '');
+    setFormRoleOverview(p.roleOverview || '');
     setShowAddForm(true);
     setActiveTab('posts');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast(`ड्राफ्ट समीक्षा फॉर्म में लोड किया गया: ${p.shortTitle || p.title} (क्रम संख्या: ${getNextBlogNumber(posts, curYear, curMonth)})`);
+  };
+
+  // AI Description Generator for Admin Post Form
+  const handleGenerateAiDescription = async () => {
+    if (!formTitle && !formDept) {
+      showToast('कृपया पहले पद का शीर्षक या विभाग दर्ज करें');
+      return;
+    }
+    setIsGeneratingAiDesc(true);
+    try {
+      const res = await fetch('/api/job/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formTitle,
+          dept: formDept,
+          totalPosts: formTotalPosts,
+          qualification: formEligibility,
+          category: formCategories[0],
+          state: formState
+        })
+      });
+      const result = await res.json();
+      if (result.success && result.data) {
+        if (result.data.description) {
+          setFormDescription(result.data.description);
+        }
+        if (result.data.roleOverview) {
+          setFormRoleOverview(result.data.roleOverview);
+        }
+        showToast('✨ AI द्वारा संपूर्ण जॉब विवरण एवं कार्य प्रोफाइल तैयार की गई!');
+      } else {
+        showToast(result.error || 'विवरण जनरेट करने में त्रुटि हुई');
+      }
+    } catch (err: unknown) {
+      console.error('AI Desc gen error:', err);
+      showToast('AI जनरेशन में समस्या आई');
+    } finally {
+      setIsGeneratingAiDesc(false);
+    }
   };
 
   // Instant URL Scraper & Gemini Grounding Extractor
@@ -852,6 +903,8 @@ export default function AdminPage() {
       setFormRole(job.role || job.shortTitle || '');
       setFormLocation(job.location || '');
       setFormBatchEligibility(job.batchEligibility || '');
+      setFormDescription(job.description || '');
+      setFormRoleOverview(job.roleOverview || '');
 
       setShowAddForm(true);
       setActiveTab('posts');
@@ -1842,6 +1895,57 @@ export default function AdminPage() {
                       placeholder="उदा: 10वीं हाई स्कूल उत्तीर्ण अथवा 12वीं इंटरमीडिएट। प्रासंगिक पदों हेतु तकनीकी डिप्लोमा आवश्यक।"
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
                     />
+                  </div>
+
+                  {/* Job Description & Editorial Role Profile Block */}
+                  <div className="bg-slate-950/90 border-2 border-amber-500/40 rounded-xl p-4 space-y-3 shadow-inner">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                      <div>
+                        <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                          <FileText className="w-4 h-4 text-amber-400" />
+                          <span>भर्ती का विस्तृत परिचय एवं कार्य प्रोफाइल (AI-Optimized Editorial Description)</span>
+                        </span>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          यह पोस्ट में विस्तृत पैराग्राफ, पद की जानकारी व जरूरी दस्तावेजों के रूप में लाइव दिखेगा
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleGenerateAiDescription}
+                        disabled={isGeneratingAiDesc}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black rounded-lg text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{isGeneratingAiDesc ? 'AI लिख रहा है...' : '✨ AI से संपूर्ण विवरण लिखें'}</span>
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold text-[11px] mb-1">
+                        भर्ती का विस्तृत विवरण (About Job & Work Profile):
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        placeholder="उदा: यह भर्ती क्या है? विभाग का परिचय, चयनित उम्मीदवार के कार्य, क्यों महत्वपूर्ण है..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white text-xs leading-relaxed focus:outline-hidden focus:border-amber-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold text-[11px] mb-1">
+                        कार्यक्षेत्र एवं जिम्मेदारियां (Role Overview / Responsibilities):
+                      </label>
+                      <input
+                        type="text"
+                        value={formRoleOverview}
+                        onChange={(e) => setFormRoleOverview(e.target.value)}
+                        placeholder="उदा: ट्रेड प्रैक्टिकल व थ्योरी प्रशिक्षण, वर्कशॉप मेंटेनेंस व NCVT प्रमाणन कार्य"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-hidden focus:border-amber-400"
+                      />
+                    </div>
                   </div>
 
                   {/* Tech Job Specific Fields */}
