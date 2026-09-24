@@ -120,7 +120,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
   // Dynamic responsive scale to ensure 1080x1350 poster scales down smoothly without cutting edges on small viewports
   const maxSafeScale = containerWidth > 32 ? (containerWidth - 16) / targetWidth : 0.32;
   const responsiveScale = containerWidth > 0 ? Math.min(zoomLevel, maxSafeScale) : Math.min(zoomLevel, 0.35);
-  const isScaledForMobile = containerWidth > 0 && maxSafeScale < zoomLevel;
   const previewRenderWidth = Math.round(targetWidth * responsiveScale);
   const previewRenderHeight = Math.round(targetHeight * responsiveScale);
 
@@ -1847,13 +1846,6 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
         {/* Scrollable / Scaled Preview Container */}
         <div ref={previewContainerRef} className="w-full max-w-full py-2 flex flex-col items-center justify-center overflow-x-auto overflow-y-hidden">
-          {isScaledForMobile && (
-            <div className="mb-2.5 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-[11px] font-bold text-amber-300 shadow-xs">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>मोबाइल स्क्रीन अनुकूलित (किनारे नहीं कटेंगे • 100% दृश्यमान)</span>
-            </div>
-          )}
-
           <div
             style={{
               width: `${previewRenderWidth}px`,

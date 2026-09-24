@@ -437,19 +437,19 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
 
           {/* 2. BRIGHT YELLOW MEGA-PILL */}
           <div
-            className={`w-full ${themeStyles.megaPillBg} border-4 border-amber-300/80 rounded-2xl sm:rounded-3xl shadow-xl px-7 py-3 sm:py-4 flex items-center justify-between gap-4`}
+            className={`w-full ${themeStyles.megaPillBg} border-4 border-amber-300/80 rounded-2xl sm:rounded-3xl shadow-xl ${isFeed ? 'px-5 py-2.5 sm:py-3' : 'px-7 py-3 sm:py-4'} flex items-center justify-between gap-4`}
           >
             <div className="flex items-baseline gap-2.5">
-              <span className={`text-6xl sm:text-7xl font-black ${themeStyles.megaPillRed} tracking-tight drop-shadow-md`}>
+              <span className={`${isFeed ? 'text-5xl sm:text-6xl' : 'text-6xl sm:text-7xl'} font-black ${themeStyles.megaPillRed} tracking-tight drop-shadow-md`}>
                 {totalPosts}
               </span>
-              <span className="text-3xl sm:text-4xl font-black text-slate-950">
+              <span className={`${isFeed ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'} font-black text-slate-950`}>
                 पद
               </span>
             </div>
 
             <div className="text-right">
-              <span className="block text-3xl sm:text-4xl font-black text-slate-950 leading-tight drop-shadow-xs">
+              <span className={`block ${isFeed ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'} font-black text-slate-950 leading-tight drop-shadow-xs`}>
                 {roleSubtitle}
               </span>
               <span className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wide">
@@ -665,32 +665,32 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
         </div>
 
         {/* BOTTOM SECTION: BRANDING BAR + WHATSAPP QR CODE + SLOGAN */}
-        <div className="relative z-10 pt-2 border-t-2 border-slate-200">
-          <div className="flex items-center gap-4">
+        <div className="relative z-10 shrink-0 pt-2 border-t-2 border-slate-200 mt-auto">
+          <div className="flex items-center gap-3 sm:gap-4">
             {/* Left Branding Strip */}
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 min-w-0 flex flex-col justify-between gap-1.5 sm:gap-2">
               <div
-                className={`w-full ${themeStyles.brandingBar} py-3.5 px-6 rounded-2xl shadow-lg border-2 text-center`}
+                className={`w-full ${themeStyles.brandingBar} ${isFeed ? 'py-2 px-4' : 'py-3.5 px-6'} rounded-xl sm:rounded-2xl shadow-lg border-2 text-center overflow-hidden`}
               >
-                <p className="text-3xl sm:text-4xl font-black tracking-widest uppercase drop-shadow-xs">
+                <p className={`${isFeed ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'} font-black tracking-widest uppercase drop-shadow-xs truncate`}>
                   {customWebsiteUrl || 'WWW.NPJOBPORTAL.COM'}
                 </p>
-                <p className="text-sm sm:text-base font-bold opacity-95 mt-0.5">
+                <p className={`${isFeed ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold opacity-95 mt-0.5 truncate`}>
                   {customWebsiteTagline || 'घर बैठे सुरक्षित ऑनलाइन फॉर्म भरवाएं • विश्वसनीय सेवा केंद्र'}
                 </p>
               </div>
 
               {/* Slogan & Operator Note */}
-              <div className="flex items-center justify-between px-2 text-slate-900">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">⚡</span>
-                  <span className="text-xl sm:text-2xl font-black text-slate-950">
+              <div className="flex items-center justify-between gap-2 px-1 text-slate-900">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="text-lg shrink-0">⚡</span>
+                  <span className={`${isFeed ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'} font-black text-slate-950 truncate`}>
                     {customBottomCallout || `${shortTitle} शुरू - जल्दी आवेदन करें!`}
                   </span>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-sm sm:text-base font-black text-blue-900 block">
+                <div className="text-right shrink-0">
+                  <span className={`${isFeed ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-black text-blue-950 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg block whitespace-nowrap shadow-2xs`}>
                     {customOwnerCallout || `संचालक: ${OWNER_INFO.name} (${OWNER_INFO.phone})`}
                   </span>
                 </div>
@@ -699,8 +699,8 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
 
             {/* Direct WhatsApp Channel QR Code Card */}
             {showQrCode && (
-              <div className="bg-white border-2 border-slate-300 rounded-2xl p-2.5 shadow-md flex flex-col items-center justify-center shrink-0 w-36 sm:w-40 text-center">
-                <span className="text-xs font-black text-emerald-700 uppercase tracking-tight block mb-1">
+              <div className={`bg-white border-2 border-slate-300 rounded-xl sm:rounded-2xl ${isFeed ? 'p-2 w-28 sm:w-32' : 'p-2.5 w-36 sm:w-40'} shadow-md flex flex-col items-center justify-center shrink-0 text-center`}>
+                <span className="text-[10px] sm:text-xs font-black text-emerald-700 uppercase tracking-tight block mb-1">
                   Scan for Details
                 </span>
                 {qrDataUrl ? (
@@ -708,14 +708,14 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
                   <img
                     src={qrDataUrl}
                     alt="WhatsApp QR Code"
-                    className="w-24 h-24 sm:w-28 sm:h-28 object-contain rounded"
+                    className={`${isFeed ? 'w-20 h-20 sm:w-22 sm:h-22' : 'w-24 h-24 sm:w-28 sm:h-28'} object-contain rounded`}
                   />
                 ) : (
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 bg-slate-100 flex items-center justify-center rounded">
-                    <QrCode className="w-12 h-12 text-slate-400" />
+                  <div className={`${isFeed ? 'w-20 h-20 sm:w-22 sm:h-22' : 'w-24 h-24 sm:w-28 sm:h-28'} bg-slate-100 flex items-center justify-center rounded`}>
+                    <QrCode className="w-10 h-10 text-slate-400" />
                   </div>
                 )}
-                <span className="text-[10px] font-bold text-slate-600 mt-1 block leading-tight">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 mt-0.5 block leading-tight">
                   WhatsApp चैनल
                 </span>
               </div>

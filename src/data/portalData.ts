@@ -14,6 +14,12 @@ export const OWNER_INFO = {
 
 export const TICKER_ALERTS: TickerAlert[] = [
   {
+    id: "tick-urgent-deadlines",
+    text: "🚨 चेतावनी (Fill Forms Fast): जिन भर्तियों की अंतिम तिथि आज, कल या परसों है, तुरंत आवेदन करें! सर्वर डाउन से पहले नीतीश जी (8982324497) से भरवाएं।",
+    isBreaking: true,
+    date: "Closing Soon"
+  },
+  {
     id: "tick-1",
     text: "MP Police Constable 2026 भर्ती: 7,500 पदों हेतु ऑनलाइन आवेदन प्रारंभ - अंतिम तिथि 15 अक्टूबर",
     isBreaking: true,

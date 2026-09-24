@@ -203,6 +203,14 @@ export function formatDateToDDMMYYYY(val: string | Date | number | undefined | n
 
   if (typeof val === 'string') {
     const trimmed = val.trim();
+    // Pure 4-digit year like "2026" - NEVER convert to 01/01/2026
+    if (/^\d{4}$/.test(trimmed)) {
+      return `दिसंबर ${trimmed}`;
+    }
+    // Hindi/Devanagari text like "नवंबर 2026", "शीघ्र घोषित" - preserve as is
+    if (/[\u0900-\u097F]/.test(trimmed)) {
+      return trimmed;
+    }
     // Already in dd/mm/yyyy
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
       return trimmed;
@@ -216,13 +224,19 @@ export function formatDateToDDMMYYYY(val: string | Date | number | undefined | n
     if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
       return trimmed.replace(/-/g, '/');
     }
-    // Try parsing as timestamp / ISO string
-    const parsed = new Date(trimmed);
-    if (!isNaN(parsed.getTime())) {
-      const d = String(parsed.getDate()).padStart(2, '0');
-      const m = String(parsed.getMonth() + 1).padStart(2, '0');
-      const y = parsed.getFullYear();
-      return `${d}/${m}/${y}`;
+    // Descriptive string with letters (e.g. "Notified Soon", "Tier 1: Nov 2026") - preserve
+    if (/[a-zA-Z]/.test(trimmed) && !/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      return trimmed;
+    }
+    // Try parsing as timestamp / ISO string ONLY if it has month and day
+    if (trimmed.includes('-') || trimmed.includes('/') || trimmed.includes('T')) {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        const d = String(parsed.getDate()).padStart(2, '0');
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const y = parsed.getFullYear();
+        return `${d}/${m}/${y}`;
+      }
     }
     return trimmed;
   }
@@ -234,6 +248,62 @@ export function formatDateToDDMMYYYY(val: string | Date | number | undefined | n
   const m = String(dObj.getMonth() + 1).padStart(2, '0');
   const y = dObj.getFullYear();
   return `${d}/${m}/${y}`;
+}
+
+/**
+ * Validates and sanitizes exam date against recruitment timeline.
+ * Fixes erroneous retroactive dates like 01/01/2026 for jobs announced in late 2026.
+ */
+export function sanitizeExamDate(
+  examDateVal: string | undefined | null,
+  startDateVal?: string | undefined | null,
+  lastDateVal?: string | undefined | null
+): string {
+  if (!examDateVal) return 'दिसंबर 2026 (अपेक्षित)';
+  const trimmed = String(examDateVal).trim();
+  if (
+    !trimmed ||
+    trimmed === '01/01/2026' ||
+    trimmed === '2026' ||
+    trimmed.toLowerCase() === 'notified soon'
+  ) {
+    return 'दिसंबर 2026 (अपेक्षित)';
+  }
+
+  // Preserve Hindi / Devanagari text
+  if (/[\u0900-\u097F]/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // If dd/mm/yyyy format, ensure year/month is not in the past relative to start date
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+    const [d, m, y] = trimmed.split('/').map(Number);
+    if (d === 1 && m === 1 && y === 2026) {
+      return 'दिसंबर 2026 (अपेक्षित)';
+    }
+
+    const examTime = new Date(y, m - 1, d).getTime();
+
+    if (startDateVal && /^\d{2}\/\d{2}\/\d{4}$/.test(startDateVal)) {
+      const [sd, sm, sy] = startDateVal.split('/').map(Number);
+      const startTime = new Date(sy, sm - 1, sd).getTime();
+      if (examTime < startTime) {
+        return 'दिसंबर 2026 (अपेक्षित)';
+      }
+    }
+
+    if (lastDateVal && /^\d{2}\/\d{2}\/\d{4}$/.test(lastDateVal)) {
+      const [ld, lm, ly] = lastDateVal.split('/').map(Number);
+      const lastTime = new Date(ly, lm - 1, ld).getTime();
+      if (examTime < lastTime) {
+        return 'दिसंबर 2026 (अपेक्षित)';
+      }
+    }
+
+    return trimmed;
+  }
+
+  return trimmed;
 }
 
 /**

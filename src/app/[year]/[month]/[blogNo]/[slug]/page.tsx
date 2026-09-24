@@ -34,7 +34,7 @@ import { TrendingJobsWidget } from '../../../../../components/TrendingJobsWidget
 import { RelatedBlogsWidget } from '../../../../../components/RelatedBlogsWidget';
 import { getJobBySlug, getPostByParams } from '../../../../../lib/firebase';
 import { JobPostDetail } from '../../../../../types';
-import { formatDateToDDMMYYYY } from '../../../../../lib/postRouting';
+import { formatDateToDDMMYYYY, sanitizeExamDate } from '../../../../../lib/postRouting';
 import { getRichJobDescription } from '../../../../../lib/jobDescriptionHelper';
 
 export default function UniversalJobDetailPage() {
@@ -79,7 +79,7 @@ export default function UniversalJobDetailPage() {
           lastDate: formatDateToDDMMYYYY(record.dates?.end),
           lastDateFee: formatDateToDDMMYYYY(record.dates?.end),
           correctionDate: 'अंतिम तिथि के पश्चात',
-          examDate: formatDateToDDMMYYYY(record.dates?.exam) || 'शीघ्र घोषित',
+          examDate: sanitizeExamDate(record.examDate || record.dates?.exam, record.dates?.start, record.dates?.end),
           admitCardDate: 'परीक्षा से 7 दिन पूर्व',
           feeGeneral: record.feeGeneral || record.fee?.gen || '₹500/-',
           feeReserved: record.feeReserved || record.fee?.reserved || '₹250/-',
@@ -151,7 +151,7 @@ export default function UniversalJobDetailPage() {
     startDate: formatDateToDDMMYYYY(rawJob.startDate),
     lastDate: formatDateToDDMMYYYY(rawJob.lastDate),
     lastDateFee: formatDateToDDMMYYYY(rawJob.lastDateFee || rawJob.lastDate),
-    examDate: formatDateToDDMMYYYY(rawJob.examDate),
+    examDate: sanitizeExamDate(rawJob.examDate, rawJob.startDate, rawJob.lastDate),
     vacanciesBreakdown: Array.isArray(rawJob.vacanciesBreakdown) && rawJob.vacanciesBreakdown.length > 0
       ? rawJob.vacanciesBreakdown
       : [

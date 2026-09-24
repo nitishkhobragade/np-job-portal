@@ -1,9 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
-import { X, ExternalLink, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
+import { X, ExternalLink, MessageCircle, Phone, ShieldCheck, FileText } from 'lucide-react';
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
 import { getPostUrl } from '../lib/postRouting';
+import { getDeadlineUrgency } from '../lib/deadlines';
+import { AlertTriangle, Clock } from 'lucide-react';
 
 interface DetailModalProps {
   item: JobItem | AdmitCardItem | ResultItem | null;
@@ -21,6 +23,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
   const job = isJob ? (item as JobItem) : null;
   const admit = isAdmit ? (item as AdmitCardItem) : null;
   const result = isResult ? (item as ResultItem) : null;
+
+  const jobUrgency = job ? getDeadlineUrgency(job.lastDate) : null;
 
   const whatsappMessage = `https://wa.me/918982324497?text=%E0%A4%A8%E0%A4%AE%E0%A4%B8%E0%A5%8D%E0%A4%A4%E0%A5%87%20Nitish%20Ji%2C%20%E0%A4%AE%E0%A5%81%E0%A4%9D%E0%A5%87%20*${encodeURIComponent(
     item.title
@@ -77,21 +81,47 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
                   <span className="text-xs text-neutral-500 font-medium">कुल पद (Total Posts):</span>
                   <p className="font-bold text-neutral-900 text-base">{job.totalPosts}</p>
                 </div>
-                <div className="bg-neutral-50 p-3 rounded-lg border border-neutral-200">
-                  <span className="text-xs text-neutral-500 font-medium">आवेदन की अंतिम तिथि:</span>
-                  <p className="font-bold text-red-600 text-base">{job.lastDate}</p>
+                <div className={`p-3 rounded-lg border ${
+                  jobUrgency && jobUrgency.diffDays <= 2 && jobUrgency.diffDays >= 0
+                    ? 'bg-red-50/90 border-red-300'
+                    : 'bg-neutral-50 border-neutral-200'
+                }`}>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs text-neutral-500 font-medium">आवेदन की अंतिम तिथि:</span>
+                    {jobUrgency && jobUrgency.diffDays <= 2 && jobUrgency.diffDays >= 0 && (
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse">
+                        {jobUrgency.diffDays === 0 ? '🔴 आज अंतिम अवसर' : jobUrgency.diffDays === 1 ? '🟠 कल अंतिम तिथि' : '🟡 परसों अंतिम तिथि'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-bold text-red-600 text-base flex items-center gap-1.5 mt-0.5">
+                    <Clock className="w-4 h-4 text-red-500" />
+                    <span>{job.lastDate}</span>
+                  </p>
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg flex items-center justify-between gap-3">
-                <div className="text-xs text-amber-900">
-                  <strong>नया:</strong> इस भर्ती का 1080×1350 WhatsApp पोस्टर एवं सरकारी रिजल्ट टेबल उपलब्ध है।
+              {/* Alert Warning Banner if closing today, tomorrow or day after tomorrow */}
+              {jobUrgency && jobUrgency.diffDays <= 2 && jobUrgency.diffDays >= 0 && (
+                <div className="p-3 bg-red-100/90 border border-red-300 rounded-xl flex items-start gap-2.5 text-xs text-red-950 font-bold shadow-xs animate-in fade-in">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5 animate-bounce" />
+                  <div>
+                    <span className="text-red-700 font-black">चेतावनी (Fill Form Fast):</span> इस भर्ती की अंतिम तिथि अत्यंत निकट है! अंतिम घंटों में आधिकारिक पोर्टल धीमा या बंद हो सकता है। कृपया बिना देरी किए अभी आवेदन करें या नीचे दिए बटन से नीतीश जी से भरवाएं।
+                  </div>
+                </div>
+              )}
+
+              <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="text-xs text-amber-950 font-medium">
+                  <strong className="text-red-700">★ सम्पूर्ण विज्ञप्ति:</strong> इस भर्ती का 1080×1350 WhatsApp पोस्टर, आयु गणना एवं सरकारी रिजल्ट टेबल उपलब्ध है।
                 </div>
                 <Link
                   href={getPostUrl(job)}
-                  className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-md shadow-xs transition-colors"
+                  onClick={onClose}
+                  className="shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5"
                 >
-                  पूरा पेज व पोस्टर देखें →
+                  <FileText className="w-3.5 h-3.5 text-slate-950" />
+                  <span>पूरा पेज व पोस्टर देखें →</span>
                 </Link>
               </div>
 
@@ -231,18 +261,45 @@ export const DetailModal: React.FC<DetailModalProps> = ({ item, itemType, onClos
               <li>फॉर्म सबमिट होने पर ऑनलाइन पेमेंट करें एवं ऑफिशियल पावती प्राप्त करें।</li>
             </ol>
           </div>
+
+          {/* LARGE PROMINENT FULL PAGE & POSTER BUTTON (ABOVE WHATSAPP ACTIONS) */}
+          {isJob && job && (
+            <div className="border-t border-neutral-200 pt-3">
+              <Link
+                href={getPostUrl(job)}
+                onClick={onClose}
+                className="w-full inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-sm sm:text-base shadow-md transition-all hover:scale-[1.01]"
+              >
+                <FileText className="w-5 h-5 text-slate-950 shrink-0" />
+                <span>पूरा पेज व पोस्टर देखें (Full Page & WhatsApp Poster) →</span>
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer CTA */}
         <div className="p-4 bg-neutral-50 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <a
-            href={isJob ? (job?.applyUrl || '#') : isAdmit ? (admit?.downloadUrl || '#') : (result?.viewUrl || '#')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-xl hover:bg-neutral-100 transition-colors"
-          >
-            आधिकारिक वेबसाइट <ExternalLink className="w-3.5 h-3.5 text-neutral-500" />
-          </a>
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            <a
+              href={isJob ? (job?.applyUrl || '#') : isAdmit ? (admit?.downloadUrl || '#') : (result?.viewUrl || '#')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-xl hover:bg-neutral-100 transition-colors"
+            >
+              आधिकारिक वेबसाइट <ExternalLink className="w-3.5 h-3.5 text-neutral-500" />
+            </a>
+
+            {isJob && job && (
+              <Link
+                href={getPostUrl(job)}
+                onClick={onClose}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-black text-amber-950 bg-amber-400 hover:bg-amber-500 border border-amber-500 rounded-xl transition-colors shadow-xs"
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-950" />
+                <span>पूरा पेज व पोस्टर देखें →</span>
+              </Link>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <a

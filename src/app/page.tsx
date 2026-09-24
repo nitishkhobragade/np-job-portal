@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { TopTicker } from '../components/TopTicker';
 import { TrendingGrid } from '../components/TrendingGrid';
+import { UrgentDeadlinesSection } from '../components/UrgentDeadlinesSection';
 import { ThreeColumnLayout } from '../components/ThreeColumnLayout';
 import { AdSenseBanner } from '../components/AdSenseBanner';
 import { ProminentServiceBanner } from '../components/ProminentServiceBanner';
@@ -272,6 +273,12 @@ export default function NPJobPortalPage() {
         <TrendingGrid
           posts={rawPosts}
           onSelectCard={handleSelectTrendingCard}
+          onSelectJob={handleSelectJob}
+        />
+
+        {/* 🚨 High Urgency Deadline Alert: आज, कल या परसों समाप्त होने वाले फॉर्म (Fill Forms Fast) */}
+        <UrgentDeadlinesSection
+          posts={rawPosts.length > 0 ? rawPosts : liveJobs}
           onSelectJob={handleSelectJob}
         />
 

@@ -34,6 +34,7 @@ import { RelatedBlogsWidget } from '../../../components/RelatedBlogsWidget';
 import { getJobBySlug } from '../../../lib/firebase';
 import { JobPostDetail } from '../../../types';
 import { getRichJobDescription } from '../../../lib/jobDescriptionHelper';
+import { sanitizeExamDate } from '../../../lib/postRouting';
 
 export default function JobDetailPage() {
   const routeParams = useParams<{ slug?: string }>();
@@ -59,7 +60,7 @@ export default function JobDetailPage() {
             lastDate: record.dates?.end || 'विज्ञप्ति अनुसार',
             lastDateFee: record.dates?.end || 'विज्ञप्ति अनुसार',
             correctionDate: 'अंतिम तिथि के पश्चात',
-            examDate: record.dates?.exam || 'शीघ्र घोषित',
+            examDate: sanitizeExamDate(record.examDate || record.dates?.exam, record.dates?.start, record.dates?.end),
             admitCardDate: 'परीक्षा से 10 दिन पूर्व',
             feeGeneral: record.fee?.gen || '₹500/-',
             feeReserved: record.fee?.reserved || '₹250/-',

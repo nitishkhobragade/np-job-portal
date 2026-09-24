@@ -357,3 +357,15 @@ export interface BlogPost {
   updatedAt?: string | number;
 }
 
+export interface AdSenseConfig {
+  enabled: boolean;
+  client: string; // ca-pub-XXXXXXXXXXXXXXXX
+  slots: {
+    leaderboard?: string;
+    inFeed?: string;
+    sidebar?: string;
+  };
+  rewardedAdEnabled: boolean;
+  rewardedIntervalHours: number; // default 12 hours
+}
+

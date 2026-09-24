@@ -23,7 +23,8 @@ import {
   List,
   ListOrdered,
   Quote,
-  Code
+  Code,
+  RefreshCw
 } from 'lucide-react';
 import { BlogPost, BlogCategory } from '../../../types';
 import {
@@ -57,6 +58,9 @@ export default function AdminBlogController() {
   const [seoKeywordsInput, setSeoKeywordsInput] = useState('');
 
   // AI & Compression States
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiKeywords, setAiKeywords] = useState('');
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const [isAiOptimizing, setIsAiOptimizing] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -189,6 +193,53 @@ export default function AdminBlogController() {
       setStatusMsg({ text: msg, type: 'error' });
     } finally {
       setIsAiOptimizing(false);
+    }
+  };
+
+  // Full Auto + Humanized AI Blog Creator
+  const handleAutoGenerateBlog = async () => {
+    if (!aiPrompt.trim()) {
+      setStatusMsg({ text: 'कृपया ब्लॉग विषय, शीर्षक या कुछ कीवर्ड्स दर्ज करें', type: 'error' });
+      return;
+    }
+
+    setIsAutoGenerating(true);
+    setStatusMsg({ text: '✨ Gemini AI द्वारा ह्यूमन-ऑप्टिमाइज्ड सम्पूर्ण ब्लॉग लेख तैयार किया जा रहा है...', type: 'info' });
+
+    try {
+      const res = await fetch('/api/blog/generate-auto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          keywords: aiKeywords.trim(),
+          category
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (data.title) setTitle(data.title);
+        if (data.slug) setSlug(data.slug);
+        if (data.category) setCategory(data.category);
+        if (data.excerpt) setExcerpt(data.excerpt);
+        if (data.content) setContent(data.content);
+        if (data.bannerUrl) setBannerUrl(data.bannerUrl);
+        if (data.tags && Array.isArray(data.tags)) setTagsInput(data.tags.join(', '));
+        if (data.seoKeywords && Array.isArray(data.seoKeywords)) setSeoKeywordsInput(data.seoKeywords.join(', '));
+
+        setStatusMsg({
+          text: '✨ ब्लॉग के सभी विवरण एवं इमेज AI द्वारा सफलतापूर्वक भरे गए! अब आप नीचे इसे एडिट कर प्रकाशित कर सकते हैं।',
+          type: 'success'
+        });
+      } else {
+        throw new Error(data.error || 'AI Blog Generation failed');
+      }
+    } catch (err: unknown) {
+      const msg = (err as Error).message || 'ब्लॉग निर्माण में त्रुटि हुई';
+      setStatusMsg({ text: msg, type: 'error' });
+    } finally {
+      setIsAutoGenerating(false);
     }
   };
 
@@ -373,10 +424,79 @@ export default function AdminBlogController() {
                 <button
                   type="button"
                   onClick={() => setPreviewModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1"
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1 cursor-pointer"
                 >
                   <Eye className="w-4 h-4" /> पूर्वावलोकन (Preview)
                 </button>
+              </div>
+            </div>
+
+            {/* FULL AUTO + MANUAL CONTROLLABLE AI BLOG GENERATOR BOX */}
+            <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-yellow-500/15 border-2 border-amber-400 rounded-2xl p-4 sm:p-5 shadow-sm mb-6">
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 rounded-xl shadow-xs font-black shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-950 flex items-center gap-1.5">
+                    <span>AI Full Auto Blog Generator</span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                      Humanized Anti-AI-Detect
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-600">
+                    ब्लॉग का शीर्षक, टॉपिक या कीवर्ड्स दर्ज करें — AI द्वारा 800+ शब्दों का ह्यूमन-ऑप्टिमाइज्ड लेख, इमेज व SEO डिटेल्स स्वतः जनरेट होकर नीचे भर जाएगी। फिर आप इसे आवश्यकतानुसार एडिट कर तुरंत पब्लिश कर सकते हैं।
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-3.5">
+                <div className="md:col-span-5">
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    ब्लॉग का शीर्षक / विषय / टॉपिक्स दर्ज करें:
+                  </label>
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="उदा. MP Police Physical Test Tips 2026, Ladli Behna Yojana..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300 bg-white font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500 text-sm shadow-2xs"
+                  />
+                </div>
+
+                <div className="md:col-span-4">
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    फोकस कीवर्ड्स / टैग्स (वैकल्पिक):
+                  </label>
+                  <input
+                    type="text"
+                    value={aiKeywords}
+                    onChange={(e) => setAiKeywords(e.target.value)}
+                    placeholder="उदा. फिजिकल परीक्षा, कट ऑफ मार्क्स, 800m दौड़"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300 bg-white font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500 text-sm shadow-2xs"
+                  />
+                </div>
+
+                <div className="md:col-span-3 flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleAutoGenerateBlog}
+                    disabled={isAutoGenerating}
+                    className="w-full h-[42px] inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isAutoGenerating ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                        <span>AI तैयार कर रहा है...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-slate-950" />
+                        <span>Create with AI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

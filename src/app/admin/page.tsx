@@ -38,9 +38,12 @@ import {
   Server,
   ShieldAlert,
   Bot,
-  BookOpen
+  BookOpen,
+  DollarSign,
+  ShieldCheck
 } from 'lucide-react';
-import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket, TickerAlert } from '../../types';
+import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket, TickerAlert, AdSenseConfig } from '../../types';
+import { getAdSenseConfig, saveAdSenseConfig } from '../../lib/adsenseConfig';
 import {
   getJobs,
   addJob,
@@ -155,8 +158,11 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup'
-  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup'>('posts');
+  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup' | 'adsense'
+  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup' | 'adsense'>('posts');
+
+  // AdSense & 12-Hour Rewarded Web Ad Config
+  const [adsenseConfig, setAdsenseConfig] = useState<AdSenseConfig>(getAdSenseConfig);
 
   // Posts State
   const [posts, setPosts] = useState<PostRecord[]>([]);
@@ -1318,6 +1324,18 @@ export default function AdminPage() {
           >
             <Database className="w-4 h-4 text-emerald-400" />
             <span>डेटाबेस बैकअप एवं रीस्टोर (Full DB Backup)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('adsense')}
+            className={`px-3.5 py-2 min-h-[44px] touch-action-manipulation rounded-lg flex items-center gap-2 shrink-0 transition-all ${
+              activeTab === 'adsense'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <span>Google AdSense एवं 12-घंटे Ad कंट्रोल {adsenseConfig.enabled && '🟢'}</span>
           </button>
 
           <Link
@@ -4257,6 +4275,187 @@ export default function AdminPage() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* GOOGLE ADSENSE & 12-HOUR REWARDED AD CONTROLLER */}
+        {activeTab === 'adsense' && (
+          <div className="space-y-6">
+            <div className="bg-slate-900 border-2 border-amber-400 rounded-2xl p-6 shadow-xl text-white">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-400 text-slate-950 rounded-xl font-black shrink-0 shadow-md">
+                    <DollarSign className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-amber-400 flex items-center gap-2">
+                      <span>Google AdSense एवं 12-घंटे विज्ञापन कंट्रोल पैनल</span>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase ${adsenseConfig.enabled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                        {adsenseConfig.enabled ? '🟢 AdSense एक्टिव' : '⚪ AdSense इनएक्टिव (सुरक्षित मोड)'}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      वेबसाइट पर Google AdSense के असली विज्ञापन प्रदर्शित करें एवं 12-घंटे में 1 बार रिवार्डेड ऐड गेटवे को नियंत्रित करें।
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveAdSenseConfig(adsenseConfig);
+                    showToast('Google AdSense सेटिंग्स सफलतापूर्वक सुरक्षित की गईं!');
+                  }}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>सेटिंग्स सुरक्षित करें (Save)</span>
+                </button>
+              </div>
+
+              {/* Status Notice */}
+              <div className="mt-6 p-4 rounded-xl border border-slate-700 bg-slate-950/60 flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-300 space-y-1">
+                  <p className="font-bold text-white">
+                    {adsenseConfig.enabled
+                      ? 'वर्तमान स्थिति: Google AdSense चालू है। असली विज्ञापन स्लॉट्स लाइव हैं।'
+                      : 'वर्तमान स्थिति: AdSense अभी निष्क्रिय है। उपयोगकर्ताओं को स्वच्छ व प्रामाणिक सेवा सूचनाएं (घर बैठे फॉर्म भरवाएं) दिख रही हैं, जिससे Google एडसेंस अप्रूवल में कोई रुकावट नहीं आएगी।'}
+                  </p>
+                  <p className="text-slate-400">
+                    जैसे ही आपका AdSense अप्रूव हो जाए, बस पब्लिशर आईडी दर्ज करके नीचे दिए गए टॉगल को चालू करें।
+                  </p>
+                </div>
+              </div>
+
+              {/* Form Settings */}
+              <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Column 1: Core AdSense Controls */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    <span>AdSense मुख्य सेटिंग्स</span>
+                  </h3>
+
+                  {/* Enable AdSense Toggle */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-900 border border-slate-800 rounded-xl">
+                    <div>
+                      <p className="text-sm font-bold text-white">AdSense विज्ञापन सक्रिय करें</p>
+                      <p className="text-xs text-slate-400">चालू करने पर बैनर की जगह AdSense कोड चलेगा</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={adsenseConfig.enabled}
+                        onChange={(e) => setAdsenseConfig({ ...adsenseConfig, enabled: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                  </div>
+
+                  {/* Publisher ID */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Google AdSense पब्लिशर आईडी (Publisher ID):
+                    </label>
+                    <input
+                      type="text"
+                      value={adsenseConfig.client}
+                      onChange={(e) => setAdsenseConfig({ ...adsenseConfig, client: e.target.value.trim() })}
+                      placeholder="ca-pub-1234567890123456"
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:ring-2 focus:ring-amber-400 focus:outline-hidden"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      यह आईडी आपके AdSense अकाउंट के Account &gt; Settings में मिलती है।
+                    </p>
+                  </div>
+
+                  {/* Slot IDs */}
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        लीडरबोर्ड विज्ञापन स्लॉट आईडी (Leaderboard 728x90 Slot ID):
+                      </label>
+                      <input
+                        type="text"
+                        value={adsenseConfig.slots?.leaderboard || ''}
+                        onChange={(e) => setAdsenseConfig({
+                          ...adsenseConfig,
+                          slots: { ...adsenseConfig.slots, leaderboard: e.target.value.trim() }
+                        })}
+                        placeholder="उदा. 9876543210"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:ring-2 focus:ring-amber-400 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        इन-फ़ीड विज्ञापन स्लॉट आईडी (In-Feed Native Slot ID):
+                      </label>
+                      <input
+                        type="text"
+                        value={adsenseConfig.slots?.inFeed || ''}
+                        onChange={(e) => setAdsenseConfig({
+                          ...adsenseConfig,
+                          slots: { ...adsenseConfig.slots, inFeed: e.target.value.trim() }
+                        })}
+                        placeholder="उदा. 5432109876"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:ring-2 focus:ring-amber-400 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: 12-Hour Rewarded Ad Controller */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>12-घंटे रिवार्डेड विज्ञापन गेटवे</span>
+                  </h3>
+
+                  {/* Rewarded Ad Toggle */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-900 border border-slate-800 rounded-xl">
+                    <div>
+                      <p className="text-sm font-bold text-white">12-Hour Rewarded Web Ad लागू करें</p>
+                      <p className="text-xs text-slate-400">12 घंटे में एक बार विज्ञापन देखने पर पोर्टल अनलॉक होगा</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={adsenseConfig.rewardedAdEnabled}
+                        onChange={(e) => setAdsenseConfig({ ...adsenseConfig, rewardedAdEnabled: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-amber-300">
+                      <span>⚠️ महत्त्वपूर्ण सूचना (आपके निर्देशानुसार):</span>
+                    </p>
+                    <p>
+                      यह 12-घंटे रिवार्डेड विज्ञापन गेट केवल तभी कार्य करेगा जब <strong>AdSense सक्रिय</strong> होगा। अभी के लिए जब तक AdSense अप्रूव नहीं होता, यह यूज़र्स को कभी बाधित नहीं करेगा।
+                    </p>
+                  </div>
+
+                  {/* Step by step guide */}
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs font-bold text-slate-200">
+                      वेबसाइट को Google AdSense से कैसे लिंक करें (How to Link):
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-400">
+                      <li><span className="text-slate-200 font-semibold">Google AdSense</span> वेबसाइट पर साइन-इन करें।</li>
+                      <li><span className="text-slate-200 font-semibold">Sites</span> सेक्शन में जाकर अपनी डोमेन दर्ज करें।</li>
+                      <li>Google द्वारा दी गई पब्लिशर आईडी (<span className="font-mono text-amber-300">ca-pub-...</span>) को ऊपर दिए गए इनपुट में पेस्ट करें।</li>
+                      <li>साइट पर 10-15 ओरिजिनल ब्लॉग्स रखें (हमारे AI ब्लॉग जनरेटर से 2 मिनट में तैयार हो जाते हैं)।</li>
+                      <li>साइट अप्रूव होते ही <span className="text-emerald-400 font-bold">&quot;AdSense विज्ञापन सक्रिय करें&quot;</span> चालू कर दें। असली विज्ञापनों से रेवेन्यू बनना तुरंत शुरू हो जाएगा।</li>
+                    </ol>
+                  </div>
                 </div>
               </div>
             </div>

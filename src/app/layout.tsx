@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ChannelJoinPopup } from "../components/ChannelJoinPopup";
 import { HashPurgeHandler } from "../components/HashPurgeHandler";
+import { RewardedAdGate } from "../components/RewardedAdGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col overflow-x-hidden w-full max-w-full">
         <HashPurgeHandler />
         <ChannelJoinPopup />
+        <RewardedAdGate />
         {children}
       </body>
     </html>

@@ -134,14 +134,14 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
     publishedAt: '21/09/2026',
     totalPosts: 'State Quota Seats',
     qualification: 'NEET UG Qualified',
-    lastDate: '05/10/2026',
+    lastDate: '24/09/2026',
     detailsUrl: '/2026/09/02/mp-ayush-ug-counselling',
     content:
       'Directorate of AYUSH Madhya Pradesh online counselling for admission into BAMS, BHMS, and BUMS government and private colleges. Complete choice filling and registration assistance.',
     state: 'MP',
     dates: {
       start: '18/09/2026',
-      end: '05/10/2026',
+      end: '24/09/2026',
       exam: 'NEET UG 2026 आधारित'
     },
     fee: {
@@ -180,14 +180,14 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
     publishedAt: '21/09/2026',
     totalPosts: '4,500',
     qualification: '10+2 Intermediate Pass',
-    lastDate: '20/10/2026',
+    lastDate: '26/09/2026',
     detailsUrl: '/2026/09/03/ssc-chsl-2026',
     content:
       'Staff Selection Commission conducts Combined Higher Secondary Level examination for Lower Division Clerk (LDC), Junior Secretariat Assistant (JSA), and Data Entry Operator (DEO).',
     state: 'Central',
     dates: {
       start: '10/09/2026',
-      end: '20/10/2026',
+      end: '26/09/2026',
       exam: 'दिसंबर 2026'
     },
     fee: {
@@ -272,14 +272,14 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
     publishedAt: '21/09/2026',
     totalPosts: '450',
     qualification: 'ITI / Polytechnic / BE / B.Tech',
-    lastDate: '12/10/2026',
+    lastDate: '25/09/2026',
     detailsUrl: '/2026/09/05/mp-iti-training-officer-to',
     content:
       'Madhya Pradesh Directorate of Skill Development recruitment for ITI Training Officers across COPA, Electrician, Fitter, Diesel Mechanic, and Welder trades.',
     state: 'MP',
     dates: {
       start: '10/09/2026',
-      end: '12/10/2026',
+      end: '25/09/2026',
       exam: 'नवंबर 2026'
     },
     fee: {

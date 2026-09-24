@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, MessageCircle, Calendar, Flame } from 'lucide-react';
+import { ArrowRight, MessageCircle, Calendar, Flame } from 'lucide-react';
 import { TRENDING_CARDS, OWNER_INFO } from '../data/portalData';
 import { TrendingCard, PostRecord, JobItem } from '../types';
 
@@ -138,10 +138,6 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard, posts 
             </p>
           </div>
         </div>
-
-        <span className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200">
-          <Sparkles className="w-3.5 h-3.5 text-amber-600" /> ऑटो-रिफ्रेशिंग लाइव
-        </span>
       </div>
 
       {/* Grid of 8 Dynamic High-Contrast Cards */}
@@ -150,6 +146,33 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard, posts 
           const whatsappPrefill = `https://wa.me/91${OWNER_INFO.phone}?text=%E0%A4%A8%E0%A4%AE%E0%A4%B8%E0%A5%8D%E0%A4%A4%E0%A5%87%20Nitish%20Ji%2C%20%E0%A4%AE%E0%A5%81%E0%A4%9D%E0%A5%87%20*${encodeURIComponent(
             card.title
           )}*%20%E0%A4%95%E0%A4%BE%20%E0%A4%AB%E0%A4%BE%E0%A4%B0%E0%A5%8D%E0%A4%AE%20%E0%A4%AD%E0%A4%B0%E0%A4%B5%E0%A4%BE%E0%A4%A8%E0%A4%BE%20%E0%A4%B9%E0%A5%88%E0%A5%A4%20%E0%A4%95%E0%A5%83%E0%A4%AA%E0%A4%AF%E0%A4%BE%20%E0%A4%9C%E0%A4%BE%E0%A4%A8%E0%A4%95%E0%A4%BE%E0%A4%B1%E0%A5%80%20%E0%A4%A6%E0%A5%87%E0%A4%82%E0%A5%A4`;
+
+          const handleOpenDetails = () => {
+            if (postOrigin && onSelectJob) {
+              onSelectJob({
+                id: postOrigin.id,
+                slug: postOrigin.slug || postOrigin.id,
+                year: postOrigin.year,
+                month: postOrigin.month,
+                blogNo: postOrigin.blogNo,
+                title: postOrigin.title,
+                department: postOrigin.dept || 'शासकीय विभाग',
+                totalPosts: String(postOrigin.totalPosts || 'विज्ञप्ति अनुसार'),
+                lastDate: postOrigin.dates?.end || postOrigin.lastDate || 'विज्ञप्ति देखें',
+                postDate: postOrigin.publishedDate || '22/09/2026',
+                publishedDate: postOrigin.publishedDate || '22/09/2026',
+                state: postOrigin.state || 'MP',
+                qualification: postOrigin.qualification || postOrigin.eligibility || 'विज्ञप्ति अनुसार',
+                fee: `सामान्य: ${postOrigin.fee?.gen || '₹500/-'} | आरक्षित: ${postOrigin.fee?.reserved || '₹250/-'}`,
+                category: postOrigin.category || 'Other',
+                isNew: true,
+                applyUrl: postOrigin.applyLink,
+                notificationUrl: postOrigin.notificationPdf
+              });
+            } else {
+              onSelectCard(card);
+            }
+          };
 
           return (
             <div
@@ -170,7 +193,11 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard, posts 
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-sm sm:text-base text-neutral-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug">
+                  <h3
+                    onClick={handleOpenDetails}
+                    className="font-bold text-sm sm:text-base text-neutral-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug cursor-pointer hover:underline"
+                    title="विवरण देखने हेतु क्लिक करें"
+                  >
                     {card.title}
                   </h3>
 
@@ -191,32 +218,7 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard, posts 
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (postOrigin && onSelectJob) {
-                          onSelectJob({
-                            id: postOrigin.id,
-                            slug: postOrigin.slug || postOrigin.id,
-                            year: postOrigin.year,
-                            month: postOrigin.month,
-                            blogNo: postOrigin.blogNo,
-                            title: postOrigin.title,
-                            department: postOrigin.dept || 'शासकीय विभाग',
-                            totalPosts: String(postOrigin.totalPosts || 'विज्ञप्ति अनुसार'),
-                            lastDate: postOrigin.dates?.end || postOrigin.lastDate || 'विज्ञप्ति देखें',
-                            postDate: postOrigin.publishedDate || '22/09/2026',
-                            publishedDate: postOrigin.publishedDate || '22/09/2026',
-                            state: postOrigin.state || 'MP',
-                            qualification: postOrigin.qualification || postOrigin.eligibility || 'विज्ञप्ति अनुसार',
-                            fee: `सामान्य: ${postOrigin.fee?.gen || '₹500/-'} | आरक्षित: ${postOrigin.fee?.reserved || '₹250/-'}`,
-                            category: postOrigin.category || 'Other',
-                            isNew: true,
-                            applyUrl: postOrigin.applyLink,
-                            notificationUrl: postOrigin.notificationPdf
-                          });
-                        } else {
-                          onSelectCard(card);
-                        }
-                      }}
+                      onClick={handleOpenDetails}
                       className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                     >
                       विवरण <ArrowRight className="w-3 h-3" />

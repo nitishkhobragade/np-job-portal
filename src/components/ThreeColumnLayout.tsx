@@ -17,6 +17,7 @@ import {
 import { JobItem, AdmitCardItem, ResultItem } from '../types';
 import { OWNER_INFO } from '../data/portalData';
 import { getPostUrl } from '../lib/postRouting';
+import { getDeadlineUrgency } from '../lib/deadlines';
 
 interface ThreeColumnLayoutProps {
   jobs: JobItem[];
@@ -227,10 +228,31 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                         प्रकाशित: {job.publishedDateFormatted || job.publishedDate || job.postDate || '22/09/2026'}
                       </span>
 
-                      <span className="inline-flex items-center gap-1 font-bold text-rose-800 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded text-[11px] shrink-0">
-                        <Calendar className="w-3 h-3 text-rose-600" />
-                        अंतिम तिथि: {job.lastDate}
-                      </span>
+                      {(() => {
+                        const urg = getDeadlineUrgency(job.lastDate);
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-[11px] shrink-0 ${
+                              urg.diffDays === 0
+                                ? 'bg-red-600 text-white animate-pulse shadow-xs font-black'
+                                : urg.diffDays === 1
+                                ? 'bg-orange-600 text-white font-black'
+                                : urg.diffDays === 2
+                                ? 'bg-amber-500 text-slate-950 font-black'
+                                : 'text-rose-800 bg-rose-50 border border-rose-200/80'
+                            }`}
+                          >
+                            <Calendar className="w-3 h-3" />
+                            {urg.diffDays === 0
+                              ? '🔴 आज अंतिम तिथि'
+                              : urg.diffDays === 1
+                              ? '🟠 कल अंतिम तिथि'
+                              : urg.diffDays === 2
+                              ? '🟡 परसों अंतिम तिथि'
+                              : `अंतिम तिथि: ${job.lastDate}`}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Fast WhatsApp Call-to-Action */}
@@ -598,8 +620,20 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                       </td>
 
                       {/* Last Date */}
-                      <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-rose-700 whitespace-nowrap">
-                        {job.lastDate}
+                      <td className="py-2.5 px-3 border-r border-slate-200 font-bold whitespace-nowrap">
+                        {(() => {
+                          const urg = getDeadlineUrgency(job.lastDate);
+                          if (urg.diffDays === 0) {
+                            return <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[11px] font-black animate-pulse">🔴 आज ({job.lastDate})</span>;
+                          }
+                          if (urg.diffDays === 1) {
+                            return <span className="px-1.5 py-0.5 rounded bg-orange-600 text-white text-[11px] font-black">🟠 कल ({job.lastDate})</span>;
+                          }
+                          if (urg.diffDays === 2) {
+                            return <span className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 text-[11px] font-black">🟡 परसों ({job.lastDate})</span>;
+                          }
+                          return <span className="text-rose-700">{job.lastDate}</span>;
+                        })()}
                       </td>
 
                       {/* Actions */}
