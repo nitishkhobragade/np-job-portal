@@ -9,6 +9,8 @@ export interface RichJobDescription {
   selectionProcess: string;
   whyApply: string;
   fullMarkdown: string;
+  aboutParagraphs: string[];
+  selectionStages: string[];
 }
 
 /**
@@ -275,6 +277,39 @@ export function getRichJobDescription(job: Partial<JobPostDetail | PostRecord>):
     ? existingDesc
     : whatIsThisJob;
 
+  const aboutParagraphs = existingDesc
+    ? existingDesc
+        .split(/\n\n+/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : [whatIsThisJob];
+
+  // Derive selection stages intelligently
+  const selectionStages: string[] = [];
+  if (isPolice) {
+    selectionStages.push('ऑनलाइन लिखित परीक्षा (CBT)', 'शारीरिक दक्षता परीक्षण (PET/PST)', 'दस्तावेज सत्यापन (DV)', 'मेडिकल परीक्षण (Medical)');
+  } else if (isCourt) {
+    selectionStages.push('प्रारंभिक लिखित परीक्षा', 'शॉर्टहैंड / टाइपिंग दक्षता परीक्षा', 'दस्तावेज सत्यापन');
+  } else if (isTech) {
+    selectionStages.push('ऑनलाइन कोडिंग व एप्टीट्यूड टेस्ट', 'तकनीकी साक्षात्कार (Technical Interview)', 'एचआर राउंड (HR)');
+  } else if (isMpOfficerTO) {
+    selectionStages.push('100 अंकों की ऑनलाइन परीक्षा (ट्रेड + सामान्य)', 'मेरिट सूची प्रकाशन', 'दस्तावेज सत्यापन');
+  } else if (isSubEng) {
+    selectionStages.push('ऑनलाइन संयुक्त परीक्षा (CBT - 200 अंक)', 'मेरिट सूची सत्यापन', 'दस्तावेज एवं पद स्थापना');
+  } else if (isPatwari) {
+    selectionStages.push('ऑनलाइन संयुक्त परीक्षा (CBT)', 'मेरिट सूची एवं जिला आवंटन', 'दस्तावेज सत्यापन');
+  } else if (isTeacher) {
+    selectionStages.push('पात्रता परीक्षा (TET)', 'चयन परीक्षा (Selection Test)', 'दस्तावेज सत्यापन एवं काउंसिलिंग');
+  } else if (isRailway) {
+    selectionStages.push('कंप्यूटर आधारित परीक्षा (CBT 1 & 2)', 'कौशल / साइको टेस्ट (यदि लागू हो)', 'दस्तावेज सत्यापन एवं मेडिकल');
+  } else if (isSsc) {
+    selectionStages.push('टियर-1 ऑनलाइन परीक्षा', 'टियर-2 मुख्य परीक्षा', 'दस्तावेज सत्यापन');
+  } else if (isBank) {
+    selectionStages.push('ऑनलाइन प्रारंभिक परीक्षा (Prelims)', 'ऑनलाइन मुख्य परीक्षा (Mains)', 'साक्षात्कार / दस्तावेज सत्यापन');
+  } else {
+    selectionStages.push('ऑनलाइन / लिखित परीक्षा (CBT)', 'दस्तावेज सत्यापन (Document Verification)', 'अंतिम चयन सूची (Final Merit)');
+  }
+
   const fullMarkdown = `
 ### 📌 यह भर्ती क्या है और इसका उद्देश्य क्या है?
 ${existingDesc || whatIsThisJob}
@@ -304,6 +339,8 @@ ${selectionProcess}
     basicDocuments,
     selectionProcess,
     whyApply,
-    fullMarkdown
+    fullMarkdown,
+    aboutParagraphs: aboutParagraphs.length > 0 ? aboutParagraphs : [whatIsThisJob],
+    selectionStages
   };
 }

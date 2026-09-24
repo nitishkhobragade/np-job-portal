@@ -71,7 +71,6 @@ import { PopupAdModal } from '../../components/PopupAdModal';
 import { SocialShareModal } from '../../components/SocialShareModal';
 import { OWNER_INFO } from '../../data/portalData';
 import {
-  getPostUrl,
   getPostRoutingMeta,
   formatDateToDDMMYYYY,
   ddmmyyyyToInputDate,

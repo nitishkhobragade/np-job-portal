@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import {
   Briefcase,
   Calendar,
@@ -34,16 +35,9 @@ import { getJobBySlug } from '../../../lib/firebase';
 import { JobPostDetail } from '../../../types';
 import { getRichJobDescription } from '../../../lib/jobDescriptionHelper';
 
-interface JobPageProps {
-  params: Promise<{
-    slug: string;
-  }>;
-}
-
-export default function JobDetailPage({ params }: JobPageProps) {
-  // Unwrap Next.js 15+ promise params
-  const resolvedParams = use(params);
-  const slug = resolvedParams.slug;
+export default function JobDetailPage() {
+  const routeParams = useParams<{ slug?: string }>();
+  const slug = routeParams?.slug || 'mp-police-constable-2026';
   const staticJob = getJobDetailBySlug(slug);
 
   const [dynamicJob, setDynamicJob] = useState<JobPostDetail | null>(null);
@@ -307,7 +301,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
 
             {/* Description Body */}
             <div className="text-sm text-neutral-700 leading-relaxed space-y-3 font-normal">
-              {richDesc.aboutParagraphs.map((para, i) => (
+              {(richDesc?.aboutParagraphs || [richDesc?.whatIsThisJob || richDesc?.intro || '']).map((para, i) => (
                 <p key={i} className="text-justify sm:text-left">
                   {para}
                 </p>
@@ -321,7 +315,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
                 <span>कार्य प्रोफाइल एवं जिम्मेदारियां (Role Responsibilities):</span>
               </div>
               <p className="text-xs sm:text-sm text-neutral-800 leading-relaxed font-medium">
-                {richDesc.workProfile}
+                {richDesc?.workProfile}
               </p>
             </div>
 
@@ -332,7 +326,7 @@ export default function JobDetailPage({ params }: JobPageProps) {
                 <span>ऑनलाइन फॉर्म हेतु आवश्यक बेसिक दस्तावेज (Must-have Documents):</span>
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {richDesc.basicDocuments.map((doc, idx) => (
+                {(richDesc?.basicDocuments || []).map((doc, idx) => (
                   <div
                     key={idx}
                     className="flex items-start gap-2 p-2.5 rounded-lg bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-800 font-medium"

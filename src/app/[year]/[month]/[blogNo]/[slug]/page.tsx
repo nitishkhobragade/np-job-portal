@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import {
   Briefcase,
   Calendar,
@@ -36,18 +37,13 @@ import { JobPostDetail } from '../../../../../types';
 import { formatDateToDDMMYYYY } from '../../../../../lib/postRouting';
 import { getRichJobDescription } from '../../../../../lib/jobDescriptionHelper';
 
-interface DynamicJobPageProps {
-  params: Promise<{
-    year: string;
-    month: string;
-    blogNo: string;
-    slug: string;
-  }>;
-}
+export default function UniversalJobDetailPage() {
+  const routeParams = useParams<{ year?: string; month?: string; blogNo?: string; slug?: string }>();
 
-export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) {
-  const resolvedParams = use(params);
-  const { year, month, blogNo, slug } = resolvedParams;
+  const year = routeParams?.year || '2026';
+  const month = routeParams?.month || '09';
+  const blogNo = routeParams?.blogNo || '01';
+  const slug = routeParams?.slug || 'mp-sub-engineer-recruitment-2026';
 
   const staticJob = getJobDetailBySlug(slug);
   const [dynamicJob, setDynamicJob] = useState<JobPostDetail | null>(null);
@@ -156,6 +152,29 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
     lastDate: formatDateToDDMMYYYY(rawJob.lastDate),
     lastDateFee: formatDateToDDMMYYYY(rawJob.lastDateFee || rawJob.lastDate),
     examDate: formatDateToDDMMYYYY(rawJob.examDate),
+    vacanciesBreakdown: Array.isArray(rawJob.vacanciesBreakdown) && rawJob.vacanciesBreakdown.length > 0
+      ? rawJob.vacanciesBreakdown
+      : [
+          {
+            postName: rawJob.shortTitle || rawJob.title,
+            total: String(rawJob.totalPosts || 'विज्ञप्ति अनुसार'),
+            eligibility: rawJob.qualificationSummary || 'विस्तृत पात्रता हेतु नोटिफिकेशन देखें'
+          }
+        ],
+    categoryWisePosts: Array.isArray(rawJob.categoryWisePosts) ? rawJob.categoryWisePosts : [],
+    requiredDocuments: Array.isArray(rawJob.requiredDocuments) && rawJob.requiredDocuments.length > 0
+      ? rawJob.requiredDocuments
+      : [
+          'आधार कार्ड (सक्रिय मोबाइल नंबर लिंक)',
+          '10वीं/12वीं अंकसूची',
+          'जाति व मूल निवासी प्रमाण पत्र',
+          'पासपोर्ट साइज फोटो एवं हस्ताक्षर'
+        ],
+    howToApplySteps: Array.isArray(rawJob.howToApplySteps) ? rawJob.howToApplySteps : [],
+    importantLinks: Array.isArray(rawJob.importantLinks) ? rawJob.importantLinks : [],
+    applyUrl: rawJob.applyUrl || 'https://esb.mp.gov.in',
+    notificationPdfUrl: rawJob.notificationPdfUrl || 'https://esb.mp.gov.in',
+    officialWebsiteUrl: rawJob.officialWebsiteUrl || 'https://esb.mp.gov.in'
   };
 
   const richDesc = getRichJobDescription(job);
@@ -413,7 +432,7 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
 
               {/* Description Body */}
               <div className="text-sm text-neutral-700 leading-relaxed space-y-3 font-normal">
-                {richDesc.aboutParagraphs.map((para, i) => (
+                {(richDesc?.aboutParagraphs || [richDesc?.whatIsThisJob || richDesc?.intro || '']).map((para, i) => (
                   <p key={i} className="text-justify sm:text-left">
                     {para}
                   </p>
@@ -427,7 +446,7 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
                   <span>कार्य प्रोफाइल एवं जिम्मेदारियां (Role Responsibilities):</span>
                 </div>
                 <p className="text-xs sm:text-sm text-neutral-800 leading-relaxed font-medium">
-                  {richDesc.workProfile}
+                  {richDesc?.workProfile}
                 </p>
               </div>
 
@@ -438,7 +457,7 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
                   <span>ऑनलाइन फॉर्म हेतु आवश्यक बेसिक दस्तावेज (Must-have Documents):</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {richDesc.basicDocuments.map((doc, idx) => (
+                  {(richDesc?.basicDocuments || []).map((doc, idx) => (
                     <div
                       key={idx}
                       className="flex items-start gap-2 p-2.5 rounded-lg bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-800 font-medium"
@@ -451,7 +470,7 @@ export default function UniversalJobDetailPage({ params }: DynamicJobPageProps) 
               </div>
 
               {/* Selection Process Overview */}
-              {richDesc.selectionStages.length > 0 && (
+              {Array.isArray(richDesc?.selectionStages) && richDesc.selectionStages.length > 0 && (
                 <div className="pt-1">
                   <h4 className="text-xs font-black text-neutral-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <GraduationCap className="w-4 h-4 text-indigo-600" />

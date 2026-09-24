@@ -309,6 +309,83 @@ export const DETAILED_JOBS_LIST: JobPostDetail[] = [
     notificationPdfUrl: "https://ibps.in/crp-po-mt-xiv-notification.pdf",
     officialWebsiteUrl: "https://ibps.in",
     serviceTagline: "बैंक फॉर्म एवं प्रेफरेंस लिस्ट सुरक्षित भरवाएं: Nitish Khobragade - 8982324497"
+  },
+  {
+    slug: "mp-sub-engineer-recruitment-2026",
+    id: "mp-sub-engineer-recruitment-2026",
+    year: "2026",
+    month: "09",
+    blogNo: "21",
+    title: "MPESB Group-3 Sub Engineer, Draftsman & Other Equivalent Posts Recruitment 2026",
+    shortTitle: "MP Sub Engineer 2026",
+    department: "Madhya Pradesh Employees Selection Board (MPESB Bhopal)",
+    advtNo: "ESB/PR/2026/09",
+    totalPosts: "1,280 Posts",
+    postDate: "21 September 2026",
+    startDate: "22/09/2026",
+    lastDate: "12/10/2026",
+    lastDateFee: "12/10/2026",
+    correctionDate: "17/10/2026",
+    examDate: "18 November 2026",
+    admitCardDate: "November 2nd Week 2026",
+    feeGeneral: "₹500/- (General & Other State)",
+    feeReserved: "₹250/- (SC / ST / OBC of MP Domicile)",
+    feePortal: "₹60/- (पोर्टल शुल्क)",
+    paymentMode: "Online via Debit/Credit Card, Net Banking or UPI",
+    minAge: "18 Years",
+    maxAge: "40 Years (Male/Female MP Domicile relaxation up to 45 Years)",
+    ageCalculationDate: "01/01/2026",
+    ageRelaxation: "SC/ST/OBC/Government Employees get 5 years age relaxation as per MP Govt rules.",
+    state: "MP",
+    category: "Other",
+    qualificationSummary: "3-Year Diploma in Civil / Electrical / Mechanical Engineering from recognized Board/University or B.E./B.Tech degree.",
+    vacanciesBreakdown: [
+      {
+        postName: "Sub Engineer (Civil)",
+        total: "890 Posts",
+        eligibility: "3-Year Diploma in Civil Engineering or B.E./B.Tech (Civil)."
+      },
+      {
+        postName: "Sub Engineer (Electrical)",
+        total: "240 Posts",
+        eligibility: "3-Year Diploma in Electrical Engineering or B.E./B.Tech (Electrical)."
+      },
+      {
+        postName: "Sub Engineer (Mechanical)",
+        total: "110 Posts",
+        eligibility: "3-Year Diploma in Mechanical Engineering or B.E./B.Tech (Mechanical)."
+      },
+      {
+        postName: "Draftsman / मानचित्रकार",
+        total: "40 Posts",
+        eligibility: "Diploma in Draftsmanship / ITI Draftsman (Civil/Mech)."
+      }
+    ],
+    categoryWisePosts: [
+      { category: "Sub Engineer Civil", ur: "245", obc: "240", ews: "89", sc: "142", st: "174", total: "890" },
+      { category: "Sub Engineer Electrical", ur: "65", obc: "65", ews: "24", sc: "38", st: "48", total: "240" },
+      { category: "Sub Engineer Mechanical", ur: "30", obc: "30", ews: "11", sc: "18", st: "21", total: "110" }
+    ],
+    howToApplySteps: [
+      "Step 1: Check notification PDF, ensure diploma/degree marksheet and MP Rojgar Panjiyan are ready.",
+      "Step 2: Have active Aadhar Card linked with Mobile OTP for MP Online biometric/OTP e-KYC.",
+      "Step 3: Contact Nitish Khobragade (8982324497) on WhatsApp for fast, 100% accurate submission from home.",
+      "Step 4: Verify trade selection and post preference before final submission.",
+      "Step 5: Receive government computerized acknowledgment slip directly on WhatsApp."
+    ],
+    requiredDocuments: [
+      "आधार कार्ड (मोबाइल नंबर लिंक)",
+      "10वीं बोर्ड अंकसूची (जन्मतिथि सत्यापन हेतु)",
+      "इंजीनियरिंग डिप्लोमा / डिग्री अंकसूची",
+      "मध्य प्रदेश का जीवित रोजगार पंजीयन",
+      "डिजिटल जाति प्रमाण पत्र (SC/ST/OBC)",
+      "मध्य प्रदेश मूल निवासी प्रमाण पत्र",
+      "नवीनतम पासपोर्ट फोटो एवं हस्ताक्षर"
+    ],
+    applyUrl: "https://esb.mp.gov.in",
+    notificationPdfUrl: "https://esb.mp.gov.in/rulebooks/rb_2026/sub_eng_2026.pdf",
+    officialWebsiteUrl: "https://esb.mp.gov.in",
+    serviceTagline: `घर बैठे 100% सुरक्षित फॉर्म भरने के लिए संपर्क करें: ${OWNER_INFO.name} - ${OWNER_INFO.phone}`
   }
 ];
 
@@ -332,6 +409,9 @@ export function getJobDetailBySlug(slug: string): JobPostDetail {
   return {
     slug: normalized,
     id: `job-${normalized}`,
+    year: '2026',
+    month: '09',
+    blogNo: '01',
     title: `${titleFormatted} Recruitment 2026`,
     shortTitle: titleFormatted,
     department: "Government Recruitment Board / Commission",
@@ -362,6 +442,9 @@ export function getJobDetailBySlug(slug: string): JobPostDetail {
         eligibility: "Educational Qualification matching the official notification criteria."
       }
     ],
+    categoryWisePosts: [
+      { category: "सामान्य / आरक्षित", ur: "—", obc: "—", ews: "—", sc: "—", st: "—", total: "विज्ञप्ति अनुसार" }
+    ],
     howToApplySteps: [
       "Step 1: Check the detailed eligibility conditions and guidelines.",
       "Step 2: Collect essential documents including photo, signature, ID proof, and academic records.",
@@ -376,6 +459,7 @@ export function getJobDetailBySlug(slug: string): JobPostDetail {
       "पासपोर्ट साइज फोटो एवं हस्ताक्षर (Photo & Signature)",
       "सक्रिय मोबाइल नंबर एवं ईमेल आईडी"
     ],
+    importantLinks: [],
     applyUrl: "https://mponline.gov.in",
     notificationPdfUrl: "https://mponline.gov.in",
     officialWebsiteUrl: "https://mponline.gov.in",
