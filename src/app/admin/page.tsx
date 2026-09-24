@@ -72,6 +72,9 @@ import { seedPostsIfEmpty } from '../../lib/seedDatabase';
 import { PosterStudio } from '../../components/PosterStudio';
 import { PopupAdModal } from '../../components/PopupAdModal';
 import { SocialShareModal } from '../../components/SocialShareModal';
+import { GlobalAuditModal } from '../../components/GlobalAuditModal';
+import { SinglePostAuditModal } from '../../components/SinglePostAuditModal';
+import { PostAuditResult } from '../../lib/recruitmentIntelligence';
 import { OWNER_INFO } from '../../data/portalData';
 import {
   getPostRoutingMeta,
@@ -255,6 +258,18 @@ export default function AdminPage() {
 
   // Social Share Modal State
   const [selectedShareJob, setSelectedShareJob] = useState<PostRecord | null>(null);
+
+  // AI Quality Assurance & Fact-Checking Engine State
+  const [isGlobalAuditOpen, setIsGlobalAuditOpen] = useState<boolean>(false);
+  const [isGlobalAuditLoading, setIsGlobalAuditLoading] = useState<boolean>(false);
+  const [globalAuditResults, setGlobalAuditResults] = useState<PostAuditResult[]>([]);
+  const [globalAuditError, setGlobalAuditError] = useState<string | null>(null);
+
+  const [isSingleAuditOpen, setIsSingleAuditOpen] = useState<boolean>(false);
+  const [isSingleAuditLoading, setIsSingleAuditLoading] = useState<boolean>(false);
+  const [singleAuditTargetJob, setSingleAuditTargetJob] = useState<PostRecord | null>(null);
+  const [singleAuditResult, setSingleAuditResult] = useState<PostAuditResult | null>(null);
+  const [singleAuditError, setSingleAuditError] = useState<string | null>(null);
 
   // Multi-Source Scraper Controller State
   const [scraperSources, setScraperSources] = useState<ScraperSource[]>([]);
@@ -1038,6 +1053,89 @@ export default function AdminPage() {
     }
   };
 
+  // AI Fact-Checking & Grounding Handlers
+  const handleRunGlobalAudit = async () => {
+    setIsGlobalAuditOpen(true);
+    setIsGlobalAuditLoading(true);
+    setGlobalAuditError(null);
+    try {
+      const res = await fetch('/api/admin/verify-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, jobs: posts })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Global audit failed');
+      }
+      setGlobalAuditResults(data.results || []);
+    } catch (err) {
+      console.error('Global audit error:', err);
+      setGlobalAuditError((err as Error).message || 'सत्यापन के दौरान त्रुटि आई। कृपया पुनः प्रयास करें।');
+    } finally {
+      setIsGlobalAuditLoading(false);
+    }
+  };
+
+  const handleRunSingleAudit = async (target: PostRecord) => {
+    setSingleAuditTargetJob(target);
+    setIsSingleAuditOpen(true);
+    setIsSingleAuditLoading(true);
+    setSingleAuditResult(null);
+    setSingleAuditError(null);
+    try {
+      const res = await fetch('/api/admin/verify-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: target.id, job: target })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Single post audit failed');
+      }
+      setSingleAuditResult(data.audit || null);
+    } catch (err) {
+      console.error('Single post audit error:', err);
+      setSingleAuditError((err as Error).message || 'सत्यापन के दौरान त्रुटि आई। कृपया पुनः प्रयास करें।');
+    } finally {
+      setIsSingleAuditLoading(false);
+    }
+  };
+
+  const handleApplyAuditFix = async (jobId: string, patch: Partial<PostRecord>): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/admin/verify-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'apply-patch', jobId, patch })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to apply patch');
+      }
+      await updateJob(jobId, patch);
+      showToast('सत्यापित सुधार सफलतापूर्वक डेटाबेस में सुरक्षित किए गए!');
+      await refreshData();
+      return true;
+    } catch (err) {
+      console.error('Error applying audit fix:', err);
+      showToast('सुधार लागू करने में विफल: ' + (err as Error).message);
+      return false;
+    }
+  };
+
+  const handleOpenInEditorFromAudit = (jobId: string) => {
+    setIsGlobalAuditOpen(false);
+    const target = posts.find((p) => p.id === jobId || p.slug === jobId);
+    if (target) {
+      startEditPost(target);
+      setActiveTab('posts');
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 300, behavior: 'smooth' });
+      }
+    }
+  };
+
   // LOGIN SCREEN (If not authenticated)
   if (!isAuthenticated) {
     return (
@@ -1215,6 +1313,17 @@ export default function AdminPage() {
               <span>पोर्टल देखें</span>
               <ExternalLink className="w-3 h-3 text-slate-400" />
             </Link>
+
+            {/* Global AI Audit Button */}
+            <button
+              onClick={handleRunGlobalAudit}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 rounded-lg text-xs font-black shadow-lg shadow-amber-500/20 border border-amber-300/80 transition-all active:scale-95 cursor-pointer relative"
+              title="रीयल-टाइम आधिकारिक सरकारी वेबसाइट्स (.gov.in / MPESB) से सभी पोस्ट्स की पुष्टि करें"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+              <span>🔍 Re-verify All Posts (AI Global Audit)</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse border border-white/50" />
+            </button>
 
             <button
               onClick={async () => {
@@ -2649,6 +2758,15 @@ export default function AdminPage() {
                                   title="पोस्टर बनाएं / एडिट करें (Generate/Edit Poster)"
                                 >
                                   <ImageIcon className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* 🤖 AI Audit / Re-verify (Single Post Row-Level) */}
+                                <button
+                                  onClick={() => handleRunSingleAudit(job)}
+                                  className="p-1.5 rounded-lg bg-cyan-950/70 hover:bg-cyan-600 text-cyan-300 hover:text-white transition-colors cursor-pointer border border-cyan-800/60"
+                                  title="🤖 AI Audit / Re-verify (इंटरनेट फैक्ट-चेकिंग एवं ऑटो-फिक्स)"
+                                >
+                                  <Bot className="w-3.5 h-3.5" />
                                 </button>
 
                                 {/* Social Multi-Share Trigger */}
@@ -4640,6 +4758,30 @@ export default function AdminPage() {
           }}
         />
       )}
+
+      {/* GLOBAL AI AUDIT MODAL */}
+      <GlobalAuditModal
+        isOpen={isGlobalAuditOpen}
+        onClose={() => setIsGlobalAuditOpen(false)}
+        isLoading={isGlobalAuditLoading}
+        auditResults={globalAuditResults}
+        onApplyFix={handleApplyAuditFix}
+        onOpenInEditor={handleOpenInEditorFromAudit}
+        onRetry={handleRunGlobalAudit}
+        errorMessage={globalAuditError}
+      />
+
+      {/* SINGLE-POST AI AUDIT MODAL */}
+      <SinglePostAuditModal
+        job={singleAuditTargetJob}
+        isOpen={isSingleAuditOpen}
+        onClose={() => setIsSingleAuditOpen(false)}
+        isLoading={isSingleAuditLoading}
+        auditResult={singleAuditResult}
+        onApplyFix={handleApplyAuditFix}
+        onRetry={() => singleAuditTargetJob && handleRunSingleAudit(singleAuditTargetJob)}
+        errorMessage={singleAuditError}
+      />
     </div>
   );
 }

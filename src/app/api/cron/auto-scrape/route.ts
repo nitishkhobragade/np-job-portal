@@ -146,9 +146,19 @@ async function handleAutoScrape(req: NextRequest) {
     try {
       // STEP 2 - DOUBLE AI CROSS-VERIFICATION & HUMANIZED RE-WRITING
       
-      // PASS 1: Fact Audit via Gemini AI
-      const factAuditPrompt = `You are a Senior Government Job Fact Verification Auditor for NP Job Portal (India).
-Audit the following job notification facts:
+      // PASS 1: Fact Audit via Gemini AI with Search Grounding
+      const currentIso = new Date().toISOString();
+      const factAuditPrompt = `You are an authoritative verification agent for government recruitment data in India (NP Job Portal).
+Current Execution Timestamp: "${currentIso}".
+
+CRITICAL TIME-AWARENESS & SEARCH GROUNDING RULES:
+1. Do NOT hardcode or assume any fixed year; analyze relative to current timestamp (${currentIso}).
+2. NEVER invent, project, or guess dates, vacancies, or download links.
+3. Accept dates, admit card links, and results ONLY if confirmed by official government portals (.gov.in, .nic.in, official exam boards) or authorized circulars.
+4. If an application or exam is announced without firm dates, mark dates as null and status flag as 'शीघ्र उपलब्ध / Announced Soon'.
+5. Direct download links must point to official servers or authentic source pages, not third-party ad sites.
+
+Target to verify on web:
 Job: "${candidate.rawTitle}"
 Dept: "${candidate.dept}"
 Notes: "${candidate.sampleDetails}"
@@ -161,8 +171,8 @@ Return pure valid JSON with audited facts:
   "totalPosts": "string (e.g. 3047 पद or विज्ञप्ति अनुसार)",
   "qualification": "string (detailed eligibility)",
   "eligibility": "string (concise eligibility summary)",
-  "lastDate": "string (dd/mm/yyyy)",
-  "startDate": "string (dd/mm/yyyy)",
+  "lastDate": "string (dd/mm/yyyy or null)",
+  "startDate": "string (dd/mm/yyyy or null)",
   "examDate": "string (dd/mm/yyyy or शीघ्र घोषित)",
   "feeGeneral": "string (e.g. ₹500/-)",
   "feeReserved": "string (e.g. ₹250/-)",
@@ -177,8 +187,11 @@ Return pure valid JSON with audited facts:
 }`;
 
       const factResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: factAuditPrompt
+        model: 'gemini-3.6-flash',
+        contents: factAuditPrompt,
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
       });
 
       const factText = factResponse.text || '';
@@ -216,7 +229,7 @@ Include the following structured sections formatted in clean Markdown with clear
 Do NOT use generic filler. Write in engaging Hindi-English (Hinglish/Hindi). Adhere strictly to Google AdSense original content and high-value journalism standards.`;
 
       const humanizeResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: humanizePrompt
       });
 

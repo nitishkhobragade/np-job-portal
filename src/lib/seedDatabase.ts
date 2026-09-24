@@ -268,38 +268,39 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
     dept: 'MP Technical Education & Skill Development Dept',
     category: 'mp-special',
     categories: ['vacancy', 'mp_special', 'teaching'],
-    status: 'published',
+    status: 'draft',
     publishedAt: '21/09/2026',
-    totalPosts: '450',
+    totalPosts: '450 (संभावित)',
     qualification: 'ITI / Polytechnic / BE / B.Tech',
-    lastDate: '25/09/2026',
+    lastDate: 'शीघ्र उपलब्ध / Announced Soon',
     detailsUrl: '/2026/09/05/mp-iti-training-officer-to',
     content:
-      'Madhya Pradesh Directorate of Skill Development recruitment for ITI Training Officers across COPA, Electrician, Fitter, Diesel Mechanic, and Welder trades.',
+      'Madhya Pradesh Directorate of Skill Development recruitment for ITI Training Officers across COPA, Electrician, Fitter, Diesel Mechanic, and Welder trades. आधिकारिक विज्ञप्ति की प्रतीक्षा है।',
     state: 'MP',
     dates: {
-      start: '10/09/2026',
-      end: '25/09/2026',
-      exam: 'नवंबर 2026'
+      start: 'शीघ्र उपलब्ध / Announced Soon',
+      end: 'शीघ्र उपलब्ध / Announced Soon',
+      exam: 'शीघ्र घोषित'
     },
+    verificationTag: 'Pending Official Release',
     fee: {
-      gen: '₹500/-',
-      reserved: '₹250/-'
+      gen: 'विज्ञप्ति अनुसार',
+      reserved: 'विज्ञप्ति अनुसार'
     },
     links: {
       apply: 'https://esb.mp.gov.in',
-      notificationPdf: 'https://esb.mp.gov.in/Rulebooks/RB_2026/ITI_TO_2026.pdf',
+      notificationPdf: 'https://esb.mp.gov.in',
       officialSite: 'https://esb.mp.gov.in'
     },
     posterConfig: {
-      headline: '★ एमपी ITI ट्रेनिंग ऑफिसर भर्ती 2026 ★',
+      headline: '★ एमपी ITI ट्रेनिंग ऑफिसर भर्ती (प्रस्तावित) ★',
       keyPoints: [
-        'कुल पद: 450 पद',
+        'कुल पद: 450 पद (प्रस्तावित)',
         'योग्यता: ITI / डिप्लोमा / डिग्री',
-        'अंतिम तिथि: 12/10/2026',
+        'अंतिम तिथि: शीघ्र उपलब्ध',
         'घर बैठे फॉर्म भरवाएं: 8982324497'
       ],
-      note: 'संपर्क करें: Nitish Khobragade (8982324497)'
+      note: 'आधिकारिक विज्ञप्ति जारी होने पर तुरंत आवेदन हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
     },
     minAge: '18 वर्ष',
     maxAge: '40 वर्ष'

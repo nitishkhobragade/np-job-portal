@@ -42,7 +42,7 @@ You must provide a structured JSON response with the following keys:
 Ensure the Hindi is clear, natural, encouraging, and authoritative. Return ONLY valid JSON.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt
     });
 
