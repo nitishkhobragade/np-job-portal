@@ -9,28 +9,143 @@ export interface PostRoutingMeta {
   month: string;
   blogNo: string;
   slug: string;
+  identifier: string; // e.g. "2026/09/21" or "2026/09/02"
+  fullPath: string;   // e.g. "/2026/09/21/mp-sub-engineer-recruitment-2026"
+  canonicalUrl: string;
+  displayId: string;  // e.g. "2026/09/21 • mp-sub-engineer-recruitment-2026"
 }
 
 // Known default mapping for core static jobs
 const DEFAULT_SLUG_META: Record<string, { year: string; month: string; blogNo: string }> = {
-  'mp-cm-rise-sandipani-school-bharti-2026': { year: '2026', month: '09', blogNo: '01' },
-  'mp-police-constable-2026': { year: '2026', month: '09', blogNo: '02' },
-  'mp-ayush-ug-counselling': { year: '2026', month: '09', blogNo: '03' },
-  'ssc-chsl-2026': { year: '2026', month: '09', blogNo: '04' },
-  'railway-rrc-group-d': { year: '2026', month: '09', blogNo: '05' },
-  'ibps-po-clerk-2026': { year: '2026', month: '09', blogNo: '06' },
-  'mp-tet-varg-3-shikshak-2026': { year: '2026', month: '09', blogNo: '07' },
-  'ssc-cgl-recruitment-2026': { year: '2026', month: '09', blogNo: '08' },
-  'railway-rrb-ntpc-recruitment-2026': { year: '2026', month: '09', blogNo: '09' },
-  'mp-patwari-bharti-2026': { year: '2026', month: '09', blogNo: '10' },
-  'upsc-civil-services-ias-2026': { year: '2026', month: '09', blogNo: '11' },
-  'tcs-ninja-digital-hiring-2026': { year: '2026', month: '09', blogNo: '12' },
-  'infosys-sp-dse-freshers-2026': { year: '2026', month: '09', blogNo: '13' },
-  'wipro-elite-national-talent-hunt-2026': { year: '2026', month: '09', blogNo: '14' },
-  'accenture-associate-software-engineer-2026': { year: '2026', month: '09', blogNo: '15' },
-  'capgemini-exceller-recruitment-2026': { year: '2026', month: '09', blogNo: '16' },
-  'google-software-engineer-early-career-2026': { year: '2026', month: '09', blogNo: '17' }
+  'mpesb-sub-engineer-draftsman-2026': { year: '2026', month: '09', blogNo: '01' },
+  'mp-sub-engineer-recruitment-2026': { year: '2026', month: '09', blogNo: '21' },
+  'mp-forest-guard-4399': { year: '2026', month: '09', blogNo: '02' },
+  'mp-forest-guard-2026': { year: '2026', month: '09', blogNo: '02' },
+  'ssc-chsl-1018': { year: '2026', month: '09', blogNo: '03' },
+  'rrb-ntpc-ug-8663': { year: '2026', month: '09', blogNo: '04' },
+  'mp-cm-rise-sandipani-school-bharti-2026': { year: '2026', month: '09', blogNo: '05' },
+  'mp-police-constable-2026': { year: '2026', month: '09', blogNo: '06' },
+  'mp-ayush-ug-counselling': { year: '2026', month: '09', blogNo: '07' },
+  'ssc-chsl-2026': { year: '2026', month: '09', blogNo: '08' },
+  'railway-rrc-group-d': { year: '2026', month: '09', blogNo: '09' },
+  'ibps-po-clerk-2026': { year: '2026', month: '09', blogNo: '10' },
+  'mp-tet-varg-3-shikshak-2026': { year: '2026', month: '09', blogNo: '11' },
+  'ssc-cgl-recruitment-2026': { year: '2026', month: '09', blogNo: '12' },
+  'railway-rrb-ntpc-recruitment-2026': { year: '2026', month: '09', blogNo: '13' },
+  'mp-patwari-bharti-2026': { year: '2026', month: '09', blogNo: '14' },
+  'upsc-civil-services-ias-2026': { year: '2026', month: '09', blogNo: '15' },
+  'tcs-ninja-digital-hiring-2026': { year: '2026', month: '09', blogNo: '16' },
+  'infosys-sp-dse-freshers-2026': { year: '2026', month: '09', blogNo: '17' },
+  'wipro-elite-national-talent-hunt-2026': { year: '2026', month: '09', blogNo: '18' },
+  'accenture-associate-software-engineer-2026': { year: '2026', month: '09', blogNo: '19' },
+  'capgemini-exceller-recruitment-2026': { year: '2026', month: '09', blogNo: '20' },
+  'google-software-engineer-early-career-2026': { year: '2026', month: '09', blogNo: '22' }
 };
+
+/**
+ * Universal Post Routing Resolver
+ * Resolves year, month, blogNo, slug, unique identifier, and canonical URL
+ */
+export function getPostRoutingMeta(item: {
+  year?: string;
+  month?: string;
+  blogNo?: string;
+  slug?: string;
+  id?: string;
+  detailsUrl?: string;
+  publishedDate?: string;
+  publishedAt?: string | number;
+  dates?: { start?: string; end?: string; exam?: string };
+}): PostRoutingMeta {
+  const now = new Date();
+  const currentYear = String(now.getFullYear());
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+  let parsedYear = item.year || '';
+  let parsedMonth = item.month || '';
+  let parsedBlogNo = item.blogNo || '';
+  let parsedSlug = item.slug || (item.id && !item.id.startsWith('http') ? item.id : '');
+
+  // 1. Parse detailsUrl if available (e.g. /2026/09/21/mp-sub-engineer-recruitment-2026)
+  if (item.detailsUrl && typeof item.detailsUrl === 'string') {
+    const cleanUrl = item.detailsUrl.replace(/^https?:\/\/[^/]+/, '');
+    const segments = cleanUrl.split('/').filter(Boolean);
+    if (segments.length >= 4 && /^\d{4}$/.test(segments[0]) && /^\d{1,2}$/.test(segments[1])) {
+      if (!parsedYear) parsedYear = segments[0];
+      if (!parsedMonth) parsedMonth = segments[1].padStart(2, '0');
+      if (!parsedBlogNo) parsedBlogNo = segments[2].padStart(2, '0');
+      if (!parsedSlug) parsedSlug = segments[3];
+    } else if (segments.length >= 3 && /^\d{4}$/.test(segments[0]) && /^\d{1,2}$/.test(segments[1])) {
+      if (!parsedYear) parsedYear = segments[0];
+      if (!parsedMonth) parsedMonth = segments[1].padStart(2, '0');
+      if (!parsedSlug) parsedSlug = segments[2];
+    }
+  }
+
+  // 2. Clean up slug
+  let slug = (parsedSlug || item.id || 'job-update')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (!slug) slug = 'job-update';
+
+  // 3. Check default slug mapping
+  const mapped = DEFAULT_SLUG_META[slug];
+
+  // 4. Resolve year and month
+  const year = parsedYear || mapped?.year || currentYear;
+  const month = (parsedMonth || mapped?.month || currentMonth).padStart(2, '0');
+
+  // 5. Resolve blogNo
+  let blogNo = parsedBlogNo || mapped?.blogNo || '';
+
+  // If still missing, check publishedDate (e.g. '21/09/2026' -> day '21')
+  if (!blogNo && item.publishedDate && typeof item.publishedDate === 'string') {
+    const dayMatch = item.publishedDate.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+    if (dayMatch) {
+      blogNo = dayMatch[1].padStart(2, '0');
+    }
+  }
+
+  // If still missing, check publishedAt if it contains day or timestamp
+  if (!blogNo && item.publishedAt) {
+    if (typeof item.publishedAt === 'string') {
+      const dayMatch = item.publishedAt.match(/^(\d{1,2})[\/-](\d{1,2})/);
+      if (dayMatch) {
+        blogNo = dayMatch[1].padStart(2, '0');
+      }
+    } else if (typeof item.publishedAt === 'number') {
+      const d = new Date(item.publishedAt);
+      if (!isNaN(d.getTime())) {
+        blogNo = String(d.getDate()).padStart(2, '0');
+      }
+    }
+  }
+
+  // If still missing, derive a deterministic, distinct 2-digit number from the slug
+  if (!blogNo) {
+    let hash = 0;
+    for (let i = 0; i < slug.length; i++) {
+      hash = (hash * 31 + slug.charCodeAt(i)) % 997;
+    }
+    const derived = (Math.abs(hash) % 28) + 1;
+    blogNo = String(derived).padStart(2, '0');
+  }
+
+  const identifier = `${year}/${month}/${blogNo}`;
+  const fullPath = `/${year}/${month}/${blogNo}/${slug}`;
+
+  return {
+    year,
+    month,
+    blogNo,
+    slug,
+    identifier,
+    fullPath,
+    canonicalUrl: fullPath,
+    displayId: `${identifier} • ${slug}`
+  };
+}
 
 /**
  * Generate canonical dynamic post URL: /[year]/[month]/[blogNo]/[slug]
@@ -41,24 +156,12 @@ export function getPostUrl(item: {
   blogNo?: string;
   slug?: string;
   id?: string;
+  detailsUrl?: string;
+  publishedDate?: string;
+  publishedAt?: string | number;
+  dates?: { start?: string; end?: string; exam?: string };
 }): string {
-  const rawSlug = (item.slug || item.id || 'job-update')
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-|-$/g, '');
-
-  const mapped = DEFAULT_SLUG_META[rawSlug];
-
-  const now = new Date();
-  const currentYear = String(now.getFullYear());
-  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-
-  const year = item.year || mapped?.year || currentYear;
-  const month = item.month || mapped?.month || currentMonth;
-  const blogNo = item.blogNo || mapped?.blogNo || '01';
-  const slug = item.slug || rawSlug;
-
-  return `/${year}/${month}/${blogNo}/${slug}`;
+  return getPostRoutingMeta(item).fullPath;
 }
 
 /**

@@ -1077,6 +1077,39 @@ export const INITIAL_SCRAPER_SOURCES: ScraperSource[] = [
     itemsFound: 1,
     description: 'MPHC Assistant Grade 3, Stenographer एवं जिला न्यायालय पद'
   },
+  {
+    id: 'src-mpvacancy-in',
+    name: 'MP Vacancy Portal (mpvacancy.in)',
+    bucket: 'mp_special',
+    url: 'https://mpvacancy.in/category/latest-update/',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 12:00 PM',
+    itemsFound: 8,
+    description: 'MP Vacancy पोर्टल - मध्य प्रदेश सरकारी भर्ती, व्यापम एवं संविदा लेटेस्ट अपडेट्स'
+  },
+  {
+    id: 'src-vacancyupdatemp-com',
+    name: 'Vacancy Update MP (vacancyupdatemp.com)',
+    bucket: 'mp_special',
+    url: 'https://vacancyupdatemp.com/latest-jobs/',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 11:30 AM',
+    itemsFound: 6,
+    description: 'Vacancy Update MP - एमपी रोजगार समाचार, जिला स्तर व विभागवार नई भर्ती अलर्ट्स'
+  },
+  {
+    id: 'src-newsjobmp-com',
+    name: 'NewsJobMP Portal (newsjobmp.com)',
+    bucket: 'mp_special',
+    url: 'https://www.newsjobmp.com/?m=1',
+    feedType: 'html',
+    enabled: true,
+    lastScraped: 'आज 10:45 AM',
+    itemsFound: 7,
+    description: 'न्यूज़ जॉब एमपी - मध्य प्रदेश सरकारी नौकरी, एडमिट कार्ड, रिजल्ट एवं आंसर की'
+  },
 
   // 2. Central Government Portals
   {
@@ -1223,7 +1256,19 @@ export async function getScraperSources(): Promise<ScraperSource[]> {
       localStorage.setItem(STORAGE_SOURCES_KEY, JSON.stringify(INITIAL_SCRAPER_SOURCES));
       return INITIAL_SCRAPER_SOURCES;
     }
-    return JSON.parse(cached);
+    const parsed: ScraperSource[] = JSON.parse(cached);
+    // Ensure all critical sources (mpvacancy.in, vacancyupdatemp.com, newsjobmp.com) exist in parsed list
+    let modified = false;
+    for (const init of INITIAL_SCRAPER_SOURCES) {
+      if (!parsed.some((p) => p.url === init.url || p.id === init.id)) {
+        parsed.unshift(init);
+        modified = true;
+      }
+    }
+    if (modified) {
+      localStorage.setItem(STORAGE_SOURCES_KEY, JSON.stringify(parsed));
+    }
+    return parsed;
   } catch {
     return INITIAL_SCRAPER_SOURCES;
   }
@@ -1328,47 +1373,175 @@ export async function triggerSourceTestFetch(sourceId: string): Promise<{
       }
     };
   } else if (src.bucket === 'mp_special') {
-    sampleDraft = {
-      id: `scraped-mp-${Date.now()}`,
-      sourcePortal: `${src.name} (${src.url})`,
-      rawTitle: 'MP ESB Vanrakshak (Forest Guard) & Kshetra Rakshak Recruitment 2026 Rulebook',
-      scrapedAt: nowStr,
-      confidenceScore: 97,
-      status: 'queued',
-      suggestedPost: {
-        id: `mp-forest-guard-${Date.now().toString().slice(-4)}`,
-        title: 'MPESB Forest Guard (वनरक्षक) & Kshetra Rakshak 2,112 Posts 2026',
-        shortTitle: 'MP Vanrakshak 2026',
-        dept: 'Madhya Pradesh Employees Selection Board (MPESB)',
-        totalPosts: '2,112 Posts',
-        categories: ['vacancy', 'mp_special'],
-        dates: {
-          start: '24/09/2026',
-          end: '18/10/2026',
-          exam: 'नवंबर 2026'
-        },
-        fee: {
-          gen: '₹500/-',
-          reserved: '₹250/- (MP मूल निवासी)'
-        },
-        eligibility: '10th / 10+2 Passed from MP Board or equivalent board.',
-        links: {
-          apply: 'https://esb.mp.gov.in',
-          notificationPdf: 'https://esb.mp.gov.in/rulebooks',
-          officialSite: 'https://esb.mp.gov.in'
-        },
-        posterConfig: {
-          headline: '★ MP वनरक्षक 2,112 पद भर्ती 2026 ★',
-          keyPoints: [
-            'कुल पद: 2,112 पद',
-            'योग्यता: 10वीं / 12वीं पास',
-            'आयु सीमा: 18 से 33 वर्ष (छूट नियमानुसार)'
-          ],
-          note: 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
-        },
-        status: 'pending_approval'
-      }
-    };
+    if (src.url.includes('mpvacancy.in')) {
+      sampleDraft = {
+        id: `scraped-mpvac-${Date.now()}`,
+        sourcePortal: `${src.name} (${src.url})`,
+        rawTitle: 'MP Panchayat Gram Sevak & Sachiv 3,450 Posts Bharti 2026 Notification',
+        scrapedAt: nowStr,
+        confidenceScore: 96,
+        status: 'queued',
+        suggestedPost: {
+          id: `mp-panchayat-sachiv-${Date.now().toString().slice(-4)}`,
+          title: 'MP Panchayat Gram Rozgar Sahayak & Sachiv 3,450 Posts 2026',
+          shortTitle: 'MP Panchayat Sachiv 2026',
+          dept: 'Panchayat & Rural Development Dept Madhya Pradesh',
+          totalPosts: '3,450 Posts',
+          categories: ['vacancy', 'mp_special'],
+          dates: {
+            start: '26/09/2026',
+            end: '22/10/2026',
+            exam: 'दिसंबर 2026'
+          },
+          fee: {
+            gen: '₹500/-',
+            reserved: '₹250/- (MP मूल निवासी)'
+          },
+          eligibility: '12th (Higher Secondary) Passed + DCA/PGDCA/CPCT Scorecard.',
+          links: {
+            apply: 'https://mpvacancy.in',
+            notificationPdf: 'https://mpvacancy.in/category/latest-update/',
+            officialSite: 'https://prd.mp.gov.in'
+          },
+          posterConfig: {
+            headline: '★ MP पंचायत सचिव व रोजगार सहायक 3,450 पद ★',
+            keyPoints: [
+              'कुल पद: 3,450 (ग्राम पंचायत वार)',
+              'योग्यता: 12वीं पास + DCA/CPCT',
+              'वेतनमान: ₹9,000 - ₹20,200 + GP'
+            ],
+            note: 'घर बैठे सुरक्षित ऑनलाइन आवेदन: Nitish Khobragade (8982324497)'
+          },
+          status: 'pending_approval'
+        }
+      };
+    } else if (src.url.includes('vacancyupdatemp.com')) {
+      sampleDraft = {
+        id: `scraped-vump-${Date.now()}`,
+        sourcePortal: `${src.name} (${src.url})`,
+        rawTitle: 'MP Anganwadi Karyakarta & Sahayika 4,200 Posts Bharti Notification 2026',
+        scrapedAt: nowStr,
+        confidenceScore: 98,
+        status: 'queued',
+        suggestedPost: {
+          id: `mp-anganwadi-karyakarta-${Date.now().toString().slice(-4)}`,
+          title: 'MP Women & Child Development Anganwadi Worker & Helper 4,200 Posts 2026',
+          shortTitle: 'MP Anganwadi Bharti 2026',
+          dept: 'महिला एवं बाल विकास विभाग मध्यप्रदेश',
+          totalPosts: '4,200 Posts',
+          categories: ['vacancy', 'mp_special'],
+          dates: {
+            start: '25/09/2026',
+            end: '20/10/2026',
+            exam: 'मेरिट आधारित चयन'
+          },
+          fee: {
+            gen: '₹0/- (निःशुल्क)',
+            reserved: '₹0/- (निःशुल्क)'
+          },
+          eligibility: '10वीं / 12वीं उत्तीर्ण (केवल महिला उम्मीदवार, संबंधित ग्राम/वार्ड की स्थानीय निवासी)',
+          links: {
+            apply: 'https://vacancyupdatemp.com/latest-jobs/',
+            notificationPdf: 'https://vacancyupdatemp.com',
+            officialSite: 'https://mpwcdmis.gov.in'
+          },
+          posterConfig: {
+            headline: '★ MP आंगनवाड़ी कार्यकर्ता एवं सहायिका 4,200 पद ★',
+            keyPoints: [
+              'कुल पद: 4,200 (प्रदेश के सभी 55 जिले)',
+              'योग्यता: 10वीं/12वीं पास (केवल महिलाएं)',
+              'आवेदन शुल्क: पूर्णतः निःशुल्क'
+            ],
+            note: 'फॉर्म भरने में सहायता हेतु संपर्क: Nitish Khobragade (8982324497)'
+          },
+          status: 'pending_approval'
+        }
+      };
+    } else if (src.url.includes('newsjobmp.com')) {
+      sampleDraft = {
+        id: `scraped-njmp-${Date.now()}`,
+        sourcePortal: `${src.name} (${src.url})`,
+        rawTitle: 'MP ESB Sub Engineer & Revenue Inspector (RI) 1,180 Posts Recruitment 2026',
+        scrapedAt: nowStr,
+        confidenceScore: 97,
+        status: 'queued',
+        suggestedPost: {
+          id: `mp-nagar-palika-ri-${Date.now().toString().slice(-4)}`,
+          title: 'MPESB Group-2 Sub Group-4 Revenue Inspector & Sahayak 1,180 Posts 2026',
+          shortTitle: 'MP Revenue Inspector 2026',
+          dept: 'Urban Administration & Development MP',
+          totalPosts: '1,180 Posts',
+          categories: ['vacancy', 'mp_special'],
+          dates: {
+            start: '28/09/2026',
+            end: '24/10/2026',
+            exam: 'दिसंबर 2026'
+          },
+          fee: {
+            gen: '₹500/-',
+            reserved: '₹250/- (MP SC/ST/OBC)'
+          },
+          eligibility: 'Degree / Diploma in Civil / Mechanical / Electrical or Commerce Degree with CPCT.',
+          links: {
+            apply: 'https://www.newsjobmp.com/?m=1',
+            notificationPdf: 'https://www.newsjobmp.com',
+            officialSite: 'https://esb.mp.gov.in'
+          },
+          posterConfig: {
+            headline: '★ MP राजस्व निरीक्षक (RI) एवं उपयंत्री भर्ती ★',
+            keyPoints: [
+              'कुल पद: 1,180 पद',
+              'योग्यता: डिप्लोमा / स्नातक + CPCT',
+              'वेतनमान: 7वां वेतनमान (Level-8)'
+            ],
+            note: 'घर बैठे ऑनलाइन फॉर्म भरवाएं: Nitish Khobragade (8982324497)'
+          },
+          status: 'pending_approval'
+        }
+      };
+    } else {
+      sampleDraft = {
+        id: `scraped-mp-${Date.now()}`,
+        sourcePortal: `${src.name} (${src.url})`,
+        rawTitle: 'MP ESB Vanrakshak (Forest Guard) & Kshetra Rakshak Recruitment 2026 Rulebook',
+        scrapedAt: nowStr,
+        confidenceScore: 97,
+        status: 'queued',
+        suggestedPost: {
+          id: `mp-forest-guard-${Date.now().toString().slice(-4)}`,
+          title: 'MPESB Forest Guard (वनरक्षक) & Kshetra Rakshak 2,112 Posts 2026',
+          shortTitle: 'MP Vanrakshak 2026',
+          dept: 'Madhya Pradesh Employees Selection Board (MPESB)',
+          totalPosts: '2,112 Posts',
+          categories: ['vacancy', 'mp_special'],
+          dates: {
+            start: '24/09/2026',
+            end: '18/10/2026',
+            exam: 'नवंबर 2026'
+          },
+          fee: {
+            gen: '₹500/-',
+            reserved: '₹250/- (MP मूल निवासी)'
+          },
+          eligibility: '10th / 10+2 Passed from MP Board or equivalent board.',
+          links: {
+            apply: 'https://esb.mp.gov.in',
+            notificationPdf: 'https://esb.mp.gov.in/rulebooks',
+            officialSite: 'https://esb.mp.gov.in'
+          },
+          posterConfig: {
+            headline: '★ MP वनरक्षक 2,112 पद भर्ती 2026 ★',
+            keyPoints: [
+              'कुल पद: 2,112 पद',
+              'योग्यता: 10वीं / 12वीं पास',
+              'आयु सीमा: 18 से 33 वर्ष (छूट नियमानुसार)'
+            ],
+            note: 'घर बैठे सुरक्षित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
+          },
+          status: 'pending_approval'
+        }
+      };
+    }
   } else {
     // Central Govt
     sampleDraft = {

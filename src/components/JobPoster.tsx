@@ -162,7 +162,7 @@ export const JobPoster = forwardRef<HTMLDivElement, JobPosterProps>(
       useCustomPoster: overrideUseCustomPoster,
       aspectRatio = 'feed', // 1080x1350 by default
       theme = 'classic',
-      characterType = 'male',
+      characterType = 'none',
       customCharacterUrl,
       characterScale = 'normal',
       titleScale = 'md',

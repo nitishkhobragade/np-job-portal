@@ -72,6 +72,7 @@ import { SocialShareModal } from '../../components/SocialShareModal';
 import { OWNER_INFO } from '../../data/portalData';
 import {
   getPostUrl,
+  getPostRoutingMeta,
   formatDateToDDMMYYYY,
   ddmmyyyyToInputDate,
   inputDateToDDMMYYYY,
@@ -1365,9 +1366,23 @@ export default function AdminPage() {
             {showAddForm && (
               <div className="bg-slate-900 border-2 border-amber-500/60 rounded-2xl p-5 sm:p-7 shadow-2xl animate-in fade-in duration-200">
                 <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
-                  <h3 className="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2">
-                    {editingPostId ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                    <span>{editingPostId ? 'भर्ती पोस्ट संपादित करें' : 'नई सरकारी भर्ती पोस्ट तैयार करें'}</span>
+                  <h3 className="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2 flex-wrap">
+                    {editingPostId ? <Edit3 className="w-5 h-5 text-amber-400" /> : <Plus className="w-5 h-5 text-amber-400" />}
+                    <span>
+                      {editingPostId ? (
+                        <span className="flex items-center gap-2 flex-wrap">
+                          <span>भर्ती पोस्ट संपादित करें:</span>
+                          <span className="text-amber-300 font-mono text-xs bg-slate-950 px-2 py-0.5 rounded border border-amber-500/40">
+                            [{formYear || '2026'}/{formMonth || '09'}/{formBlogNo || '01'}]
+                          </span>
+                          <span className="text-white text-xs sm:text-sm font-bold truncate max-w-md">
+                            {formTitle || formShortTitle}
+                          </span>
+                        </span>
+                      ) : (
+                        'नई सरकारी भर्ती पोस्ट तैयार करें'
+                      )}
+                    </span>
                   </h3>
                   <button
                     onClick={() => setShowAddForm(false)}
@@ -2459,8 +2474,9 @@ export default function AdminPage() {
                       </tr>
                     ) : (
                       filteredPosts.map((job, index) => {
-                        const postUrl = getPostUrl(job);
-                        const identifierStr = `${job.routingYear || '2026'}/${job.routingMonth || '09'}/${job.routingBlogNo || '01'}`;
+                        const meta = getPostRoutingMeta(job);
+                        const postUrl = meta.fullPath;
+                        const identifierStr = meta.identifier;
                         const startDateFmt = formatDateToDDMMYYYY(job.dates?.start || '');
                         const endDateFmt = formatDateToDDMMYYYY(job.dates?.end || '');
 
@@ -2473,16 +2489,21 @@ export default function AdminPage() {
 
                             {/* 2. Identifier: [year]/[month]/[blogNo] */}
                             <td className="py-3 px-3">
-                              <span className="inline-block px-2 py-1 rounded bg-slate-950 border border-amber-500/30 text-amber-300 font-mono text-[11px] font-bold">
+                              <span className="inline-block px-2 py-1 rounded bg-slate-950 border border-amber-500/50 text-amber-300 font-mono text-[11px] font-bold shadow-xs">
                                 {identifierStr}
                               </span>
-                              <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate max-w-[120px]">
-                                {job.routingSlug || job.id}
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[130px]" title={meta.slug}>
+                                {meta.slug}
                               </div>
                             </td>
 
                             {/* 3. Job Title & Department */}
                             <td className="py-3 px-4">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-950 text-[10px] font-mono text-amber-400 border border-slate-800 font-bold">
+                                  ID: {identifierStr} • {meta.slug}
+                                </span>
+                              </div>
                               <Link
                                 href={postUrl}
                                 target="_blank"
@@ -2667,7 +2688,7 @@ export default function AdminPage() {
               </div>
 
               {/* Selector to switch active job */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-slate-400 font-semibold">भर्ती चुनें:</span>
                 <select
                   value={posterJob?.id || ''}
@@ -2675,19 +2696,23 @@ export default function AdminPage() {
                     const found = posts.find((p) => p.id === e.target.value);
                     if (found) setPosterJob(found);
                   }}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-bold"
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-bold max-w-[320px] sm:max-w-[460px] truncate"
                 >
-                  {posts.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.shortTitle || p.title}
-                    </option>
-                  ))}
+                  {posts.map((p) => {
+                    const pMeta = getPostRoutingMeta(p);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        [{pMeta.identifier}] {p.title} ({p.dept || p.totalPosts})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
 
             {posterJob ? (
               <PosterStudio
+                key={posterJob.id}
                 job={posterJob}
                 initialEditableMode={true}
                 isAdmin={true}
@@ -2835,8 +2860,11 @@ export default function AdminPage() {
                 <span className="text-slate-400 font-bold">त्वरित टेस्ट सैंपल्स:</span>
                 {[
                   { label: '🏛️ MPESB व्यापम', url: 'https://esb.mp.gov.in/latest-rulebooks' },
-                  { label: '🏛️ SSC CGL/GD', url: 'https://ssc.gov.in/api/latest-notices' },
+                  { label: '📰 MP Vacancy', url: 'https://mpvacancy.in/category/latest-update/' },
+                  { label: '📰 Vacancy Update MP', url: 'https://vacancyupdatemp.com/latest-jobs/' },
+                  { label: '📰 NewsJobMP', url: 'https://www.newsjobmp.com/?m=1' },
                   { label: '🏛️ MPPSC राज्य सेवा', url: 'https://mppsc.mp.gov.in/notifications' },
+                  { label: '🏛️ SSC CGL/GD', url: 'https://ssc.gov.in/api/latest-notices' },
                   { label: '💼 Infosys Careers', url: 'https://career.infosys.com/joblist' },
                   { label: '💼 TCS iON NQT', url: 'https://tcs.com/careers/india-freshers' },
                 ].map((sample) => (
@@ -4243,9 +4271,17 @@ export default function AdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-slate-900 border-2 border-blue-500/70 rounded-2xl p-6 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-sm font-black text-white flex items-center gap-2">
+              <h3 className="text-sm font-black text-white flex items-center gap-2 flex-wrap">
                 <LinkIcon className="w-4 h-4 text-blue-400" />
-                <span>हाइपरलिंक ओवरराइड: {overrideJob.shortTitle || overrideJob.title}</span>
+                <span>
+                  हाइपरलिंक ओवरराइड:{' '}
+                  <span className="font-mono text-amber-300 text-xs bg-slate-950 px-1.5 py-0.5 rounded border border-amber-500/40">
+                    [{getPostRoutingMeta(overrideJob).identifier}]
+                  </span>{' '}
+                  <span className="text-slate-200">
+                    {overrideJob.shortTitle || overrideJob.title}
+                  </span>
+                </span>
               </h3>
               <button
                 onClick={() => setOverrideJob(null)}

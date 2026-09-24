@@ -32,6 +32,7 @@ import { JobPoster, PosterTheme, TitleScale } from './JobPoster';
 import { CharacterType } from './CandidateCharacter';
 import { WHATSAPP_CHANNEL_URL } from '../lib/qrCodeHelper';
 import { updateJob } from '../lib/firebase';
+import { getPostRoutingMeta } from '../lib/postRouting';
 
 interface PosterStudioProps {
   job: JobPostDetail | PostRecord;
@@ -142,9 +143,9 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
 
   const posterConfig = postRec?.posterConfig;
 
-  // Visual Customizer Controls with State Persistence
+  // Visual Customizer Controls with State Persistence (Default No Character)
   const [theme, setTheme] = useState<PosterTheme>(posterConfig?.theme || 'classic');
-  const [characterType, setCharacterType] = useState<CharacterType>(posterConfig?.characterType || 'male');
+  const [characterType, setCharacterType] = useState<CharacterType>(posterConfig?.characterType || 'none');
   const [customCharacterUrl, setCustomCharacterUrl] = useState<string>(posterConfig?.customCharacterUrl || '');
   const [characterScale, setCharacterScale] = useState<'normal' | 'large' | 'xlarge'>('normal');
   const [titleScale, setTitleScale] = useState<TitleScale>(posterConfig?.titleScale || 'md');
@@ -696,23 +697,40 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
       ) : (
         <>
           {/* 0. ACTIVE EDITING PERSISTENCE BANNER */}
+      {/* Dynamic Header with Unique Identifier & Post Info */}
       <div className="bg-gradient-to-r from-amber-950/90 via-slate-900 to-slate-950 border border-amber-500/50 rounded-xl p-3.5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shrink-0">
             📌
           </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] text-amber-300 font-bold uppercase tracking-wider">
-                वर्तमान में एडिट हो रहा है:
-              </span>
-              <span className="font-mono text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30 text-amber-200 font-bold">
-                ID: {job.id}
-              </span>
-            </div>
-            <h3 className="text-sm sm:text-base font-black text-white truncate max-w-xl mt-0.5">
-              {job.title}
-            </h3>
+            {(() => {
+              const routingMeta = getPostRoutingMeta(job);
+              return (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] text-amber-300 font-bold uppercase tracking-wider">
+                      वर्तमान में पोस्टर एडिट हो रहा है:
+                    </span>
+                    <span className="font-mono text-xs bg-slate-950 px-2.5 py-0.5 rounded-md border border-amber-400/80 text-amber-300 font-extrabold shadow-xs">
+                      ID: {routingMeta.identifier}
+                    </span>
+                    <span className="font-mono text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-slate-300">
+                      {routingMeta.fullPath}
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white truncate max-w-xl mt-1">
+                    <span className="text-amber-400 mr-1.5 font-mono font-bold">[{routingMeta.identifier}]</span>
+                    {job.title}
+                  </h3>
+                  <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span>विभाग: <strong className="text-slate-200">{job.dept}</strong></span>
+                    <span>•</span>
+                    <span>कुल पद: <strong className="text-amber-400 font-mono">{job.totalPosts}</strong></span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -1351,22 +1369,43 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
               {/* Character Controls */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-amber-400" />
-                    <span>कैंडिडेट कट-आउट (Candidate Avatar):</span>
+                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between gap-1">
+                    <span className="flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-amber-400" />
+                      <span>कैंडिडेट कट-आउट (Cartoon / Avatar):</span>
+                    </span>
+                    <span className="text-[10px] font-normal px-2 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-700">
+                      डिफ़ॉल्ट: Turn Off (No Character)
+                    </span>
                   </label>
                   <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCharacterType('none')}
+                      className={`p-2 rounded-xl border text-left transition-all ${
+                        characterType === 'none'
+                          ? 'bg-gradient-to-r from-emerald-950 to-slate-900 border-emerald-400 text-white font-black ring-1 ring-emerald-400/50 shadow-sm'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold block">🚫 No Character</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono">डिफ़ॉल्ट</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">फुल चौड़ाई टाइल्स (कार्टून बंद)</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setCharacterType('male')}
                       className={`p-2 rounded-xl border text-left transition-all ${
                         characterType === 'male'
-                          ? 'bg-blue-900 border-amber-400 text-white font-black'
-                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                          ? 'bg-blue-900 border-amber-400 text-white font-black ring-1 ring-amber-400/50 shadow-sm'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600'
                       }`}
                     >
-                      <span className="text-xs block">👨‍🎓 Male Aspirant</span>
-                      <span className="text-[10px] text-slate-400">स्मार्ट स्टूडेंट</span>
+                      <span className="text-xs block font-bold">👨‍🎓 Male Aspirant</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">स्मार्ट स्टूडेंट कट-आउट</span>
                     </button>
 
                     <button
@@ -1374,12 +1413,12 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                       onClick={() => setCharacterType('female')}
                       className={`p-2 rounded-xl border text-left transition-all ${
                         characterType === 'female'
-                          ? 'bg-purple-900 border-amber-400 text-white font-black'
-                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                          ? 'bg-purple-900 border-amber-400 text-white font-black ring-1 ring-amber-400/50 shadow-sm'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600'
                       }`}
                     >
-                      <span className="text-xs block">👩‍💼 Female Officer</span>
-                      <span className="text-[10px] text-slate-400">ऑफिसर लुक</span>
+                      <span className="text-xs block font-bold">👩‍💼 Female Officer</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">ऑफिसर लुक कट-आउट</span>
                     </button>
 
                     <div className="relative">
@@ -1395,28 +1434,18 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({
                         htmlFor="character-upload-input"
                         className={`block p-2 rounded-xl border text-left cursor-pointer transition-all ${
                           characterType === 'custom'
-                            ? 'bg-amber-900 border-amber-400 text-white font-black'
-                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                            ? 'bg-amber-900 border-amber-400 text-white font-black ring-1 ring-amber-400/50 shadow-sm'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600'
                         }`}
                       >
-                        <span className="text-xs block truncate">📤 Custom PNG</span>
-                        <span className="text-[10px] text-amber-300 font-medium">कट-आउट अपलोड</span>
+                        <span className="text-xs block truncate font-bold">📤 Custom PNG</span>
+                        <span className="text-[10px] text-amber-300 font-medium block mt-0.5">अपना कट-आउट अपलोड करें</span>
                       </label>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setCharacterType('none')}
-                      className={`p-2 rounded-xl border text-left transition-all ${
-                        characterType === 'none'
-                          ? 'bg-slate-700 border-amber-400 text-white font-black'
-                          : 'bg-slate-900 border-slate-700 text-slate-300'
-                      }`}
-                    >
-                      <span className="text-xs block">🚫 No Character</span>
-                      <span className="text-[10px] text-slate-400">फुल चौड़ाई टाइल्स</span>
-                    </button>
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-1.5">
+                    💡 <strong className="text-slate-300">नोट:</strong> बाय डिफ़ॉल्ट कार्टून कट-आउट बंद रहेगा। यदि आप चाहें तो ऊपर दिए गए Male, Female अथवा Custom PNG पर क्लिक करके इसे ऑन (Enable) कर सकते हैं।
+                  </p>
                 </div>
 
                 {/* Character Scale */}
