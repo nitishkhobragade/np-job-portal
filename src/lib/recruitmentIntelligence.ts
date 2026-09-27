@@ -6,6 +6,16 @@ export interface AuditDiagnosticItem {
   details: string;
   verifiedValue?: string;
   currentValue?: string;
+  verifiedStart?: string;
+  verifiedEnd?: string;
+  verifiedExam?: string;
+  verifiedPdfUrl?: string;
+  verifiedApplyUrl?: string;
+  verifiedPosts?: string;
+  verifiedEligibility?: string;
+  verifiedAge?: string;
+  verifiedGeneralFee?: string;
+  verifiedReservedFee?: string;
 }
 
 export interface AuditIssue {

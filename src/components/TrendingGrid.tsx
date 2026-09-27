@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, MessageCircle, Calendar, Flame } from 'lucide-react';
 import { TRENDING_CARDS, OWNER_INFO } from '../data/portalData';
 import { TrendingCard, PostRecord, JobItem } from '../types';
+import { getDeletedPostIds } from '../lib/firebase';
 
 interface TrendingGridProps {
   onSelectCard: (card: TrendingCard) => void;
@@ -30,22 +31,14 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard, posts 
     postOrigin?: PostRecord;
     directUrl?: string;
   }[] = useMemo(() => {
-    // If no dynamic posts yet, fallback to curated portal trending cards
-    if (!posts || posts.length === 0) {
-      return TRENDING_CARDS.map((c) => {
-        let directUrl = '';
-        if (c.id === 'trend-1') directUrl = '/2026/09/02/mp-police-constable-2026';
-        else if (c.id === 'trend-2') directUrl = '/2026/09/03/mp-ayush-ug-counselling';
-        else if (c.id === 'trend-3') directUrl = '/2026/09/04/ssc-chsl-2026';
-        else if (c.id === 'trend-4') directUrl = '/2026/09/05/railway-rrc-group-d';
-        return { card: c, directUrl };
-      });
-    }
+    const deleted = getDeletedPostIds();
 
-    // Filter relevant job posts
-    const activeJobs = posts.filter(
+    // Filter relevant job posts that are strictly not deleted
+    const activeJobs = (posts || []).filter(
       (p) =>
         p.status === 'published' &&
+        !deleted.has(p.id) &&
+        !deleted.has(p.slug || p.id) &&
         (p.category === 'latest-jobs' ||
           p.category === 'mp-special' ||
           p.category === 'tech-jobs' ||
@@ -53,70 +46,65 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ onSelectCard, posts 
           !p.categories?.includes('result'))
     );
 
-    // Map the latest published jobs into trending card format
-    const dynamicList = activeJobs.slice(0, 8).map((p, index) => {
-      const gradient = GRADIENTS[index % GRADIENTS.length];
-      const shortTitle = p.shortTitle || (p.title.length > 50 ? `${p.title.slice(0, 48)}...` : p.title);
-      const postCount = p.totalPosts ? `${p.totalPosts} पद` : 'विज्ञप्ति अनुसार';
-      const lastDate = p.dates?.end || p.lastDate || 'अंतिम तिथि शीघ्र';
-      const badge =
-        index === 0
-          ? '🔥 TOP ट्रेंडिंग'
-          : index === 1
-          ? '⚡ ऑनलाइन लाइव'
-          : p.isTechJob
-          ? '💻 IT डायरेक्ट'
-          : p.state === 'MP' || p.categories?.includes('mp_special')
-          ? '🏛️ MP स्पेशल'
-          : '📢 नई भर्ती';
+    // If dynamic active jobs exist, render them directly without injecting obsolete cards
+    if (activeJobs.length > 0) {
+      return activeJobs.slice(0, 8).map((p, index) => {
+        const gradient = GRADIENTS[index % GRADIENTS.length];
+        const shortTitle = p.shortTitle || (p.title.length > 50 ? `${p.title.slice(0, 48)}...` : p.title);
+        const postCount = p.totalPosts ? `${p.totalPosts} पद` : 'विज्ञप्ति अनुसार';
+        const lastDate = p.dates?.end || p.lastDate || 'अंतिम तिथि शीघ्र';
+        const badge =
+          index === 0
+            ? '🔥 TOP ट्रेंडिंग'
+            : index === 1
+            ? '⚡ ऑनलाइन लाइव'
+            : p.isTechJob
+            ? '💻 IT डायरेक्ट'
+            : p.state === 'MP' || p.categories?.includes('mp_special')
+            ? '🏛️ MP स्पेशल'
+            : '📢 नई भर्ती';
 
-      const categoryLabel = p.isTechJob
-        ? 'IT & TECH MNC'
-        : p.category === 'mp-special'
-        ? 'मध्य प्रदेश शासन'
-        : p.category === 'railway'
-        ? 'रेलवे भर्ती'
-        : p.dept || 'शासकीय भर्ती';
+        const categoryLabel = p.isTechJob
+          ? 'IT & TECH MNC'
+          : p.category === 'mp-special'
+          ? 'मध्य प्रदेश शासन'
+          : p.category === 'railway'
+          ? 'रेलवे भर्ती'
+          : p.dept || 'शासकीय भर्ती';
 
-      const directUrl =
-        p.year && p.month && p.blogNo && p.slug
-          ? `/${p.year}/${p.month}/${p.blogNo}/${p.slug}`
-          : p.slug
-          ? `/jobs/${p.slug}`
-          : `/jobs/${p.id}`;
+        const directUrl =
+          p.year && p.month && p.blogNo && p.slug
+            ? `/${p.year}/${p.month}/${p.blogNo}/${p.slug}`
+            : p.slug
+            ? `/jobs/${p.slug}`
+            : `/jobs/${p.id}`;
 
-      const card: TrendingCard = {
-        id: `dyn-${p.id}`,
-        title: shortTitle,
-        subtitle: p.dept || p.role || 'ऑनलाइन आवेदन प्रक्रिया लाइव है',
-        badge,
-        category: categoryLabel,
-        colorTheme: gradient,
-        postsOrDate: `${postCount} • ${lastDate}`,
-        link: directUrl
-      };
+        const card: TrendingCard = {
+          id: `dyn-${p.id}`,
+          title: shortTitle,
+          subtitle: p.dept || p.role || 'ऑनलाइन आवेदन प्रक्रिया लाइव है',
+          badge,
+          category: categoryLabel,
+          colorTheme: gradient,
+          postsOrDate: `${postCount} • ${lastDate}`,
+          link: directUrl
+        };
 
-      return { card, postOrigin: p, directUrl };
-    });
-
-    // If we have fewer than 8 dynamic posts, fill remaining spots with curated portal cards
-    if (dynamicList.length < 8) {
-      const remainingNeeded = 8 - dynamicList.length;
-      const fillCards = TRENDING_CARDS.slice(0, remainingNeeded).map((c) => ({
-        card: c,
-        directUrl:
-          c.id === 'trend-1'
-            ? '/2026/09/02/mp-police-constable-2026'
-            : c.id === 'trend-2'
-            ? '/2026/09/03/mp-ayush-ug-counselling'
-            : c.id === 'trend-3'
-            ? '/2026/09/04/ssc-chsl-2026'
-            : '/2026/09/05/railway-rrc-group-d'
-      }));
-      return [...dynamicList, ...fillCards];
+        return { card, postOrigin: p, directUrl };
+      });
     }
 
-    return dynamicList;
+    // Fallback only if no active jobs have loaded yet - strictly filter out deleted IDs
+    return TRENDING_CARDS
+      .filter((c) => !deleted.has(c.id) && !deleted.has('railway-rrc-group-d'))
+      .map((c) => {
+        let directUrl = '';
+        if (c.id === 'trend-1') directUrl = '/2026/09/01/mp-police-constable-recruitment-2026';
+        else if (c.id === 'trend-2') directUrl = '/2026/09/02/mp-ayush-ug-counselling';
+        else if (c.id === 'trend-3') directUrl = '/2026/09/03/ssc-chsl-2026';
+        else if (c.id === 'trend-4') directUrl = '/2026/09/04/mp-police-subedar-asi-2026';
+        return { card: c, directUrl };
+      });
   }, [posts]);
 
   return (

@@ -15,10 +15,7 @@ import { FloatingMobileBar } from '../components/FloatingMobileBar';
 import { Footer } from '../components/Footer';
 import { PopupAdModal } from '../components/PopupAdModal';
 import { JobItem, AdmitCardItem, ResultItem, TrendingCard, PostRecord } from '../types';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { seedPostsIfEmpty } from '../lib/seedDatabase';
-import { runDatabaseSanitizationAudit } from '../lib/autoCorrectPosts';
+import { subscribeToPosts, getDeletedPostIds, syncTombstonesFromFirestore } from '../lib/firebase';
 
 // Helper to reliably compute publication timestamp for strict descending ordering
 function getPostTimestamp(p: PostRecord): number {
@@ -129,82 +126,60 @@ export default function NPJobPortalPage() {
   const [selectedItemType, setSelectedItemType] = useState<'job' | 'admit' | 'result' | null>(null);
 
   useEffect(() => {
-    // 1. Run database sanitization audit in background
-    runDatabaseSanitizationAudit().catch((err) => console.warn('Sanitization audit check:', err));
+    // Initial sync of tombstones from Firestore
+    syncTombstonesFromFirestore().catch(() => {});
 
-    // 2. Ensure Firestore is seeded if empty
-    seedPostsIfEmpty().catch((err) => console.warn('Seeding check:', err));
+    // Real-time Firestore synchronization on published posts with strict tombstone enforcement
+    const unsubscribe = subscribeToPosts((publishedList) => {
+      setIsLoading(false);
+      const deletedIds = getDeletedPostIds();
+      const validPosts = (publishedList || []).filter(
+        (p) => !deletedIds.has(p.id) && !deletedIds.has(p.slug || p.id)
+      );
 
-    // 3. Real-time Firestore synchronization on published posts
-    // Query: collection(db, "posts"), where("status", "==", "published")
-    // Order: latest published post strictly on top
-    const postsCol = collection(db, 'posts');
-    const q = query(postsCol, where('status', '==', 'published'));
+      // Strict descending order: latest published post strictly on top
+      validPosts.sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
+      setRawPosts(validPosts);
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setIsLoading(false);
-        if (!snapshot.empty) {
-          const publishedList: PostRecord[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data() as PostRecord;
-            publishedList.push({ ...data, id: docSnap.id });
-          });
+      // Separate into Jobs, Admit Cards, and Results
+      const jobsList = validPosts
+        .filter(
+          (p) =>
+            p.category === 'latest-jobs' ||
+            p.category === 'mp-special' ||
+            p.category === 'tech-jobs' ||
+            p.category === 'central' ||
+            p.categories?.includes('vacancy') ||
+            (!p.categories?.includes('admit-card') && !p.categories?.includes('result'))
+        )
+        .map(mapPostToJob);
 
-          // Strict descending order: latest published post strictly on top
-          publishedList.sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
-          setRawPosts(publishedList);
+      const admitList = validPosts
+        .filter(
+          (p) =>
+            p.category === 'admit-card' ||
+            p.categories?.includes('admit-card') ||
+            p.categories?.includes('admit_card') ||
+            p.title.toLowerCase().includes('admit')
+        )
+        .map(mapPostToAdmitCard);
 
-          // Separate into Jobs, Admit Cards, and Results
-          const jobsList = publishedList
-            .filter(
-              (p) =>
-                p.category === 'latest-jobs' ||
-                p.category === 'mp-special' ||
-                p.category === 'tech-jobs' ||
-                p.category === 'central' ||
-                p.categories?.includes('vacancy') ||
-                (!p.categories?.includes('admit-card') && !p.categories?.includes('result'))
-            )
-            .map(mapPostToJob);
+      const resultsList = validPosts
+        .filter(
+          (p) =>
+            p.category === 'results' ||
+            p.category === 'result' ||
+            p.categories?.includes('result') ||
+            p.categories?.includes('results') ||
+            p.title.toLowerCase().includes('result') ||
+            p.title.toLowerCase().includes('answer key')
+        )
+        .map(mapPostToResult);
 
-          const admitList = publishedList
-            .filter(
-              (p) =>
-                p.category === 'admit-card' ||
-                p.categories?.includes('admit-card') ||
-                p.categories?.includes('admit_card') ||
-                p.title.toLowerCase().includes('admit')
-            )
-            .map(mapPostToAdmitCard);
-
-          const resultsList = publishedList
-            .filter(
-              (p) =>
-                p.category === 'results' ||
-                p.category === 'result' ||
-                p.categories?.includes('result') ||
-                p.categories?.includes('results') ||
-                p.title.toLowerCase().includes('result') ||
-                p.title.toLowerCase().includes('answer key')
-            )
-            .map(mapPostToResult);
-
-          setLiveJobs(jobsList);
-          setLiveAdmitCards(admitList);
-          setLiveResults(resultsList);
-        } else {
-          setLiveJobs([]);
-          setLiveAdmitCards([]);
-          setLiveResults([]);
-        }
-      },
-      (error) => {
-        console.warn('Realtime sync warning:', error);
-        setIsLoading(false);
-      }
-    );
+      setLiveJobs(jobsList);
+      setLiveAdmitCards(admitList);
+      setLiveResults(resultsList);
+    }, 'published');
 
     return () => {
       unsubscribe();
@@ -227,26 +202,14 @@ export default function NPJobPortalPage() {
   };
 
   const handleSelectTrendingCard = (card: TrendingCard) => {
+    const deletedIds = getDeletedPostIds();
+    if (deletedIds.has(card.id) || deletedIds.has('railway-rrc-group-d')) return;
+
     const matchingJob = liveJobs.find((j) =>
       j.title.toLowerCase().includes(card.title.toLowerCase().slice(0, 10))
     );
     if (matchingJob) {
       setSelectedItem(matchingJob);
-      setSelectedItemType('job');
-    } else {
-      const fallbackJob: JobItem = {
-        id: card.id,
-        title: card.title + ' 2026 भर्ती एवं चयन परीक्षा',
-        department: card.subtitle,
-        totalPosts: card.badge,
-        lastDate: card.postsOrDate,
-        state: card.category.includes('MP') ? 'MP' : 'Central',
-        qualification: 'मान्यता प्राप्त बोर्ड / विश्वविद्यालय से 10वीं/12वीं/स्नातक पास',
-        fee: 'सामान्य / ओबीसी: ₹500 | आरक्षित: ₹250',
-        category: 'Other',
-        isNew: true
-      };
-      setSelectedItem(fallbackJob);
       setSelectedItemType('job');
     }
   };

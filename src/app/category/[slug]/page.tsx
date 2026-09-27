@@ -8,8 +8,7 @@ import { DetailModal } from '../../../components/DetailModal';
 import { Footer } from '../../../components/Footer';
 import { FloatingMobileBar } from '../../../components/FloatingMobileBar';
 import { JobItem, AdmitCardItem, ResultItem, PostRecord } from '../../../types';
-import { subscribeToPosts } from '../../../lib/firebase';
-import { getInitialSeedPosts } from '../../../lib/seedDatabase';
+import { subscribeToPosts, getStoredPosts } from '../../../lib/firebase';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 
 function mapPostToJob(p: PostRecord): JobItem {
@@ -129,7 +128,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       : 'All Updates'
   );
 
-  const initialPosts = getInitialSeedPosts();
+  const initialPosts = getStoredPosts();
   const [liveJobs, setLiveJobs] = useState<JobItem[]>(() =>
     initialPosts.map(mapPostToJob)
   );

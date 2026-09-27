@@ -21,7 +21,7 @@ export const TICKER_ALERTS: TickerAlert[] = [
   },
   {
     id: "tick-1",
-    text: "MP Police Constable 2026 भर्ती: 7,500 पदों हेतु ऑनलाइन आवेदन प्रारंभ - अंतिम तिथि 15 अक्टूबर",
+    text: "MP Police Constable 2026 भर्ती: 7,500 पदों हेतु ऑनलाइन आवेदन प्रारंभ - अंतिम तिथि 06 अक्टूबर 2026",
     isBreaking: true,
     date: "Today"
   },
@@ -33,13 +33,13 @@ export const TICKER_ALERTS: TickerAlert[] = [
   },
   {
     id: "tick-3",
-    text: "SSC CHSL 10+2 भर्ती 2026: 3,712 पदों हेतु ऑनलाइन फॉर्म शुरू - घर बैठे फॉर्म भरवाएं!",
+    text: "RRB NTPC Graduate 2026 भर्ती: 3,477 पदों हेतु ऑनलाइन फॉर्म शुरू - घर बैठे फॉर्म भरवाएं!",
     isBreaking: false,
     date: "Active"
   },
   {
     id: "tick-4",
-    text: "Railway RRC Group D भर्ती अधिसूचना जारी - 32,000+ पदों पर भर्ती प्रक्रिया प्रारंभ",
+    text: "MP Police सूबेदार, स्टेनो एवं ASI (मिनिस्ट्रियल) 2026 भर्ती: 655 पदों हेतु आवेदन प्रारंभ - अंतिम तिथि 08 अक्टूबर",
     isBreaking: true,
     date: "Big Update"
   },
@@ -58,7 +58,7 @@ export const TRENDING_CARDS: TrendingCard[] = [
     subtitle: "MP ESB Constable GD & Radio",
     colorTheme: "from-blue-600 to-indigo-700",
     badge: "7,500 Posts",
-    postsOrDate: "Last Date: 15/10/2026",
+    postsOrDate: "Last Date: 06/10/2026",
     category: "MP Special"
   },
   {
@@ -72,21 +72,21 @@ export const TRENDING_CARDS: TrendingCard[] = [
   },
   {
     id: "trend-3",
-    title: "SSC CHSL (10+2) 2026",
-    subtitle: "LDC, JSA & Data Entry Operator",
+    title: "RRB NTPC Graduate 2026",
+    subtitle: "Goods Train Manager & Station Master",
     colorTheme: "from-amber-600 to-orange-700",
-    badge: "3,712 Posts",
-    postsOrDate: "Last Date: 28/09/2026",
-    category: "Central SSC"
+    badge: "3,477 Posts",
+    postsOrDate: "Last Date: 06/11/2026",
+    category: "Railway"
   },
   {
     id: "trend-4",
-    title: "Railway RRC Group D",
-    subtitle: "Track Maintainer & Assistant Pointsman",
+    title: "MP Police Subedar & ASI",
+    subtitle: "Stenographer & Assistant Sub-Inspector",
     colorTheme: "from-rose-600 to-red-700",
-    badge: "32,000+ Posts",
-    postsOrDate: "10th Pass / ITI",
-    category: "Railway"
+    badge: "655 Posts",
+    postsOrDate: "Last Date: 08/10/2026",
+    category: "MP Special"
   },
   {
     id: "trend-5",

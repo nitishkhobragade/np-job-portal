@@ -73,15 +73,15 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
     publishedAt: '21/09/2026',
     totalPosts: '7,500',
     qualification: '10th / 12th Pass',
-    lastDate: '15/10/2026',
+    lastDate: '06/10/2026',
     detailsUrl: '/2026/09/01/mp-police-constable-recruitment-2026',
     content:
-      'Madhya Pradesh Employees Selection Board (MPESB Bhopal) invites online applications for 7,500 Constable GD and Radio Operator positions. Complete syllabus, physical parameters, and safe home-based online form filling available.',
+      'Madhya Pradesh Employees Selection Board (MPESB Bhopal) invites online applications for 7,500 Constable GD and Radio Operator positions. Online application starts 22/09/2026, Last date 06/10/2026, Written exam from 19/11/2026.',
     state: 'MP',
     dates: {
-      start: '15/09/2026',
-      end: '15/10/2026',
-      exam: '15/12/2026'
+      start: '22/09/2026',
+      end: '06/10/2026',
+      exam: '19/11/2026 से प्रारंभ'
     },
     fee: {
       gen: '₹500/-',
@@ -98,7 +98,7 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
       keyPoints: [
         'कुल पद: 7,500 (GD: 7090 | रेडियो: 410)',
         'योग्यता: 10वीं/12वीं पास (रेडियो हेतु ITI)',
-        'अंतिम तिथि: 15/10/2026',
+        'अंतिम तिथि: 06/10/2026',
         'घर बैठे सुरक्षित फॉर्म भरवाएं: 8982324497'
       ],
       note: 'घर बैठे 100% त्रुटिरहित फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
@@ -216,44 +216,44 @@ export const INITIAL_SEED_POSTS: SeedPostData[] = [
     blogNo: '04',
     year: '2026',
     month: '09',
-    slug: 'railway-rrc-group-d',
-    title: 'Railway RRC Group D Level-1 Centralized Recruitment 2026',
-    shortTitle: 'Railway Group D 2026',
-    dept: 'Railway Recruitment Cell (RRC / Indian Railways)',
-    category: 'latest-jobs',
-    categories: ['vacancy', 'central', 'railway'],
+    slug: 'mp-police-subedar-asi-2026',
+    title: 'MP Police Subedar, Steno & Assistant Sub Inspector (ASI) Recruitment 2026',
+    shortTitle: 'MP Police Subedar & ASI 2026',
+    dept: 'MP Police / MPESB Bhopal',
+    category: 'mp-special',
+    categories: ['vacancy', 'mp_special', 'police'],
     status: 'published',
-    publishedAt: '21/09/2026',
-    totalPosts: '1,03,769',
-    qualification: '10th Pass or ITI from NCVT/SCVT',
-    lastDate: '28/10/2026',
-    detailsUrl: '/2026/09/04/railway-rrc-group-d',
+    publishedAt: '24/09/2026',
+    totalPosts: '655',
+    qualification: '12th Pass + CPCT Scorecard / Stenography Certificate',
+    lastDate: '08/10/2026',
+    detailsUrl: '/2026/09/04/mp-police-subedar-asi-2026',
     content:
-      'Indian Railways Centralized Employment Notification for Track Maintainer Grade IV, Helper/Assistant across electrical, mechanical, and S&T departments.',
-    state: 'Central',
+      'Madhya Pradesh Employees Selection Board (MPESB Bhopal) invites online applications for 655 Subedar, Stenographer, and Assistant Sub-Inspector (Ministerial) vacancies. Application start 24/09/2026, Last date 08/10/2026, Written exam from 03/11/2026.',
+    state: 'MP',
     dates: {
-      start: '12/09/2026',
-      end: '28/10/2026',
-      exam: 'जनवरी 2027'
+      start: '24/09/2026',
+      end: '08/10/2026',
+      exam: '03/11/2026 से प्रारंभ'
     },
     fee: {
       gen: '₹500/-',
       reserved: '₹250/-'
     },
     links: {
-      apply: 'https://www.rrcb.gov.in',
-      notificationPdf: 'https://www.rrcb.gov.in/notice_group_d_2026.pdf',
-      officialSite: 'https://www.rrcb.gov.in'
+      apply: 'https://esb.mponline.gov.in',
+      notificationPdf: 'https://esb.mp.gov.in/Rulebooks/RB_2026/ASI_Steno_2026_Rulebook.pdf',
+      officialSite: 'https://esb.mp.gov.in'
     },
     posterConfig: {
-      headline: '★ रेलवे RRC ग्रुप-D 1 लाख+ पदों पर महाभर्ती 2026 ★',
+      headline: '★ मध्य प्रदेश पुलिस सूबेदार एवं ASI (स्टेनो) 655 पद भर्ती ★',
       keyPoints: [
-        'कुल पद: 1,03,769 पद',
-        'योग्यता: 10वीं पास या ITI',
-        'अंतिम तिथि: 28/10/2026',
-        'घर बैठे सुरक्षित आवेदन: 8982324497'
+        'कुल पद: 655 (सूबेदार, स्टेनो, ASI मिनिस्ट्रियल)',
+        'योग्यता: 12वीं + CPCT स्कोरकार्ड / स्टेनो',
+        'अंतिम तिथि: 08/10/2026',
+        'घर बैठे सुरक्षित फॉर्म भरवाएं: 8982324497'
       ],
-      note: 'संपर्क करें: Nitish Khobragade (8982324497)'
+      note: 'घर बैठे त्रुटिरहित ऑनलाइन फॉर्म भरवाने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
     },
     minAge: '18 वर्ष',
     maxAge: '33 वर्ष'
@@ -592,15 +592,28 @@ export function seedPostToPostRecord(post: SeedPostData): PostRecord {
 
 /**
  * Returns formatted in-memory list for immediate rendering without delays,
- * incorporating both base seeds and audited drafts.
+ * strictly filtering out any posts deleted by Admin.
  */
 export function getInitialSeedPosts(): PostRecord[] {
-  return INITIAL_SEED_POSTS.map(seedPostToPostRecord);
+  const list = INITIAL_SEED_POSTS.map(seedPostToPostRecord);
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('np_portal_deleted_post_ids_v1');
+      if (raw) {
+        const deletedArr: string[] = JSON.parse(raw);
+        if (Array.isArray(deletedArr) && deletedArr.length > 0) {
+          const deletedSet = new Set(deletedArr);
+          return list.filter((p) => !deletedSet.has(p.id) && !deletedSet.has(p.slug || p.id));
+        }
+      }
+    } catch {}
+  }
+  return list;
 }
 
 /**
  * Checks Firestore collection 'posts' and seeds all posts if empty.
- * Can also force re-sync when requested by Admin.
+ * Can also force re-sync when requested by Admin. Strictly skips deleted tombstones.
  */
 export async function seedPostsIfEmpty(forceReSync: boolean = false): Promise<{ success: boolean; count: number }> {
   try {
@@ -611,8 +624,21 @@ export async function seedPostsIfEmpty(forceReSync: boolean = false): Promise<{ 
       return { success: true, count: snap.size };
     }
 
+    // Load tombstones from settings/tombstones if available
+    const deletedSet = new Set<string>();
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('np_portal_deleted_post_ids_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) parsed.forEach((id: string) => deletedSet.add(id));
+        }
+      } catch {}
+    }
+
     let seededCount = 0;
     for (const post of INITIAL_SEED_POSTS) {
+      if (deletedSet.has(post.slug)) continue;
       const docRef = doc(db, 'posts', post.slug);
       const payload: Record<string, unknown> = {
         ...post,

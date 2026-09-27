@@ -16,7 +16,8 @@ import {
   Briefcase,
   Send,
   BellRing,
-  BookOpen
+  BookOpen,
+  Wrench
 } from 'lucide-react';
 import { OWNER_INFO } from '../data/portalData';
 import { ContactModal } from './ContactModal';
@@ -177,15 +178,20 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <span>Telegram</span>
             </a>
 
-            <a
-              href={OWNER_INFO.whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+            {/* Direct Tools Button (Replaced WhatsApp Button as requested) */}
+            <Link
+              href="/tools"
+              className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs shadow-xs transition-all active:scale-95 cursor-pointer ${
+                pathname.startsWith('/tools')
+                  ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300'
+                  : 'bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800 text-white ring-1 ring-violet-400/40'
+              }`}
+              title="सरकारी फॉर्म टूल्स (Photo Resizer, Name on Photo, PDF Maker)"
             >
-              <MessageCircle className="w-4 h-4 fill-white" />
-              <span>WhatsApp</span>
-            </a>
+              <Wrench className="w-4 h-4 text-amber-300" />
+              <span>Tools</span>
+              <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase ml-0.5">Free</span>
+            </Link>
 
             <a
               href={OWNER_INFO.callUrl}
@@ -196,17 +202,20 @@ const HeaderInner: React.FC<HeaderProps> = ({
             </a>
           </div>
 
-          {/* Mobile Right Controls: WhatsApp Quick Icon & Hamburger */}
+          {/* Mobile Right Controls: Tools Quick Button & Hamburger */}
           <div className="flex md:hidden items-center gap-2">
-            <a
-              href={OWNER_INFO.whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-lg bg-emerald-600 text-white shadow-xs"
-              aria-label="WhatsApp Nitish Khobragade"
+            <Link
+              href="/tools"
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black shadow-xs transition-all active:scale-95 ${
+                pathname.startsWith('/tools')
+                  ? 'bg-amber-400 text-slate-950 ring-1 ring-amber-300'
+                  : 'bg-gradient-to-r from-violet-600 to-indigo-700 text-white'
+              }`}
+              aria-label="सरकारी फॉर्म टूल्स (Tools)"
             >
-              <MessageCircle className="w-4 h-4 fill-white" />
-            </a>
+              <Wrench className="w-3.5 h-3.5 text-amber-300" />
+              <span>Tools</span>
+            </Link>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -330,6 +339,20 @@ const HeaderInner: React.FC<HeaderProps> = ({
               }`}
             >
               <span>📖 ब्लॉग (Blogs)</span>
+            </Link>
+
+            {/* Tools Link in Navbar */}
+            <Link
+              href="/tools"
+              className={`px-3.5 py-3 transition-colors uppercase font-black flex items-center gap-1.5 cursor-pointer ${
+                pathname.startsWith('/tools')
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-violet-300 hover:bg-violet-700 hover:text-white'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5 text-amber-300" />
+              <span>🛠️ टूल्स (Tools)</span>
+              <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">Free</span>
             </Link>
 
             {/* More Dropdown */}
@@ -544,6 +567,19 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <div className="px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <span>अन्य सेवाएं एवं विकल्प</span>
               </div>
+
+              {/* Tools Link in mobile drawer */}
+              <Link
+                href="/tools"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2 py-1.5 rounded-md flex items-center justify-between text-xs font-black text-amber-300 bg-violet-950/70 border border-violet-700/60 hover:bg-violet-900 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>🛠️ सरकारी फॉर्म टूल्स (Photo, Sign & PDF Tools)</span>
+                </div>
+                <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded">Free</span>
+              </Link>
 
               {/* Blogs link in mobile drawer */}
               <Link

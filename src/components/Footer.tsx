@@ -188,6 +188,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-center gap-3">
               <Link href="/disclaimer" className="hover:text-white">डिस्क्लेमर</Link>
               <Link href="/about-us" className="hover:text-white">सेवाएं</Link>
+              <Link href="/tools" className="text-amber-400 font-bold hover:text-amber-300">🛠️ फॉर्म टूल्स</Link>
               <Link href="/blogs" className="text-amber-400 font-bold hover:text-amber-300">करियर ब्लॉग्स</Link>
               <Link
                 href="/admin"

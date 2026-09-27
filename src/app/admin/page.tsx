@@ -271,6 +271,10 @@ export default function AdminPage() {
   const [singleAuditResult, setSingleAuditResult] = useState<PostAuditResult | null>(null);
   const [singleAuditError, setSingleAuditError] = useState<string | null>(null);
 
+  // In-App Post Deletion Confirmation Modal State
+  const [postToDelete, setPostToDelete] = useState<PostRecord | null>(null);
+  const [isDeletingPost, setIsDeletingPost] = useState<boolean>(false);
+
   // Multi-Source Scraper Controller State
   const [scraperSources, setScraperSources] = useState<ScraperSource[]>([]);
   const [scrapedDrafts, setScrapedDrafts] = useState<ScrapedJobDraft[]>([]);
@@ -539,17 +543,29 @@ export default function AdminPage() {
     setErrorMsg("");
   };
 
-  // Delete Post Action with admin password verification ("admin@nk")
-  const handleDeletePost = async (id: string, title: string) => {
-    const enteredPass = window.prompt(`पोस्ट "${title}" को हटाने हेतु एडमिन पासवर्ड दर्ज करें:`);
-    if (enteredPass === null) return;
-    if (enteredPass.trim() !== 'admin@nk') {
-      showToast('गलत पासवर्ड! पोस्ट नहीं हटाई गई। (Invalid admin password)');
-      return;
+  // Delete Post Action - In-App Confirmation Handler
+  const handleInitiateDeletePost = (job: PostRecord) => {
+    setPostToDelete(job);
+  };
+
+  const handleConfirmDeletePost = async () => {
+    if (!postToDelete) return;
+    setIsDeletingPost(true);
+    try {
+      const { id, slug, title } = postToDelete;
+      await deleteJob(id, slug);
+      setPosts((prev) =>
+        prev.filter((p) => p.id !== id && p.slug !== id && (slug ? p.id !== slug && p.slug !== slug : true))
+      );
+      showToast(`सफलतापूर्वक हटाया गया: ${title}`);
+      setPostToDelete(null);
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to delete post:', err);
+      showToast('पोस्ट हटाने में त्रुटि हुई। कृपया पुनः प्रयास करें।');
+    } finally {
+      setIsDeletingPost(false);
     }
-    await deleteJob(id);
-    setPosts((prev) => prev.filter((p) => p.id !== id));
-    showToast(`सफलतापूर्वक हटाया गया: ${title}`);
   };
 
   // Open Edit Links Modal
@@ -2789,7 +2805,7 @@ export default function AdminPage() {
 
                                 {/* Delete */}
                                 <button
-                                  onClick={() => handleDeletePost(job.id, job.title)}
+                                  onClick={() => handleInitiateDeletePost(job)}
                                   className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-600 text-rose-300 hover:text-white transition-colors cursor-pointer"
                                   title="पोस्ट हटाएं (Delete)"
                                 >
@@ -4782,6 +4798,67 @@ export default function AdminPage() {
         onRetry={() => singleAuditTargetJob && handleRunSingleAudit(singleAuditTargetJob)}
         errorMessage={singleAuditError}
       />
+
+      {/* IN-APP POST DELETION CONFIRMATION MODAL */}
+      {postToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl text-left animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-400 mb-4">
+              <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-800/60">
+                <Trash2 className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">भर्ती पोस्ट हटाएं (Delete Post)</h3>
+                <p className="text-xs text-slate-400">यह क्रिया अपरिवर्तनीय है (Permanent)</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 mb-5 space-y-1.5">
+              <p className="text-xs font-medium text-slate-400">हटाने हेतु चुनी गई पोस्ट:</p>
+              <p className="text-sm font-semibold text-rose-200 line-clamp-2">{postToDelete.title}</p>
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
+                <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">ID: {postToDelete.id}</span>
+                {postToDelete.dept && (
+                  <span className="truncate">{postToDelete.dept}</span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed mb-6">
+              क्या आप वाकई इस भर्ती को डेटाबेस से स्थायी रूप से हटाना चाहते हैं? यह होम पेज और सभी संबंधित सूचियों से तुरंत हटा दी जाएगी और पुनः प्रकट नहीं होगी।
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPostToDelete(null)}
+                disabled={isDeletingPost}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                रद्द करें (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePost}
+                disabled={isDeletingPost}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-lg shadow-rose-900/40 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {isDeletingPost ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    हटाया जा रहा है...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    हाँ, स्थायी रूप से हटाएं
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

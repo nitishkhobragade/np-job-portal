@@ -25,9 +25,9 @@ export const AUDITED_POSTS_DATABASE: PostRecord[] = [
     status: 'published',
     publishedDate: '21/09/2026',
     publishedAt: '21/09/2026',
-    startDate: '15/09/2026',
-    lastDate: '15/10/2026',
-    examDate: 'दिसंबर 2026',
+    startDate: '22/09/2026',
+    lastDate: '06/10/2026',
+    examDate: '19/11/2026 से प्रारंभ',
     admitCardDate: 'परीक्षा से 7 दिन पूर्व',
     totalPosts: '7,500',
     qualification: '10th / 12th Pass (GD) | ITI / Polytechnic Diploma (Radio Operator)',
@@ -47,12 +47,12 @@ export const AUDITED_POSTS_DATABASE: PostRecord[] = [
     notificationPdf: 'https://esb.mp.gov.in/notices/MP_Police_Constable_Rulebook_2026.pdf',
     detailsUrl: '/2026/09/01/mp-police-constable-recruitment-2026',
     content:
-      'Madhya Pradesh Employees Selection Board (MPESB Bhopal) has released notification for 7,500 Constable GD & Radio Operator posts in MP Police. Physical test, written exam details, and step-by-step application guidance.',
+      'Madhya Pradesh Employees Selection Board (MPESB Bhopal) has released notification for 7,500 Constable GD & Radio Operator posts in MP Police. Online application start 22/09/2026, Last date 06/10/2026, Written exam from 19/11/2026 onwards.',
     state: 'MP',
     dates: {
-      start: '15/09/2026',
-      end: '15/10/2026',
-      exam: 'दिसंबर 2026'
+      start: '22/09/2026',
+      end: '06/10/2026',
+      exam: '19/11/2026 से प्रारंभ'
     },
     fee: {
       gen: '₹500/-',
@@ -394,71 +394,6 @@ export const AUDITED_POSTS_DATABASE: PostRecord[] = [
         'पद: कांस्टेबल (BSF, CISF, CRPF, ITBP, SSB)',
         'योग्यता: 10वीं पास (Matriculation)',
         'अंतिम तिथि: 14/10/2026',
-        'फॉर्म भरवाएं: Nitish Khobragade (8982324497)'
-      ],
-      note: 'घर बैठे फॉर्म भरने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'
-    }
-  },
-
-  // 7. MP ITI Training Officer (TO) 2026
-  {
-    id: 'mp-iti-training-officer-to-2026',
-    slug: 'mp-iti-training-officer-to-2026',
-    blogNo: '08',
-    year: '2026',
-    month: '09',
-    title: 'MP ITI Training Officer (TO) Recruitment 2026',
-    shortTitle: 'MP ITI TO 450 पद भर्ती',
-    dept: 'Department of Technical Education, Skill Development & Employment / MPESB',
-    category: 'mp-special',
-    categories: ['vacancy', 'mp_special', 'teaching'],
-    status: 'published',
-    publishedDate: '21/09/2026',
-    publishedAt: '21/09/2026',
-    startDate: '16/09/2026',
-    lastDate: '22/10/2026',
-    examDate: 'नवंबर 2026',
-    admitCardDate: 'परीक्षा से 7 दिन पूर्व',
-    totalPosts: '450',
-    qualification: '10th + ITI / NAC in relevant trade OR Polytechnic Diploma / BE / B.Tech',
-    eligibility: '10वीं + संबंधित ट्रेड में ITI / डिप्लोमा अथवा बीई/बीटेक',
-    ageLimit: {
-      min: '18 वर्ष',
-      max: '40 वर्ष',
-      relaxation: 'MP आरक्षित वर्गों (SC/ST/OBC) एवं महिलाओं हेतु 5 वर्ष की छूट'
-    },
-    applicationFees: {
-      ur: '₹500/-',
-      reserved: '₹250/-',
-      portalFee: '₹60/-'
-    },
-    isItMnc: false,
-    applyLink: 'https://esb.mp.gov.in',
-    notificationPdf: 'https://esb.mp.gov.in/rulebooks/ITI_TO_2026_Rulebook.pdf',
-    detailsUrl: '/2026/09/08/mp-iti-training-officer-to-2026',
-    content:
-      'MPESB invites online applications for ITI Training Officer (TO) in government industrial training institutes across Madhya Pradesh.',
-    state: 'MP',
-    dates: {
-      start: '16/09/2026',
-      end: '22/10/2026',
-      exam: 'नवंबर 2026'
-    },
-    fee: {
-      gen: '₹500/-',
-      reserved: '₹250/-'
-    },
-    links: {
-      apply: 'https://esb.mp.gov.in',
-      notificationPdf: 'https://esb.mp.gov.in/rulebooks/ITI_TO_2026_Rulebook.pdf',
-      officialSite: 'https://esb.mp.gov.in'
-    },
-    posterConfig: {
-      headline: '★ एमपी आईटीआई ट्रेनिंग ऑफिसर (TO) 450 पद भर्ती 2026 ★',
-      keyPoints: [
-        'पद: प्रशिक्षण अधिकारी (Training Officer - ITI)',
-        'योग्यता: संबंधित ट्रेड में ITI / डिप्लोमा / BE / B.Tech',
-        'अंतिम तिथि: 22/10/2026',
         'फॉर्म भरवाएं: Nitish Khobragade (8982324497)'
       ],
       note: 'घर बैठे फॉर्म भरने हेतु Nitish Khobragade (8982324497) से संपर्क करें।'

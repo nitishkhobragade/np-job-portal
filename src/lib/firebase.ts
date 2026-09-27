@@ -71,20 +71,94 @@ let memoryPopupAd: PopupAdSettings = { ...DEFAULT_POPUP_AD };
 const STORAGE_POSTS_KEY = 'np_portal_firestore_posts_cache_v3';
 const STORAGE_POPUP_KEY = 'np_portal_popup_ad_settings_v3';
 const STORAGE_SCRAPER_KEY = 'np_portal_scraper_queue_v3';
+const STORAGE_DELETED_POSTS_KEY = 'np_portal_deleted_post_ids_v1';
+
+// In-memory set of deleted post IDs to prevent resurrections
+const memoryDeletedIds = new Set<string>();
+
+export const getDeletedPostIds = (): Set<string> => {
+  if (typeof window === 'undefined') return memoryDeletedIds;
+  try {
+    const raw = localStorage.getItem(STORAGE_DELETED_POSTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((id: string) => memoryDeletedIds.add(id));
+      }
+    }
+  } catch {}
+  return memoryDeletedIds;
+};
+
+export const recordDeletedPostId = (id: string, slug?: string) => {
+  memoryDeletedIds.add(id);
+  if (slug) memoryDeletedIds.add(slug);
+  if (typeof window !== 'undefined') {
+    try {
+      const current = Array.from(getDeletedPostIds());
+      if (!current.includes(id)) current.push(id);
+      if (slug && !current.includes(slug)) current.push(slug);
+      localStorage.setItem(STORAGE_DELETED_POSTS_KEY, JSON.stringify(current));
+    } catch {}
+  }
+};
+
+/**
+ * Synchronizes tombstones from Firestore settings/tombstones collection
+ */
+export async function syncTombstonesFromFirestore(): Promise<Set<string>> {
+  try {
+    const tombstoneRef = doc(db, 'settings', 'tombstones');
+    const snap = await getDoc(tombstoneRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data?.deletedIds)) {
+        data.deletedIds.forEach((item: string) => {
+          if (item) recordDeletedPostId(item);
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Direct Firestore tombstone sync notice:', err);
+  }
+
+  // Backup sync via server API endpoint
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/admin/delete-job');
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json?.deletedIds)) {
+          json.deletedIds.forEach((item: string) => {
+            if (item) recordDeletedPostId(item);
+          });
+        }
+      }
+    } catch {}
+  }
+
+  return getDeletedPostIds();
+}
 
 // Safe LocalStorage helpers
 export const getStoredPosts = (): PostRecord[] => {
-  if (typeof window === 'undefined') return memoryPosts;
+  const deleted = getDeletedPostIds();
+  const filterDeleted = (list: PostRecord[]) =>
+    list.filter((p) => !deleted.has(p.id) && !deleted.has(p.slug || p.id));
+
+  if (typeof window === 'undefined') return filterDeleted(memoryPosts);
   try {
     const raw = localStorage.getItem(STORAGE_POSTS_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_POSTS_KEY, JSON.stringify(SEED_POSTS));
-      return SEED_POSTS;
+      const filteredSeeds = filterDeleted(SEED_POSTS);
+      localStorage.setItem(STORAGE_POSTS_KEY, JSON.stringify(filteredSeeds));
+      return filteredSeeds;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED_POSTS;
+    const result = Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED_POSTS;
+    return filterDeleted(result);
   } catch {
-    return memoryPosts;
+    return filterDeleted(memoryPosts);
   }
 };
 
@@ -167,6 +241,17 @@ export function subscribeToPosts(
     : initial;
   onUpdate(filteredInitial);
 
+  // Sync tombstones asynchronously and re-emit if changed
+  if (typeof window !== 'undefined') {
+    syncTombstonesFromFirestore()
+      .then(() => {
+        const fresh = getStoredPosts();
+        fresh.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
+        onUpdate(statusFilter === 'published' ? fresh.filter((p) => (p.status || 'published') === 'published') : fresh);
+      })
+      .catch(() => {});
+  }
+
   // Auto-seed if collection is empty on first mount
   if (!hasAttemptedSeed && typeof window !== 'undefined') {
     hasAttemptedSeed = true;
@@ -183,10 +268,15 @@ export function subscribeToPosts(
       q,
       (snapshot) => {
         if (!snapshot.empty) {
+          const deleted = getDeletedPostIds();
           const list: PostRecord[] = [];
           snapshot.forEach((docSnap) => {
             const data = docSnap.data() as PostRecord;
-            list.push({ ...data, id: docSnap.id });
+            const docId = docSnap.id;
+            const docSlug = data.slug || docId;
+            if (!deleted.has(docId) && !deleted.has(docSlug)) {
+              list.push({ ...data, id: docId });
+            }
           });
           // Sort real-time descending: newest published first
           list.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
@@ -210,6 +300,7 @@ export function subscribeToPosts(
  * Fetch all posts from Firestore collection 'posts', falling back to cached seed
  */
 export async function getJobs(statusFilter?: 'published' | 'all'): Promise<PostRecord[]> {
+  const deleted = getDeletedPostIds();
   try {
     const postsCol = collection(db, 'posts');
     const q = statusFilter === 'published'
@@ -219,7 +310,12 @@ export async function getJobs(statusFilter?: 'published' | 'all'): Promise<PostR
     if (!snapshot.empty) {
       const firestoreList: PostRecord[] = [];
       snapshot.forEach((docSnap) => {
-        firestoreList.push({ ...(docSnap.data() as PostRecord), id: docSnap.id });
+        const data = docSnap.data() as PostRecord;
+        const docId = docSnap.id;
+        const docSlug = data.slug || docId;
+        if (!deleted.has(docId) && !deleted.has(docSlug)) {
+          firestoreList.push({ ...data, id: docId });
+        }
       });
       firestoreList.sort((a, b) => getPostSortingTimestamp(b) - getPostSortingTimestamp(a));
       persistStoredPosts(firestoreList);
@@ -509,18 +605,80 @@ export async function updateJob(id: string, updates: Partial<PostRecord>): Promi
 }
 
 /**
- * Delete a job by its ID with real-time deleteDoc
+ * Delete a job by its ID and optional Slug with real-time deleteDoc and persistent tombstone
  */
-export async function deleteJob(id: string): Promise<boolean> {
+export async function deleteJob(id: string, slug?: string): Promise<boolean> {
+  // 1. Record tombstone immediately in memory & localStorage
+  recordDeletedPostId(id, slug);
+
+  // 2. Direct Firestore delete
   try {
     const docRef = doc(db, 'posts', id);
     await deleteDoc(docRef);
   } catch (err) {
-    console.warn('Firestore deleteJob error:', err);
+    console.warn('Firestore deleteDoc direct ID error:', err);
   }
 
+  if (slug && slug !== id) {
+    try {
+      const docRefSlug = doc(db, 'posts', slug);
+      await deleteDoc(docRefSlug);
+    } catch {}
+  }
+
+  // 3. Query collection for any docs matching id or slug
+  try {
+    const postsCol = collection(db, 'posts');
+    const qSlug = query(postsCol, where('slug', '==', id));
+    const snapSlug = await getDocs(qSlug);
+    snapSlug.forEach(async (d) => {
+      try {
+        await deleteDoc(d.ref);
+      } catch {}
+    });
+
+    if (slug) {
+      const qSlug2 = query(postsCol, where('slug', '==', slug));
+      const snapSlug2 = await getDocs(qSlug2);
+      snapSlug2.forEach(async (d) => {
+        try {
+          await deleteDoc(d.ref);
+        } catch {}
+      });
+    }
+  } catch (qErr) {
+    console.warn('Firestore query-based delete error:', qErr);
+  }
+
+  // 4. Server-side deletion call for Firestore persistence and tombstone recording
+  try {
+    await fetch('/api/admin/delete-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, slug })
+    });
+  } catch (fetchErr) {
+    console.warn('Server-side delete route notice:', fetchErr);
+  }
+
+  // 5. Direct client-side tombstone write if Firestore is accessible
+  try {
+    const tombstoneRef = doc(db, 'settings', 'tombstones');
+    await setDoc(
+      tombstoneRef,
+      {
+        deletedIds: arrayUnion(id, ...(slug ? [slug] : [])),
+        updatedAt: Date.now()
+      },
+      { merge: true }
+    );
+  } catch {}
+
+  // 6. Update local memory and cache
   const currentPosts = getStoredPosts();
-  const filtered = currentPosts.filter((p) => p.id !== id && p.slug !== id);
+  const filtered = currentPosts.filter(
+    (p) => p.id !== id && p.slug !== id && (slug ? p.id !== slug && p.slug !== slug : true)
+  );
   persistStoredPosts(filtered);
   return true;
 }
