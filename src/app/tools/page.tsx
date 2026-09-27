@@ -24,7 +24,9 @@ import {
   ArrowLeft,
   Grid,
   Shuffle,
-  Trash2
+  Trash2,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Header } from '../../components/Header';
@@ -473,10 +475,50 @@ export default function ToolsPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showExitModal, setShowExitModal] = useState<boolean>(false);
 
-  // Sync when hash changes externally
+  // Theme: 'dark' (default) or 'light'
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('np_tools_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'dark';
+  });
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('np_tools_theme', next);
+      }
+      return next;
+    });
+  }, []);
+
+  // Refs for bulletproof back-button and hash protection
+  const viewModeRef = React.useRef(viewMode);
+  const activeToolRef = React.useRef(activeTool);
+  const isExitingConfirmedRef = React.useRef(false);
+
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+    activeToolRef.current = activeTool;
+  }, [viewMode, activeTool]);
+
+  // Sync when hash changes externally & protect against accidental back
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
+
+      // If user was in active workspace and hasn't confirmed exit, accidental back button clicked!
+      if (viewModeRef.current === 'workspace' && !isExitingConfirmedRef.current) {
+        if (!hash || hash === 'grid' || hash === 'all' || hash !== activeToolRef.current) {
+          // Re-lock the hash immediately to keep user on tool
+          window.location.hash = activeToolRef.current;
+          setShowExitModal(true);
+          return;
+        }
+      }
+
       if (hash && hash !== 'grid' && hash !== 'all') {
         const found = TOOLS_CONFIG.find((t) => t.id === hash);
         if (found) {
@@ -485,55 +527,75 @@ export default function ToolsPage() {
           return;
         }
       }
-      setViewMode('grid');
+
+      if (isExitingConfirmedRef.current || viewModeRef.current !== 'workspace') {
+        setViewMode('grid');
+      }
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // ACCIDENTAL BACK BUTTON PREVENTION
+  // ACCIDENTAL BACK BUTTON & EXIT PREVENTION SYSTEM
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.history.pushState({ page: 'tools-active' }, '');
+    if (typeof window === 'undefined') return;
 
-      const handlePopState = () => {
-        if (viewMode === 'workspace') {
-          // If in workspace, back returns to PDF24 grid view
-          window.history.pushState({ page: 'tools-active' }, '');
-          setViewMode('grid');
-          window.history.replaceState(null, '', '/tools');
-        } else {
-          // In grid, show exit modal
-          window.history.pushState({ page: 'tools-active' }, '');
-          setShowExitModal(true);
-        }
-      };
-
-      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        if (viewMode === 'workspace') {
-          e.preventDefault();
-          e.returnValue = '';
-        }
-      };
-
-      window.addEventListener('popstate', handlePopState);
-      window.addEventListener('beforeunload', handleBeforeUnload);
-
-      return () => {
-        window.removeEventListener('popstate', handlePopState);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-      };
+    // Ensure there is always an internal history state to intercept
+    if (viewMode === 'workspace') {
+      window.history.pushState({ page: 'tools-workspace', tool: activeTool }, '', `/tools#${activeTool}`);
     }
-  }, [viewMode]);
+
+    const handlePopState = () => {
+      if (viewModeRef.current === 'workspace' && !isExitingConfirmedRef.current) {
+        // ALWAYS re-push history state to prevent unconfirmed exit
+        window.history.pushState({ page: 'tools-workspace', tool: activeToolRef.current }, '', `/tools#${activeToolRef.current}`);
+        // Trigger the explicit confirmation modal
+        setShowExitModal(true);
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (viewModeRef.current === 'workspace') {
+        e.preventDefault();
+        e.returnValue = 'आपके द्वारा किए गए बदलाव या फ़ाइल रिसेट हो सकती है। क्या आप सच में छोड़ना चाहते हैं?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [viewMode, activeTool]);
 
   const handleConfirmExit = useCallback(() => {
+    isExitingConfirmedRef.current = true;
     setShowExitModal(false);
-    router.push('/');
-  }, [router]);
+    if (viewMode === 'workspace') {
+      setViewMode('grid');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({ page: 'tools-grid' }, '', '/tools');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else {
+      router.push('/');
+    }
+    setTimeout(() => {
+      isExitingConfirmedRef.current = false;
+    }, 400);
+  }, [viewMode, router]);
 
   const handleCancelExit = useCallback(() => {
     setShowExitModal(false);
+  }, []);
+
+  const requestBackToGrid = useCallback(() => {
+    // Show confirmation modal before leaving the active tool workspace
+    setShowExitModal(true);
   }, []);
 
   // Filter tools based on category and search query
@@ -560,17 +622,8 @@ export default function ToolsPage() {
   const openTool = (id: ToolId) => {
     setActiveTool(id);
     setViewMode('workspace');
-    setMobileSidebarOpen(false);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/tools#${id}`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const backToGrid = () => {
-    setViewMode('grid');
-    if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/tools');
+      window.history.pushState({ page: 'tools-workspace', tool: id, view: 'workspace' }, '', `/tools#${id}`);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -584,7 +637,9 @@ export default function ToolsPage() {
   const utilCount = TOOLS_CONFIG.filter((t) => t.category === 'utility').length;
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col font-sans text-slate-100">
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+      theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+    }`}>
       {/* Schema.org WebApplication Metadata for Search Engines */}
       <script
         type="application/ld+json"
@@ -619,49 +674,65 @@ export default function ToolsPage() {
 
       <Header />
 
-      {/* ACCIDENTAL EXIT MODAL */}
+      {/* ACCIDENTAL EXIT MODAL WITH CONTEXT-AWARE WARNING */}
       {showExitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-slate-900 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-800 space-y-4 text-slate-100">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
-                <AlertTriangle className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className={`rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border space-y-4 ${
+            theme === 'dark'
+              ? 'bg-slate-900 border-slate-700 text-slate-100'
+              : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+          }`}>
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/30">
+                <AlertTriangle className="w-7 h-7 animate-pulse text-amber-500" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-sm sm:text-base font-black text-slate-100">
-                  पेज छोड़ने की पुष्टि (Unsaved Work Warning)
+                <h3 className={`text-base sm:text-lg font-black ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {viewMode === 'workspace'
+                    ? '⚠️ क्या आप वापस जाना चाहते हैं?'
+                    : 'पोर्टल मुख्य पेज पर जाने की पुष्टि'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  क्या आप सच में NP Job Portal के मुख्य पेज पर वापस जाना चाहते हैं?
+                <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {viewMode === 'workspace' ? (
+                    <>
+                      आप अभी <strong className="text-amber-500 font-bold">{currentTool.name}</strong> में काम कर रहे हैं। यदि आप वापस जाएंगे, तो आपकी अपलोड की गई फ़ाइल व प्रोग्रेस रिसेट हो सकती है। क्या आप सच में वापस जाना चाहते हैं?
+                    </>
+                  ) : (
+                    'क्या आप टूल्स पेज छोड़कर NP Job Portal के मुख्य पेज पर वापस जाना चाहते हैं?'
+                  )}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  (Do you really want to return to home page?)
+                <p className={`text-[11px] mt-1.5 font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  (Accidental back prevented: Do you want to go back? Unsaved progress will be discarded.)
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className={`flex items-center justify-end gap-2.5 pt-3 border-t ${
+              theme === 'dark' ? 'border-slate-800' : 'border-slate-200'
+            }`}>
               <button
                 type="button"
                 onClick={handleCancelExit}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-black cursor-pointer transition-colors"
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-black cursor-pointer transition-all shadow-md active:scale-95"
               >
-                नहीं, यहीं रहें (Stay Here)
+                {viewMode === 'workspace' ? 'नहीं, काम जारी रखें (Stay Here)' : 'नहीं, यहीं रहें'}
               </button>
               <button
                 type="button"
                 onClick={handleConfirmExit}
-                className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer transition-colors"
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-black cursor-pointer transition-all shadow-sm active:scale-95"
               >
-                हाँ, वापस जाएं (Go Home)
+                {viewMode === 'workspace' ? 'हाँ, वापस जाएं (Leave)' : 'हाँ, मुख्य पेज पर जाएं'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* STICKY TOP SUB-HEADER: SEARCH & VIEW CONTROLS */}
-      <nav className="bg-slate-900 border-b border-slate-800 sticky top-[48px] sm:top-[52px] z-30 shadow-md">
+      {/* STICKY TOP SUB-HEADER: SEARCH, FILTERS & THEME TOGGLE */}
+      <nav className={`sticky top-[48px] sm:top-[52px] z-30 shadow-md transition-colors duration-200 border-b ${
+        theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+      }`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
             {/* Left: View Mode Indicator & Category Filter Tabs */}
@@ -669,7 +740,7 @@ export default function ToolsPage() {
               {viewMode === 'workspace' && (
                 <button
                   type="button"
-                  onClick={backToGrid}
+                  onClick={requestBackToGrid}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
                   title="सभी टूल्स की ग्रिड सूची देखें"
                 >
@@ -682,12 +753,14 @@ export default function ToolsPage() {
                 type="button"
                 onClick={() => {
                   setActiveCategory('all');
-                  if (viewMode === 'workspace') setViewMode('grid');
+                  if (viewMode === 'workspace') requestBackToGrid();
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all cursor-pointer ${
                   activeCategory === 'all' && viewMode === 'grid'
                     ? 'bg-red-600 text-white shadow-xs'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    : theme === 'dark'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                 }`}
               >
                 सभी टूल्स ({TOOLS_CONFIG.length})
@@ -697,12 +770,14 @@ export default function ToolsPage() {
                 type="button"
                 onClick={() => {
                   setActiveCategory('image');
-                  if (viewMode === 'workspace') setViewMode('grid');
+                  if (viewMode === 'workspace') requestBackToGrid();
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all cursor-pointer ${
                   activeCategory === 'image' && viewMode === 'grid'
                     ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-xs'
-                    : 'bg-slate-800/80 hover:bg-slate-700 text-rose-300 border border-rose-500/20'
+                    : theme === 'dark'
+                    ? 'bg-slate-800/80 hover:bg-slate-700 text-rose-300 border border-rose-500/20'
+                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
                 }`}
               >
                 <Camera className="w-3.5 h-3.5" />
@@ -713,12 +788,14 @@ export default function ToolsPage() {
                 type="button"
                 onClick={() => {
                   setActiveCategory('pdf');
-                  if (viewMode === 'workspace') setViewMode('grid');
+                  if (viewMode === 'workspace') requestBackToGrid();
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all cursor-pointer ${
                   activeCategory === 'pdf' && viewMode === 'grid'
                     ? 'bg-gradient-to-r from-purple-600 to-indigo-700 text-white shadow-xs'
-                    : 'bg-slate-800/80 hover:bg-slate-700 text-purple-300 border border-purple-500/20'
+                    : theme === 'dark'
+                    ? 'bg-slate-800/80 hover:bg-slate-700 text-purple-300 border border-purple-500/20'
+                    : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -729,12 +806,14 @@ export default function ToolsPage() {
                 type="button"
                 onClick={() => {
                   setActiveCategory('converters');
-                  if (viewMode === 'workspace') setViewMode('grid');
+                  if (viewMode === 'workspace') requestBackToGrid();
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all cursor-pointer ${
                   activeCategory === 'converters' && viewMode === 'grid'
                     ? 'bg-gradient-to-r from-blue-600 to-cyan-700 text-white shadow-xs'
-                    : 'bg-slate-800/80 hover:bg-slate-700 text-blue-300 border border-blue-500/20'
+                    : theme === 'dark'
+                    ? 'bg-slate-800/80 hover:bg-slate-700 text-blue-300 border border-blue-500/20'
+                    : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
                 }`}
               >
                 <FileType className="w-3.5 h-3.5" />
@@ -745,12 +824,14 @@ export default function ToolsPage() {
                 type="button"
                 onClick={() => {
                   setActiveCategory('utility');
-                  if (viewMode === 'workspace') setViewMode('grid');
+                  if (viewMode === 'workspace') requestBackToGrid();
                 }}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
                   activeCategory === 'utility' && viewMode === 'grid'
                     ? 'bg-slate-700 text-white shadow-xs'
-                    : 'bg-slate-800/60 hover:bg-slate-700 text-slate-400'
+                    : theme === 'dark'
+                    ? 'bg-slate-800/60 hover:bg-slate-700 text-slate-400'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
@@ -758,34 +839,71 @@ export default function ToolsPage() {
               </button>
             </div>
 
-            {/* Right: Quick Search Box */}
+            {/* Right: Quick Search Box & Theme Toggle */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1 md:w-64">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${
+                  theme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                }`} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="टूल खोजें... (उदा. compress, photo, rearrange)"
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-950 border border-slate-700 rounded-lg focus:bg-slate-900 focus:ring-2 focus:ring-red-500 focus:outline-hidden text-slate-100 placeholder-slate-500 font-medium"
+                  className={`w-full pl-8 pr-7 py-1.5 text-xs rounded-lg font-medium transition-colors focus:ring-2 focus:ring-red-500 focus:outline-hidden ${
+                    theme === 'dark'
+                      ? 'bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:bg-slate-900'
+                      : 'bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:bg-white'
+                  }`}
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer ${
+                      theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'
+                    }`}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Toggle to Grid / Workspace */}
+              {/* Theme Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border shrink-0 ${
+                  theme === 'dark'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300 shadow-2xs'
+                }`}
+                title={theme === 'dark' ? 'लाइट मोड चालू करें (Switch to Light Mode)' : 'डार्क मोड चालू करें (Switch to Dark Mode)'}
+                aria-label="Theme Toggle"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">Light</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span className="hidden sm:inline">Dark</span>
+                  </>
+                )}
+              </button>
+
+              {/* Toggle to Grid from Workspace */}
               {viewMode === 'workspace' && (
                 <button
                   type="button"
-                  onClick={backToGrid}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1 shrink-0"
+                  onClick={requestBackToGrid}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
+                  }`}
                   title="ग्रिड दृश्य"
                 >
                   <Grid className="w-3.5 h-3.5" />
@@ -804,16 +922,20 @@ export default function ToolsPage() {
         <section className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6">
           {/* Hero Banner Header */}
           <div className="text-center max-w-3xl mx-auto space-y-2.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-black uppercase tracking-wider">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>100% Client-Side Private • Zero Server Latency</span>
             </div>
 
-            <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
-              सरकारी नौकरी फॉर्म <span className="text-red-500">फोटो व PDF टूल्स</span> सुइट
+            <h1 className={`text-xl sm:text-3xl lg:text-4xl font-black tracking-tight ${
+              theme === 'dark' ? 'text-white' : 'text-slate-900'
+            }`}>
+              सरकारी नौकरी फॉर्म <span className="text-red-600">फोटो व PDF टूल्स</span> सुइट
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            <p className={`text-xs sm:text-sm leading-relaxed ${
+              theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+            }`}>
               MP Online, SSC, UPSC, MP Police, Vyapam (MPESB) और रेलवे परीक्षाओं के ऑनलाइन आवेदन हेतु सभी आवश्यक टूल्स।
               आपका कोई भी दस्तावेज़ या फोटो हमारे सर्वर पर अपलोड नहीं होता।
             </p>
@@ -827,14 +949,24 @@ export default function ToolsPage() {
                 <div
                   key={tool.id}
                   onClick={() => openTool(tool.id)}
-                  className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-red-500/60 hover:bg-slate-850 hover:shadow-xl hover:shadow-red-500/5 transition-all duration-200 cursor-pointer group flex flex-col justify-between p-3.5 sm:p-4.5 relative overflow-hidden"
+                  className={`rounded-2xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between p-3.5 sm:p-4.5 relative overflow-hidden ${
+                    theme === 'dark'
+                      ? 'bg-slate-900/90 border-slate-800 hover:border-red-500/60 hover:bg-slate-850 hover:shadow-xl hover:shadow-red-500/5'
+                      : 'bg-white border-slate-200/90 hover:border-red-500/70 hover:shadow-xl hover:shadow-slate-300/60'
+                  }`}
                 >
                   {/* Top Badge & Number */}
                   <div className="flex items-center justify-between gap-1 mb-3">
-                    <span className="text-[10px] font-mono text-slate-500">
+                    <span className={`text-[10px] font-mono ${
+                      theme === 'dark' ? 'text-slate-500' : 'text-slate-400 font-semibold'
+                    }`}>
                       #{tool.orderNumber < 10 ? `0${tool.orderNumber}` : tool.orderNumber}
                     </span>
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-[120px]">
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full truncate max-w-[120px] ${
+                      theme === 'dark'
+                        ? 'bg-slate-800 text-slate-300 border border-slate-700/60'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}>
                       {tool.badge}
                     </span>
                   </div>
@@ -848,23 +980,35 @@ export default function ToolsPage() {
                     </div>
 
                     <div>
-                      <h3 className="text-xs sm:text-sm font-black text-white group-hover:text-red-400 transition-colors line-clamp-2 leading-snug">
+                      <h3 className={`text-xs sm:text-sm font-black transition-colors line-clamp-2 leading-snug ${
+                        theme === 'dark'
+                          ? 'text-white group-hover:text-red-400'
+                          : 'text-slate-900 group-hover:text-red-600'
+                      }`}>
                         {tool.name}
                       </h3>
-                      <p className="text-[11px] font-bold text-amber-400/90 mt-0.5 line-clamp-1">
+                      <p className={`text-[11px] font-bold mt-0.5 line-clamp-1 ${
+                        theme === 'dark' ? 'text-amber-400/90' : 'text-amber-700'
+                      }`}>
                         {tool.hindiName}
                       </p>
                     </div>
 
-                    <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                    <p className={`text-[11px] line-clamp-2 leading-relaxed ${
+                      theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                    }`}>
                       {tool.description}
                     </p>
                   </div>
 
                   {/* Bottom Action Footer */}
-                  <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-black text-slate-300 group-hover:text-white">
+                  <div className={`pt-3 mt-3 border-t flex items-center justify-between text-[11px] font-black transition-colors ${
+                    theme === 'dark'
+                      ? 'border-slate-800/80 text-slate-300 group-hover:text-white'
+                      : 'border-slate-100 text-slate-600 group-hover:text-red-600'
+                  }`}>
                     <span>टूल खोलें (Open)</span>
-                    <span className="text-red-400 group-hover:translate-x-1 transition-transform">→</span>
+                    <span className="text-red-500 group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
               );
@@ -872,12 +1016,14 @@ export default function ToolsPage() {
           </div>
 
           {filteredTools.length === 0 && (
-            <div className="text-center py-12 bg-slate-900 rounded-2xl border border-slate-800 p-8 space-y-3">
-              <Search className="w-10 h-10 text-slate-600 mx-auto" />
-              <h3 className="text-sm font-black text-slate-200">
+            <div className={`text-center py-12 rounded-2xl border p-8 space-y-3 ${
+              theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+            }`}>
+              <Search className="w-10 h-10 text-slate-400 mx-auto" />
+              <h3 className={`text-sm font-black ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
                 &apos;{searchQuery}&apos; से संबंधित कोई टूल नहीं मिला
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                 कृपया अन्य कीवर्ड खोजें या श्रेणी फ़िल्टर बदलकर पुनः प्रयास करें।
               </p>
               <button
@@ -886,7 +1032,7 @@ export default function ToolsPage() {
                   setSearchQuery('');
                   setActiveCategory('all');
                 }}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
               >
                 सभी टूल्स रीसेट करें
               </button>
@@ -894,22 +1040,26 @@ export default function ToolsPage() {
           )}
 
           {/* Privacy & Safe Data Guarantee Card */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className={`border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left ${
+            theme === 'dark'
+              ? 'bg-slate-900/60 border-slate-800 text-slate-100'
+              : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-xs sm:text-sm font-black text-slate-100">
+                <h4 className={`text-xs sm:text-sm font-black ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
                   100% सुरक्षित और निजी (Browser-Side Processing)
                 </h4>
-                <p className="text-[11px] text-slate-400">
+                <p className={`text-[11px] ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                   आपकी कोई भी निजी फोटो, आधार कार्ड, मार्कशीट या पीडीएफ हमारे किसी भी सर्वर पर नहीं भेजी जाती।
                 </p>
               </div>
             </div>
 
-            <div className="text-xs font-bold text-amber-400 shrink-0">
+            <div className={`text-xs font-bold shrink-0 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
               संस्थापक: Nitish Khobragade (8982324497)
             </div>
           </div>
@@ -922,13 +1072,21 @@ export default function ToolsPage() {
       {viewMode === 'workspace' && (
         <div className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-4 py-3 sm:py-5">
           {/* Top Breadcrumb & Action Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 shadow-sm mb-4">
+          <div className={`border rounded-xl px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 shadow-sm mb-4 transition-colors ${
+            theme === 'dark'
+              ? 'bg-slate-900 border-slate-800 text-slate-100'
+              : 'bg-white border-slate-200 text-slate-900'
+          }`}>
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
-                onClick={backToGrid}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer transition-colors"
-                title="सभी टूल्स ग्रिड पर वापस जाएं"
+                onClick={requestBackToGrid}
+                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                }`}
+                title="सभी टूल्स ग्रिड पर वापस जाएं (Back to Grid)"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
@@ -939,14 +1097,18 @@ export default function ToolsPage() {
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xs sm:text-sm font-black text-white truncate">
+                  <h1 className={`text-xs sm:text-sm font-black truncate ${
+                    theme === 'dark' ? 'text-white' : 'text-slate-900'
+                  }`}>
                     {currentTool.name}
                   </h1>
-                  <span className="hidden sm:inline text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
+                  <span className="hidden sm:inline text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30">
                     {currentTool.badge}
                   </span>
                 </div>
-                <p className="text-[10px] sm:text-xs text-amber-400/90 truncate">
+                <p className={`text-[10px] sm:text-xs truncate ${
+                  theme === 'dark' ? 'text-amber-400/90' : 'text-amber-700 font-medium'
+                }`}>
                   {currentTool.hindiName}
                 </p>
               </div>
@@ -956,14 +1118,18 @@ export default function ToolsPage() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={backToGrid}
-                className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer"
+                onClick={requestBackToGrid}
+                className={`hidden sm:inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg cursor-pointer transition-colors ${
+                  theme === 'dark'
+                    ? 'text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700'
+                    : 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200'
+                }`}
               >
                 <Grid className="w-3.5 h-3.5" />
                 <span>सभी टूल्स ग्रिड</span>
               </button>
 
-              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-md">
+              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-md">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">100% Safe (Local Browser)</span>
                 <span className="sm:hidden">Safe</span>
@@ -984,7 +1150,9 @@ export default function ToolsPage() {
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
                     isActive
                       ? 'bg-red-600 text-white shadow-xs ring-1 ring-red-500'
-                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                      : theme === 'dark'
+                      ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
                   }`}
                 >
                   <Icon className={`w-3 h-3 ${isActive ? 'text-white' : t.iconColor}`} />
