@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Upload, Download, RefreshCw, CheckCircle2, Feather, ShieldCheck } from 'lucide-react';
+import { ToolErrorBanner } from './ToolErrorBanner';
 
 interface SignaturePreset {
   name: string;
@@ -60,9 +61,11 @@ export const SignatureTool: React.FC = () => {
   const [cleanWhiteBg, setCleanWhiteBg] = useState<boolean>(true);
   const [grayscale, setGrayscale] = useState<boolean>(true);
 
+  // Explicit processing output states
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [processedSizeKb, setProcessedSizeKb] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,6 +75,10 @@ export const SignatureTool: React.FC = () => {
     if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
 
     setSelectedFile(file);
+    setProcessedImageUrl(null);
+    setProcessedSizeKb(0);
+    setErrorMessage(null);
+
     setOriginalSizeKb(Math.round((file.size / 1024) * 10) / 10);
     const url = URL.createObjectURL(file);
     setOriginalImageUrl(url);
@@ -84,22 +91,33 @@ export const SignatureTool: React.FC = () => {
         setHeight(img.naturalHeight);
       }
     };
+    img.onerror = () => {
+      setErrorMessage('सिग्नेचर फोटो लोड नहीं हो सकी। कृपया वैध फोटो चुनें।');
+    };
     img.src = url;
   };
 
-  useEffect(() => {
-    if (!originalImageUrl) return;
+  // EXPLICIT ACTION TRIGGER FLOW (Fix Auto-Process Bug)
+  const handleProcessSignature = async () => {
+    if (!originalImageUrl || !selectedFile) {
+      setErrorMessage('कृपया पहले हस्ताक्षर की फोटो अपलोड करें।');
+      return;
+    }
 
-    let isMounted = true;
-    const timer = setTimeout(() => {
-      if (isMounted) setIsProcessing(true);
-    }, 0);
+    setIsProcessing(true);
+    setErrorMessage(null);
 
-    const img = new Image();
-    img.onload = async () => {
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('सिग्नेचर प्रोसेस करने में विफलता आई।'));
+        img.src = originalImageUrl;
+      });
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) throw new Error('ब्राउज़र Canvas 2D सपोर्ट नहीं कर रहा है।');
 
       const targetW = applyDimensions && width > 0 ? width : (originalDimensions.width || img.naturalWidth || 300);
       const targetH = applyDimensions && height > 0 ? height : (originalDimensions.height || img.naturalHeight || 100);
@@ -107,12 +125,11 @@ export const SignatureTool: React.FC = () => {
       canvas.width = targetW;
       canvas.height = targetH;
 
-      // Draw image
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, targetW, targetH);
       ctx.drawImage(img, 0, 0, targetW, targetH);
 
-      // Pixel processing for clean white background and sharp ink
+      // Pixel processing for ink sharpening and background cleanup
       const imgData = ctx.getImageData(0, 0, targetW, targetH);
       const data = imgData.data;
 
@@ -137,7 +154,7 @@ export const SignatureTool: React.FC = () => {
         g = contrastFactor * (g - 128) + 128 + brightnessOffset;
         b = contrastFactor * (b - 128) + 128 + brightnessOffset;
 
-        // Clean white background filter (threshold out off-white paper and shadows)
+        // Clean white background filter
         if (cleanWhiteBg) {
           const avg = (r + g + b) / 3;
           if (avg > 185) {
@@ -160,6 +177,7 @@ export const SignatureTool: React.FC = () => {
       ctx.putImageData(imgData, 0, 0);
 
       // Fine tune KB
+      const targetBytes = targetKb * 1024;
       let low = 0.1;
       let high = 0.98;
       let bestBlob: Blob | null = await new Promise((resolve) =>
@@ -167,14 +185,14 @@ export const SignatureTool: React.FC = () => {
       );
 
       if (bestBlob && targetKb > 0) {
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 6; i++) {
           const mid = (low + high) / 2;
           const testBlob: Blob | null = await new Promise((resolve) =>
             canvas.toBlob(resolve, 'image/jpeg', mid)
           );
           if (testBlob) {
             bestBlob = testBlob;
-            if (testBlob.size / 1024 > targetKb) {
+            if (testBlob.size > targetBytes) {
               high = mid;
             } else {
               low = mid;
@@ -183,21 +201,19 @@ export const SignatureTool: React.FC = () => {
         }
       }
 
-      if (bestBlob && isMounted) {
-        if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-        const newUrl = URL.createObjectURL(bestBlob);
-        setProcessedImageUrl(newUrl);
-        setProcessedSizeKb(Math.round((bestBlob.size / 1024) * 10) / 10);
-        setIsProcessing(false);
-      }
-    };
-    img.src = originalImageUrl;
+      if (!bestBlob) throw new Error('सिग्नेचर कंप्रेस नहीं हो सका।');
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [originalImageUrl, originalDimensions.width, originalDimensions.height, applyDimensions, width, height, targetKb, contrast, brightness, cleanWhiteBg, grayscale]);
+      if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
+      const newUrl = URL.createObjectURL(bestBlob);
+      setProcessedImageUrl(newUrl);
+      setProcessedSizeKb(Math.round((bestBlob.size / 1024) * 10) / 10);
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'अपेक्षित समस्या आई');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const selectPreset = (p: SignaturePreset) => {
     setSelectedPreset(p.name);
@@ -224,10 +240,18 @@ export const SignatureTool: React.FC = () => {
         </span>
       </div>
 
+      {errorMessage && (
+        <ToolErrorBanner
+          toolName="Signature Tool"
+          errorMessage={errorMessage}
+          onRetry={handleProcessSignature}
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-        {/* Left Column */}
+        {/* Left Column: 3-Step Configuration */}
         <div className="lg:col-span-6 space-y-3">
-          {/* 1. Upload */}
+          {/* STEP 1: Upload */}
           <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
               1. अपने हस्ताक्षर (Signature) की फोटो अपलोड करें
@@ -242,12 +266,15 @@ export const SignatureTool: React.FC = () => {
             {selectedFile && (
               <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
                 <span className="font-semibold text-neutral-800 truncate max-w-[200px]">{selectedFile.name}</span>
-                <span className="font-bold text-neutral-600">मूल साइज़: <span className="text-emerald-700">{originalSizeKb} KB</span></span>
+                <span className="font-bold text-neutral-600">
+                  मूल साइज़: <span className="text-emerald-700">{originalSizeKb} KB</span>
+                  {originalDimensions.width > 0 && ` (${originalDimensions.width}x${originalDimensions.height}px)`}
+                </span>
               </div>
             )}
           </div>
 
-          {/* 2. Fast Exam Presets - Custom selected by default */}
+          {/* STEP 2: Presets & Settings */}
           <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               2. परीक्षा अनुसार मानक साइज़ चुनें (Exam Presets)
@@ -274,7 +301,7 @@ export const SignatureTool: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. Image Contrast, Background Clean & Dimensions Controls */}
+          {/* Filters & Dimensions */}
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               3. स्याही डार्क करें, आयाम व फाइल साइज़ (Ink & Dimensions)
@@ -430,12 +457,34 @@ export const SignatureTool: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* STEP 3: EXPLICIT ACTION BUTTON */}
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={!selectedFile || isProcessing}
+                onClick={handleProcessSignature}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>हस्ताक्षर प्रोसेस हो रहा है...</span>
+                  </>
+                ) : (
+                  <>
+                    <Feather className="w-4 h-4" />
+                    <span>हस्ताक्षर प्रोसेस करें (Clean & Resize)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Output Preview */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
+        {/* Right Column: STEP 4 - Output Preview & Download */}
+        <div className="lg:col-span-6 space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
                 <h3 className="text-sm font-black text-neutral-900 flex items-center gap-1.5">
@@ -452,7 +501,7 @@ export const SignatureTool: React.FC = () => {
               {/* Preview Box */}
               <div className="min-h-[220px] bg-neutral-100/80 rounded-xl border border-dashed border-neutral-300 flex items-center justify-center p-4 relative overflow-hidden">
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-white/70 backdrop-blur-2xs flex items-center justify-center z-10">
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex items-center justify-center z-10">
                     <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-white px-3 py-1.5 rounded-full shadow-md">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>सिग्नेचर प्रोसेस हो रहा है...</span>
@@ -462,7 +511,7 @@ export const SignatureTool: React.FC = () => {
 
                 {processedImageUrl ? (
                   <div className="text-center space-y-3">
-                    <div className="p-3 bg-white border border-neutral-300 rounded-lg shadow-sm inline-block">
+                    <div className="p-3 bg-white border border-neutral-300 rounded-lg shadow-xs inline-block">
                       <img
                         src={processedImageUrl}
                         alt="Signature Output"
@@ -478,6 +527,24 @@ export const SignatureTool: React.FC = () => {
                     <div className="text-xs font-bold text-neutral-600">
                       आयाम: {applyDimensions ? `${width} x ${height} px` : `${originalDimensions.width || 300} x ${originalDimensions.height || 100} px (मूल अनुपात)`} • साइज़: {processedSizeKb} KB
                     </div>
+                  </div>
+                ) : originalImageUrl ? (
+                  <div className="text-center space-y-2 p-4">
+                    <img
+                      src={originalImageUrl}
+                      alt="Original Signature"
+                      style={{
+                        maxWidth: '240px',
+                        maxHeight: '110px',
+                        width: 'auto',
+                        height: 'auto'
+                      }}
+                      className="mx-auto rounded-lg opacity-85 object-contain border border-neutral-300 bg-white p-2"
+                    />
+                    <p className="text-xs font-bold text-neutral-700">अपलोड किया गया मूल सिग्नेचर ({originalSizeKb} KB)</p>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      सफेद बैकग्राउंड व डार्क स्याही बनाने के लिए बाईं तरफ &quot;हस्ताक्षर प्रोसेस करें&quot; बटन दबाएं
+                    </p>
                   </div>
                 ) : (
                   <div className="text-center text-neutral-400 p-6">
@@ -509,10 +576,12 @@ export const SignatureTool: React.FC = () => {
                 </a>
               ) : (
                 <button
-                  disabled
-                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-400 font-bold text-sm cursor-not-allowed text-center"
+                  type="button"
+                  onClick={handleProcessSignature}
+                  disabled={!selectedFile}
+                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-500 font-bold text-sm cursor-pointer hover:bg-neutral-300 transition-colors text-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  डाउनलोड करने हेतु पहले सिग्नेचर अपलोड करें
+                  {selectedFile ? 'पहले "हस्ताक्षर प्रोसेस करें" बटन दबाएं' : 'डाउनलोड करने हेतु पहले सिग्नेचर अपलोड करें'}
                 </button>
               )}
 

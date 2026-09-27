@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, Layers, ShieldCheck } from 'lucide-react';
+import { ToolErrorBanner } from './ToolErrorBanner';
 
 interface PdfFileItem {
   id: string;
@@ -213,9 +214,11 @@ export const PdfMergeTool: React.FC = () => {
             </label>
 
             {errorMsg && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-                {errorMsg}
-              </div>
+              <ToolErrorBanner
+                toolName="PDF Merge Tool"
+                errorMessage={errorMsg}
+                onRetry={handleMergePdfs}
+              />
             )}
 
             <button

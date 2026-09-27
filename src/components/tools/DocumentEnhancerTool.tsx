@@ -1,21 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Upload, Download, RefreshCw, FileText, CheckCircle2, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Upload, Download, RefreshCw, FileText, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { ToolErrorBanner } from './ToolErrorBanner';
 
 export const DocumentEnhancerTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [originalSizeKb, setOriginalSizeKb] = useState<number>(0);
+  const [originalDimensions, setOriginalDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  const [mode, setMode] = useState<'clean_bw' | 'enhance_color' | 'grayscale'>('clean_bw');
+  const [mode, setMode] = useState<'clean_bw' | 'grayscale' | 'color_enhanced'>('clean_bw');
   const [contrast, setContrast] = useState<number>(140);
-  const [brightness, setBrightness] = useState<number>(115);
-  const [targetKb, setTargetKb] = useState<number>(180);
+  const [brightness, setBrightness] = useState<number>(105);
+  const [targetKb, setTargetKb] = useState<number>(200);
 
+  // Output states
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [processedSizeKb, setProcessedSizeKb] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -25,24 +29,45 @@ export const DocumentEnhancerTool: React.FC = () => {
     if (processedUrl) URL.revokeObjectURL(processedUrl);
 
     setSelectedFile(file);
+    setProcessedUrl(null);
+    setProcessedSizeKb(0);
+    setErrorMessage(null);
+
     setOriginalSizeKb(Math.round((file.size / 1024) * 10) / 10);
     const url = URL.createObjectURL(file);
     setOriginalImageUrl(url);
-  };
-
-  useEffect(() => {
-    if (!originalImageUrl) return;
-
-    let isMounted = true;
-    const timer = setTimeout(() => {
-      if (isMounted) setIsProcessing(true);
-    }, 0);
 
     const img = new Image();
-    img.onload = async () => {
+    img.onload = () => {
+      setOriginalDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => {
+      setErrorMessage('दस्तावेज़ इमेज लोड करने में समस्या आई।');
+    };
+    img.src = url;
+  };
+
+  // EXPLICIT ACTION TRIGGER: Clean & enhance document
+  const handleEnhance = async () => {
+    if (!originalImageUrl || !selectedFile) {
+      setErrorMessage('कृपया पहले दस्तावेज़ की फोटो अपलोड करें।');
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('इमेज प्रोसेस करने में विफलता आई।'));
+        img.src = originalImageUrl;
+      });
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) throw new Error('Canvas 2D उपलब्ध नहीं है।');
 
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
@@ -94,6 +119,7 @@ export const DocumentEnhancerTool: React.FC = () => {
       ctx.putImageData(imgData, 0, 0);
 
       // Target size optimization
+      const targetBytes = targetKb * 1024;
       let low = 0.1;
       let high = 0.95;
       let bestBlob: Blob | null = await new Promise((resolve) =>
@@ -101,14 +127,14 @@ export const DocumentEnhancerTool: React.FC = () => {
       );
 
       if (bestBlob && targetKb > 0) {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
           const mid = (low + high) / 2;
           const testBlob: Blob | null = await new Promise((resolve) =>
             canvas.toBlob(resolve, 'image/jpeg', mid)
           );
           if (testBlob) {
             bestBlob = testBlob;
-            if (testBlob.size / 1024 > targetKb) {
+            if (testBlob.size > targetBytes) {
               high = mid;
             } else {
               low = mid;
@@ -117,59 +143,70 @@ export const DocumentEnhancerTool: React.FC = () => {
         }
       }
 
-      if (bestBlob && isMounted) {
-        if (processedUrl) URL.revokeObjectURL(processedUrl);
-        const newUrl = URL.createObjectURL(bestBlob);
-        setProcessedUrl(newUrl);
-        setProcessedSizeKb(Math.round((bestBlob.size / 1024) * 10) / 10);
-        setIsProcessing(false);
-      }
-    };
-    img.src = originalImageUrl;
+      if (!bestBlob) throw new Error('दस्तावेज़ साफ नहीं हो सका।');
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [originalImageUrl, mode, contrast, brightness, targetKb]);
+      if (processedUrl) URL.revokeObjectURL(processedUrl);
+      const newUrl = URL.createObjectURL(bestBlob);
+      setProcessedUrl(newUrl);
+      setProcessedSizeKb(Math.round((bestBlob.size / 1024) * 10) / 10);
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'अपेक्षित समस्या आई');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* Compact Tool Header Strip */}
-      <div className="bg-gradient-to-r from-teal-700 to-emerald-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+      <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-emerald-900 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xs sm:text-sm font-black truncate">
-          दस्तावेज़ स्कैनर व साफ करें (Document Scanner)
+          दस्तावेज़ स्कैनर व क्लीनर (Document Enhancer & Shadow Remover)
         </h2>
         <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-          मार्कशीट • जाति • निवास
+          मार्कशीट • जाति • निवास • प्रमाण पत्र
         </span>
       </div>
+
+      {errorMessage && (
+        <ToolErrorBanner
+          toolName="Document Enhancer"
+          errorMessage={errorMessage}
+          onRetry={handleEnhance}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         {/* Left Column */}
         <div className="lg:col-span-6 space-y-3">
+          {/* STEP 1: Upload */}
           <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
-              1. दस्तावेज़ की फोटो अपलोड करें
+              1. दस्तावेज़ / मार्कशीट की फोटो अपलोड करें
             </label>
             <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-xl bg-teal-50/50 hover:bg-teal-50 cursor-pointer transition-colors text-center">
               <Upload className="w-7 h-7 text-teal-600 mb-1.5 animate-bounce" />
-              <span className="text-xs sm:text-sm font-bold text-neutral-900">मार्कशीट या सर्टिफिकेट चुनें</span>
-              <span className="text-[10px] text-neutral-500 mt-0.5">मोबाइल कैमरे से ली गई फोटो भी चलेगी</span>
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">दस्तावेज़ की फोटो चुनें</span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">मोबाइल से खींची गई मार्कशीट की फोटो भी चलेगी</span>
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             </label>
 
             {selectedFile && (
               <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
                 <span className="font-semibold text-neutral-800 truncate max-w-[200px]">{selectedFile.name}</span>
-                <span className="font-bold text-neutral-600">मूल साइज़: <span className="text-teal-700">{originalSizeKb} KB</span></span>
+                <span className="font-bold text-neutral-600">
+                  मूल साइज़: <span className="text-teal-700">{originalSizeKb} KB</span>
+                  {originalDimensions.width > 0 && ` (${originalDimensions.width}x${originalDimensions.height}px)`}
+                </span>
               </div>
             )}
           </div>
 
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
+          {/* STEP 2: Enhancement Mode & Settings */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
-              2. स्कैनिंग मोड चुनें (Enhance Mode)
+              2. क्लीनिंग मोड व साइज़ (Enhancement Mode)
             </label>
 
             <div className="grid grid-cols-3 gap-2">
@@ -182,21 +219,21 @@ export const DocumentEnhancerTool: React.FC = () => {
                     : 'border-neutral-200 bg-neutral-50 text-neutral-700'
                 }`}
               >
-                <div>क्लियर B&amp;W</div>
-                <div className="text-[10px] text-neutral-500 font-normal">सफेद कागज + काली स्याही</div>
+                <div>साफ B&W</div>
+                <div className="text-[10px] text-neutral-500 font-normal">छाया हटाए</div>
               </button>
 
               <button
                 type="button"
-                onClick={() => setMode('enhance_color')}
+                onClick={() => setMode('color_enhanced')}
                 className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  mode === 'enhance_color'
+                  mode === 'color_enhanced'
                     ? 'border-teal-600 bg-teal-50 text-teal-900 ring-2 ring-teal-500/20'
                     : 'border-neutral-200 bg-neutral-50 text-neutral-700'
                 }`}
               >
-                <div>रंगीन बूस्ट</div>
-                <div className="text-[10px] text-neutral-500 font-normal">रंगीन सील व स्टैम्प</div>
+                <div>कलर साफ</div>
+                <div className="text-[10px] text-neutral-500 font-normal">रंग सुरक्षित</div>
               </button>
 
               <button
@@ -213,7 +250,7 @@ export const DocumentEnhancerTool: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="font-semibold text-neutral-700">कांट्रास्ट:</span>
@@ -281,12 +318,34 @@ export const DocumentEnhancerTool: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* STEP 3: EXPLICIT ACTION TRIGGER BUTTON */}
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={!selectedFile || isProcessing}
+                onClick={handleEnhance}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-800 hover:from-teal-800 hover:to-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>दस्तावेज़ को साफ किया जा रहा है...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>दस्तावेज़ साफ करें (Enhance Document)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
+        {/* Right Column: STEP 4 - Live Preview & Download */}
+        <div className="lg:col-span-6 space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
                 <h3 className="text-sm font-black text-neutral-900 flex items-center gap-1.5">
@@ -302,7 +361,7 @@ export const DocumentEnhancerTool: React.FC = () => {
 
               <div className="min-h-[280px] bg-neutral-100/80 rounded-xl border border-dashed border-neutral-300 flex items-center justify-center p-4 relative overflow-hidden">
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-white/70 backdrop-blur-2xs flex items-center justify-center z-10">
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex items-center justify-center z-10">
                     <div className="flex items-center gap-2 text-xs font-bold text-teal-700 bg-white px-3 py-1.5 rounded-full shadow-md">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>दस्तावेज़ को साफ किया जा रहा है...</span>
@@ -320,6 +379,18 @@ export const DocumentEnhancerTool: React.FC = () => {
                     <div className="text-xs font-bold text-neutral-600">
                       साफ दस्तावेज़ • साइज़: {processedSizeKb} KB
                     </div>
+                  </div>
+                ) : originalImageUrl ? (
+                  <div className="text-center space-y-2 p-4">
+                    <img
+                      src={originalImageUrl}
+                      alt="Original Document"
+                      className="mx-auto rounded-lg opacity-85 object-contain max-h-[200px] border border-neutral-300 bg-white"
+                    />
+                    <p className="text-xs font-bold text-neutral-700">मूल दस्तावेज़ ({originalSizeKb} KB)</p>
+                    <p className="text-[11px] text-teal-700 font-medium">
+                      छाया हटाने व साफ करने हेतु बाईं तरफ &quot;दस्तावेज़ साफ करें&quot; बटन दबाएं
+                    </p>
                   </div>
                 ) : (
                   <div className="text-center text-neutral-400 p-6">
@@ -345,10 +416,12 @@ export const DocumentEnhancerTool: React.FC = () => {
                 </a>
               ) : (
                 <button
-                  disabled
-                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-400 font-bold text-sm cursor-not-allowed text-center"
+                  type="button"
+                  onClick={handleEnhance}
+                  disabled={!selectedFile}
+                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-500 font-bold text-sm cursor-pointer hover:bg-neutral-300 transition-colors text-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  डाउनलोड करने हेतु पहले दस्तावेज़ अपलोड करें
+                  {selectedFile ? 'पहले "दस्तावेज़ साफ करें" बटन दबाएं' : 'डाउनलोड करने हेतु पहले दस्तावेज़ अपलोड करें'}
                 </button>
               )}
 

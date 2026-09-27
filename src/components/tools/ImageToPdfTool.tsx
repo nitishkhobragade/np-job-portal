@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ToolErrorBanner } from './ToolErrorBanner';
 
 interface UploadedImageItem {
   id: string;
@@ -21,11 +22,13 @@ export const ImageToPdfTool: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfSizeKb, setPdfSizeKb] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    setErrorMessage(null);
     const newItems: UploadedImageItem[] = Array.from(files).map((f) => ({
       id: Math.random().toString(36).substring(2, 9),
       file: f,
@@ -157,8 +160,14 @@ export const ImageToPdfTool: React.FC = () => {
       const url = URL.createObjectURL(blob);
       setPdfBlobUrl(url);
       setPdfSizeKb(Math.round((blob.size / 1024) * 10) / 10);
-    } catch (err) {
+      setErrorMessage(null);
+    } catch (err: unknown) {
       console.error('PDF Generation Error:', err);
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : 'फोटो से PDF बनाने में समस्या आई। कृपया इमेज की साइज़ अथवा फॉर्मेट जांचें।'
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -392,6 +401,15 @@ export const ImageToPdfTool: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Error Banner if error occurs */}
+            {errorMessage && (
+              <ToolErrorBanner
+                toolName="Images to PDF Converter"
+                errorMessage={errorMessage}
+                onRetry={generatePdf}
+              />
+            )}
 
             {/* Action Buttons */}
             <div className="pt-2">

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Upload, Download, RefreshCw, Image as ImageIcon, ShieldCheck } from 'lucide-react';
+import { ToolErrorBanner } from './ToolErrorBanner';
 
 interface Preset {
   name: string;
@@ -76,9 +77,9 @@ export const PhotoResizerTool: React.FC = () => {
   const [originalSizeKb, setOriginalSizeKb] = useState<number>(0);
   const [originalDimensions, setOriginalDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  // By default, Custom preset is selected as requested
+  // Default Custom preset
   const [selectedPreset, setSelectedPreset] = useState<string>('Custom (अपनी पसंद अनुसार)');
-  // Dimensions only applied when user checks the checkbox
+  // Dimensions only applied when user checks the box
   const [applyDimensions, setApplyDimensions] = useState<boolean>(false);
   const [width, setWidth] = useState<number>(200);
   const [height, setHeight] = useState<number>(250);
@@ -86,9 +87,11 @@ export const PhotoResizerTool: React.FC = () => {
   const [targetKb, setTargetKb] = useState<number>(50);
   const [rotation, setRotation] = useState<number>(0);
 
+  // Explicit processing output states (No auto-process on upload!)
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [processedSizeKb, setProcessedSizeKb] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Apply preset values
   const applyPreset = (presetName: string) => {
@@ -111,13 +114,16 @@ export const PhotoResizerTool: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset previous object urls
     if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
     if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
 
     setSelectedFile(file);
-    setOriginalSizeKb(Math.round((file.size / 1024) * 10) / 10);
+    setProcessedImageUrl(null);
+    setProcessedSizeKb(0);
+    setHasProcessed(false);
+    setErrorMessage(null);
 
+    setOriginalSizeKb(Math.round((file.size / 1024) * 10) / 10);
     const url = URL.createObjectURL(file);
     setOriginalImageUrl(url);
 
@@ -129,29 +135,38 @@ export const PhotoResizerTool: React.FC = () => {
         setHeight(img.naturalHeight);
       }
     };
+    img.onerror = () => {
+      setErrorMessage('फोटो लोड नहीं हो सकी। कृपया वैध JPG, PNG अथवा WEBP फोटो चुनें।');
+    };
     img.src = url;
   };
 
-  // Re-process image whenever parameters change
-  useEffect(() => {
-    if (!originalImageUrl) return;
+  // EXPLICIT ACTION TRIGGER FLOW (Fix Auto-Process Bug)
+  const handleProcessImage = async () => {
+    if (!originalImageUrl || !selectedFile) {
+      setErrorMessage('कृपया पहले अपनी फोटो अपलोड करें।');
+      return;
+    }
 
-    let isMounted = true;
-    const timer = setTimeout(() => {
-      if (isMounted) setIsProcessing(true);
-    }, 0);
+    setIsProcessing(true);
+    setErrorMessage(null);
 
-    const img = new Image();
-    img.onload = async () => {
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('इमेज प्रोसेस करने में विफलता आई।'));
+        img.src = originalImageUrl;
+      });
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) throw new Error('ब्राउज़र Canvas 2D सपोर्ट नहीं कर रहा है।');
 
-      // Determine effective render dimensions
       const effectiveWidth = applyDimensions && width > 0 ? width : (originalDimensions.width || img.naturalWidth || 400);
       const effectiveHeight = applyDimensions && height > 0 ? height : (originalDimensions.height || img.naturalHeight || 500);
 
-      // Handle rotation
+      // Rotation handling
       if (rotation % 180 !== 0) {
         canvas.width = effectiveHeight;
         canvas.height = effectiveWidth;
@@ -181,57 +196,55 @@ export const PhotoResizerTool: React.FC = () => {
       }
       ctx.restore();
 
-      // Optimize quality to reach near target KB if specified
-      const currentQuality = 0.85;
-      let blob: Blob | null = await new Promise((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', currentQuality)
+      // Binary search quality for target KB
+      const targetBytes = targetKb * 1024;
+      let low = 0.1;
+      let high = 0.98;
+      let bestBlob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.85)
       );
 
-      // Binary search quality if targetKb is set
-      if (blob && targetKb > 0) {
-        let low = 0.1;
-        let high = 0.98;
-        let bestBlob = blob;
-        for (let i = 0; i < 6; i++) {
+      if (bestBlob && targetKb > 0) {
+        for (let i = 0; i < 7; i++) {
           const mid = (low + high) / 2;
           const testBlob: Blob | null = await new Promise((resolve) =>
             canvas.toBlob(resolve, 'image/jpeg', mid)
           );
           if (testBlob) {
-            const sizeKb = testBlob.size / 1024;
             bestBlob = testBlob;
-            if (sizeKb > targetKb) {
+            if (testBlob.size > targetBytes) {
               high = mid;
             } else {
               low = mid;
             }
           }
         }
-        blob = bestBlob;
       }
 
-      if (blob && isMounted) {
-        if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-        const newUrl = URL.createObjectURL(blob);
-        setProcessedImageUrl(newUrl);
-        setProcessedSizeKb(Math.round((blob.size / 1024) * 10) / 10);
-        setIsProcessing(false);
-      }
-    };
-    img.src = originalImageUrl;
+      if (!bestBlob) throw new Error('इमेज कंप्रेस नहीं हो सकी।');
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [originalImageUrl, originalDimensions.width, originalDimensions.height, applyDimensions, width, height, targetKb, rotation]);
+      if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
+      const newUrl = URL.createObjectURL(bestBlob);
+      setProcessedImageUrl(newUrl);
+      setProcessedSizeKb(Math.round((bestBlob.size / 1024) * 10) / 10);
+      setHasProcessed(true);
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'अपेक्षित समस्या आई');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleRotate = () => {
     setRotation((prev) => (prev + 90) % 360);
+    // Mark as needing re-process
+    setHasProcessed(false);
   };
 
   const handleWidthChange = (val: number) => {
     setWidth(val);
+    setHasProcessed(false);
     if (maintainAspect && originalDimensions.width > 0) {
       const ratio = originalDimensions.height / originalDimensions.width;
       setHeight(Math.round(val * ratio));
@@ -240,6 +253,7 @@ export const PhotoResizerTool: React.FC = () => {
 
   const handleHeightChange = (val: number) => {
     setHeight(val);
+    setHasProcessed(false);
     if (maintainAspect && originalDimensions.height > 0) {
       const ratio = originalDimensions.width / originalDimensions.height;
       setWidth(Math.round(val * ratio));
@@ -249,7 +263,7 @@ export const PhotoResizerTool: React.FC = () => {
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* Compact Tool Header Strip */}
-      <div className="bg-gradient-to-r from-red-600 to-rose-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+      <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xs sm:text-sm font-black truncate">
           पासपोर्ट फोटो रिसाइज़र व KB कंप्रेसर (Photo Resizer)
         </h2>
@@ -258,11 +272,18 @@ export const PhotoResizerTool: React.FC = () => {
         </span>
       </div>
 
-      {/* Main Grid: Upload & Controls + Live Preview */}
+      {errorMessage && (
+        <ToolErrorBanner
+          toolName="Photo Resizer"
+          errorMessage={errorMessage}
+          onRetry={handleProcessImage}
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-        {/* Left Column: Upload & Settings */}
+        {/* Left Column: 3-Step Configuration */}
         <div className="lg:col-span-6 space-y-3">
-          {/* Upload Area */}
+          {/* STEP 1: Upload & Initial State */}
           <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
               1. अपनी पासपोर्ट फोटो अपलोड करें (Upload Photo)
@@ -271,28 +292,26 @@ export const PhotoResizerTool: React.FC = () => {
               <Upload className="w-7 h-7 text-red-600 mb-1.5 animate-bounce" />
               <span className="text-xs sm:text-sm font-bold text-neutral-900">फोटो चुनें या यहाँ खींचकर छोड़ें</span>
               <span className="text-[10px] text-neutral-500 mt-0.5">JPG, JPEG, PNG, WEBP सपोर्टेड</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+              <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             </label>
 
             {selectedFile && (
               <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
                 <span className="font-semibold text-neutral-800 truncate max-w-[200px]">{selectedFile.name}</span>
-                <span className="font-bold text-neutral-600">मूल साइज़: <span className="text-red-700">{originalSizeKb} KB</span></span>
+                <span className="font-bold text-neutral-600">
+                  मूल साइज़: <span className="text-red-700">{originalSizeKb} KB</span>
+                  {originalDimensions.width > 0 && ` (${originalDimensions.width}x${originalDimensions.height}px)`}
+                </span>
               </div>
             )}
           </div>
 
-          {/* Exam Presets */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
-            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
+          {/* STEP 2: Settings & Requirements Configuration */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2">
+            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               2. परीक्षा अनुसार प्रीसेट चुनें (Select Exam Preset)
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {PRESETS.map((p) => {
                 const isSelected = selectedPreset === p.name;
                 return (
@@ -300,21 +319,21 @@ export const PhotoResizerTool: React.FC = () => {
                     key={p.name}
                     type="button"
                     onClick={() => applyPreset(p.name)}
-                    className={`p-2.5 text-left rounded-xl border text-xs transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left ${
                       isSelected
-                        ? 'border-red-600 bg-red-50 ring-2 ring-red-500/20 text-red-900 font-bold'
+                        ? 'border-red-600 bg-red-50 text-red-950 ring-2 ring-red-500/20'
                         : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700'
                     }`}
                   >
                     <div className="font-extrabold truncate">{p.name}</div>
-                    <div className="text-[10px] text-neutral-500 mt-0.5 leading-tight">{p.description}</div>
+                    <div className="text-[10px] text-neutral-500 font-normal truncate mt-0.5">{p.description}</div>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Manual Fine Tuning Controls */}
+          {/* Settings: Dimensions & Target KB */}
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-neutral-800 uppercase tracking-wider">
@@ -330,7 +349,7 @@ export const PhotoResizerTool: React.FC = () => {
               </button>
             </div>
 
-            {/* Checkbox for Dimensions - When unchecked, original photo dimensions are preserved */}
+            {/* Checkbox for Dimensions */}
             <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
@@ -340,6 +359,7 @@ export const PhotoResizerTool: React.FC = () => {
                   onChange={(e) => {
                     const checked = e.target.checked;
                     setApplyDimensions(checked);
+                    setHasProcessed(false);
                     if (checked && originalDimensions.width > 0 && (!width || width === 200)) {
                       setWidth(originalDimensions.width);
                       setHeight(originalDimensions.height);
@@ -356,7 +376,7 @@ export const PhotoResizerTool: React.FC = () => {
                 <p className="text-[11px] text-neutral-500 pl-6.5 leading-relaxed">
                   {originalDimensions.width > 0 ? (
                     <>
-                      मूल फोटो के आयाम सुरक्षित रहेंगे: <span className="font-bold text-neutral-800">{originalDimensions.width} x {originalDimensions.height} px</span>। फोटो बिना खींचे/दबे प्राकृतिक अनुपात में कंप्रेस होगी। (बदलने के लिए बॉक्स चेक करें)
+                      मूल फोटो के आयाम सुरक्षित रहेंगे: <span className="font-bold text-neutral-800">{originalDimensions.width} x {originalDimensions.height} px</span>। फोटो बिना खींचे प्राकृतिक अनुपात में कंप्रेस होगी।
                     </>
                   ) : (
                     <>मूल फोटो का अनुपात सुरक्षित रहेगा। विशेष परीक्षा हेतु चौड़ाई/ऊंचाई बदलने के लिए ही चेकबॉक्स टिक करें।</>
@@ -392,7 +412,10 @@ export const PhotoResizerTool: React.FC = () => {
                       type="checkbox"
                       id="aspectRatioCheck"
                       checked={maintainAspect}
-                      onChange={(e) => setMaintainAspect(e.target.checked)}
+                      onChange={(e) => {
+                        setMaintainAspect(e.target.checked);
+                        setHasProcessed(false);
+                      }}
                       className="w-4 h-4 text-red-600 rounded border-neutral-300 focus:ring-red-500 cursor-pointer"
                     />
                     <label htmlFor="aspectRatioCheck" className="text-xs font-semibold text-neutral-700 cursor-pointer">
@@ -403,6 +426,7 @@ export const PhotoResizerTool: React.FC = () => {
               )}
             </div>
 
+            {/* Target KB Input Box + Quick Chips */}
             <div>
               <label className="block text-xs font-bold text-neutral-800 mb-1">
                 टारगेट फाइल साइज़ दर्ज करें (अपनी पसंद का Size KB में डालें):
@@ -413,7 +437,10 @@ export const PhotoResizerTool: React.FC = () => {
                   min="5"
                   max="2000"
                   value={targetKb || ''}
-                  onChange={(e) => setTargetKb(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => {
+                    setTargetKb(Math.max(1, Number(e.target.value)));
+                    setHasProcessed(false);
+                  }}
                   placeholder="उदा. 20, 50, 100"
                   className="w-full px-3 py-2 pr-12 text-sm font-black border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-hidden text-neutral-900 bg-white"
                 />
@@ -427,7 +454,10 @@ export const PhotoResizerTool: React.FC = () => {
                   <button
                     key={kb}
                     type="button"
-                    onClick={() => setTargetKb(kb)}
+                    onClick={() => {
+                      setTargetKb(kb);
+                      setHasProcessed(false);
+                    }}
                     className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
                       targetKb === kb
                         ? 'bg-red-600 text-white border-red-600 shadow-2xs'
@@ -439,17 +469,39 @@ export const PhotoResizerTool: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* STEP 3: EXPLICIT ACTION TRIGGER BUTTON */}
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={!selectedFile || isProcessing}
+                onClick={handleProcessImage}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>फोटो रिसाइज़ व कंप्रेस हो रही है...</span>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="w-4 h-4" />
+                    <span>फोटो रिसाइज़ व कंप्रेस करें (Process Photo)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Live Output & Download */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
+        {/* Right Column: STEP 4 - Live Preview & Download */}
+        <div className="lg:col-span-6 space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
                 <h3 className="text-sm font-black text-neutral-900 flex items-center gap-1.5">
                   <ImageIcon className="w-4 h-4 text-red-600" />
-                  <span>लाइव प्रीव्यू व आउटपुट (Preview & Download)</span>
+                  <span>लाइव आउटपुट प्रीव्यू (Preview & Download)</span>
                 </h3>
                 {processedSizeKb > 0 && (
                   <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
@@ -460,10 +512,10 @@ export const PhotoResizerTool: React.FC = () => {
                 )}
               </div>
 
-              {/* Preview Canvas Box */}
+              {/* Preview Box */}
               <div className="min-h-[280px] bg-neutral-100/80 rounded-xl border border-dashed border-neutral-300 flex items-center justify-center p-4 relative overflow-hidden">
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-white/70 backdrop-blur-2xs flex items-center justify-center z-10">
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex items-center justify-center z-10">
                     <div className="flex items-center gap-2 text-xs font-bold text-red-700 bg-white px-3 py-1.5 rounded-full shadow-md">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>प्रोसेसिंग हो रही है...</span>
@@ -485,8 +537,26 @@ export const PhotoResizerTool: React.FC = () => {
                       className="mx-auto rounded-lg shadow-md object-contain border border-neutral-300 bg-white"
                     />
                     <div className="text-[11px] font-semibold text-neutral-600">
-                      {applyDimensions ? `${width} x ${height} px` : `${originalDimensions.width || 400} x ${originalDimensions.height || 500} px (मूल आयाम)`} • {processedSizeKb} KB
+                      {applyDimensions ? `${width} x ${height} px` : `${originalDimensions.width || 400} x ${originalDimensions.height || 500} px (मूल अनुपात)`} • {processedSizeKb} KB
                     </div>
+                  </div>
+                ) : originalImageUrl ? (
+                  <div className="text-center space-y-2 p-4">
+                    <img
+                      src={originalImageUrl}
+                      alt="Original Photo"
+                      style={{
+                        maxWidth: '220px',
+                        maxHeight: '240px',
+                        width: 'auto',
+                        height: 'auto'
+                      }}
+                      className="mx-auto rounded-lg opacity-85 object-contain border border-neutral-300 bg-white"
+                    />
+                    <p className="text-xs font-bold text-neutral-700">अपलोड की गई मूल फोटो ({originalSizeKb} KB)</p>
+                    <p className="text-[11px] text-red-600 font-medium">
+                      कंप्रेस व रिसाइज़ करने के लिए बाईं तरफ &quot;फोटो रिसाइज़ व कंप्रेस करें&quot; बटन दबाएं
+                    </p>
                   </div>
                 ) : (
                   <div className="text-center text-neutral-400 p-6">
@@ -527,10 +597,12 @@ export const PhotoResizerTool: React.FC = () => {
                 </a>
               ) : (
                 <button
-                  disabled
-                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-400 font-bold text-sm cursor-not-allowed text-center"
+                  type="button"
+                  onClick={handleProcessImage}
+                  disabled={!selectedFile}
+                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-500 font-bold text-sm cursor-pointer hover:bg-neutral-300 transition-colors text-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  डाउनलोड करने हेतु पहले फोटो अपलोड करें
+                  {selectedFile ? 'पहले "फोटो रिसाइज़ व कंप्रेस करें" बटन दबाएं' : 'डाउनलोड करने हेतु पहले फोटो अपलोड करें'}
                 </button>
               )}
 
