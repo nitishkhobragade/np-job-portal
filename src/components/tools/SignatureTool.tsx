@@ -1,16 +1,60 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, RefreshCw, CheckCircle2, Feather } from 'lucide-react';
+import { Upload, Download, RefreshCw, CheckCircle2, Feather, ShieldCheck } from 'lucide-react';
+
+interface SignaturePreset {
+  name: string;
+  width: number;
+  height: number;
+  kb: number;
+  desc: string;
+}
+
+const SIGNATURE_PRESETS: SignaturePreset[] = [
+  {
+    name: 'Custom (अपनी पसंद अनुसार)',
+    width: 140,
+    height: 60,
+    kb: 15,
+    desc: 'कस्टम साइज़ व अपनी इच्छानुसार KB'
+  },
+  {
+    name: 'SSC & Bank',
+    width: 140,
+    height: 60,
+    kb: 15,
+    desc: '140x60 px (10-20KB)'
+  },
+  {
+    name: 'MP ESB व्यापम',
+    width: 150,
+    height: 80,
+    kb: 25,
+    desc: '150x80 px (10-40KB)'
+  },
+  {
+    name: 'UPSC / Railway',
+    width: 140,
+    height: 110,
+    kb: 20,
+    desc: '140x110 px (10-30KB)'
+  }
+];
 
 export const SignatureTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [originalSizeKb, setOriginalSizeKb] = useState<number>(0);
+  const [originalDimensions, setOriginalDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
+  // Default to Custom preset
+  const [selectedPreset, setSelectedPreset] = useState<string>('Custom (अपनी पसंद अनुसार)');
+  const [applyDimensions, setApplyDimensions] = useState<boolean>(false);
   const [width, setWidth] = useState<number>(140);
   const [height, setHeight] = useState<number>(60);
-  const [targetKb, setTargetKb] = useState<number>(18);
+  const [targetKb, setTargetKb] = useState<number>(15);
+
   const [contrast, setContrast] = useState<number>(130); // 100 is normal
   const [brightness, setBrightness] = useState<number>(110);
   const [cleanWhiteBg, setCleanWhiteBg] = useState<boolean>(true);
@@ -31,6 +75,16 @@ export const SignatureTool: React.FC = () => {
     setOriginalSizeKb(Math.round((file.size / 1024) * 10) / 10);
     const url = URL.createObjectURL(file);
     setOriginalImageUrl(url);
+
+    const img = new Image();
+    img.onload = () => {
+      setOriginalDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      if (!applyDimensions) {
+        setWidth(img.naturalWidth);
+        setHeight(img.naturalHeight);
+      }
+    };
+    img.src = url;
   };
 
   useEffect(() => {
@@ -47,16 +101,19 @@ export const SignatureTool: React.FC = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      canvas.width = width;
-      canvas.height = height;
+      const targetW = applyDimensions && width > 0 ? width : (originalDimensions.width || img.naturalWidth || 300);
+      const targetH = applyDimensions && height > 0 ? height : (originalDimensions.height || img.naturalHeight || 100);
+
+      canvas.width = targetW;
+      canvas.height = targetH;
 
       // Draw image
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.fillRect(0, 0, targetW, targetH);
+      ctx.drawImage(img, 0, 0, targetW, targetH);
 
       // Pixel processing for clean white background and sharp ink
-      const imgData = ctx.getImageData(0, 0, width, height);
+      const imgData = ctx.getImageData(0, 0, targetW, targetH);
       const data = imgData.data;
 
       const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
@@ -140,12 +197,19 @@ export const SignatureTool: React.FC = () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [originalImageUrl, width, height, targetKb, contrast, brightness, cleanWhiteBg, grayscale]);
+  }, [originalImageUrl, originalDimensions.width, originalDimensions.height, applyDimensions, width, height, targetKb, contrast, brightness, cleanWhiteBg, grayscale]);
 
-  const setPreset = (w: number, h: number, kb: number) => {
-    setWidth(w);
-    setHeight(h);
-    setTargetKb(kb);
+  const selectPreset = (p: SignaturePreset) => {
+    setSelectedPreset(p.name);
+    if (p.name.includes('Custom')) {
+      setApplyDimensions(false);
+      setTargetKb(15);
+    } else {
+      setApplyDimensions(true);
+      setWidth(p.width);
+      setHeight(p.height);
+      setTargetKb(p.kb);
+    }
   };
 
   return (
@@ -183,57 +247,37 @@ export const SignatureTool: React.FC = () => {
             )}
           </div>
 
-          {/* 2. Fast Exam Presets */}
+          {/* 2. Fast Exam Presets - Custom selected by default */}
           <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               2. परीक्षा अनुसार मानक साइज़ चुनें (Exam Presets)
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setPreset(140, 60, 18)}
-                className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  width === 140 && height === 60
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <div>SSC & Bank</div>
-                <div className="text-[10px] text-neutral-500 font-normal">140x60 px (10-20KB)</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPreset(150, 80, 30)}
-                className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  width === 150 && height === 80
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <div>MP ESB व्यापम</div>
-                <div className="text-[10px] text-neutral-500 font-normal">150x80 px (10-40KB)</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPreset(140, 110, 25)}
-                className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  width === 140 && height === 110
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <div>UPSC / Railway</div>
-                <div className="text-[10px] text-neutral-500 font-normal">140x110 px (10-30KB)</div>
-              </button>
+            <div className="grid grid-cols-2 gap-2">
+              {SIGNATURE_PRESETS.map((p) => {
+                const isSelected = selectedPreset === p.name;
+                return (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => selectPreset(p)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                        : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700'
+                    }`}
+                  >
+                    <div className="font-extrabold truncate">{p.name}</div>
+                    <div className="text-[10px] text-neutral-500 font-normal truncate mt-0.5">{p.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* 3. Image Contrast & Background Clean Filters */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          {/* 3. Image Contrast, Background Clean & Dimensions Controls */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
-              3. स्याही डार्क करें व छाया हटाएं (Ink & Paper Filters)
+              3. स्याही डार्क करें, आयाम व फाइल साइज़ (Ink & Dimensions)
             </label>
 
             <div className="space-y-2">
@@ -242,7 +286,7 @@ export const SignatureTool: React.FC = () => {
                   type="checkbox"
                   checked={cleanWhiteBg}
                   onChange={(e) => setCleanWhiteBg(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500"
+                  className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 cursor-pointer"
                 />
                 <span className="text-xs font-bold text-neutral-800">
                   कागज की छाया व पीलापन हटाएं (Auto Clean White Background)
@@ -254,7 +298,7 @@ export const SignatureTool: React.FC = () => {
                   type="checkbox"
                   checked={grayscale}
                   onChange={(e) => setGrayscale(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500"
+                  className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 cursor-pointer"
                 />
                 <span className="text-xs font-bold text-neutral-800">
                   ब्लैक एंड व्हाइट / डार्क स्याही मोड (Black & White Ink)
@@ -262,7 +306,63 @@ export const SignatureTool: React.FC = () => {
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Checkbox for Dimensions */}
+            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="applySigDimensionsCheck"
+                  checked={applyDimensions}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setApplyDimensions(checked);
+                    if (checked && originalDimensions.width > 0 && (!width || width === 140)) {
+                      setWidth(originalDimensions.width);
+                      setHeight(originalDimensions.height);
+                    }
+                  }}
+                  className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-neutral-900">
+                  हस्ताक्षर के Dimensions (चौड़ाई व ऊंचाई px) बदलें
+                </span>
+              </label>
+
+              {!applyDimensions ? (
+                <p className="text-[11px] text-neutral-500 pl-6.5 leading-relaxed">
+                  {originalDimensions.width > 0 ? (
+                    <>मूल हस्ताक्षर के आयाम सुरक्षित हैं: <span className="font-bold text-neutral-800">{originalDimensions.width} x {originalDimensions.height} px</span>। केवल स्याही साफ व KB साइज कम होगा।</>
+                  ) : (
+                    <>हस्ताक्षर का मूल आयाम सुरक्षित रहेगा। विशेष परीक्षा अनुपात हेतु ही चेकबॉक्स टिक करें।</>
+                  )}
+                </p>
+              ) : (
+                <div className="pt-2 border-t border-neutral-200 grid grid-cols-2 gap-3 pl-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1">चौड़ाई (Width px)</label>
+                    <input
+                      type="number"
+                      value={width || ''}
+                      onChange={(e) => setWidth(Number(e.target.value))}
+                      placeholder="140"
+                      className="w-full px-3 py-2 text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-mono text-neutral-900 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1">ऊंचाई (Height px)</label>
+                    <input
+                      type="number"
+                      value={height || ''}
+                      onChange={(e) => setHeight(Number(e.target.value))}
+                      placeholder="60"
+                      className="w-full px-3 py-2 text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-mono text-neutral-900 bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="font-semibold text-neutral-700">कांट्रास्ट (Contrast):</span>
@@ -366,12 +466,17 @@ export const SignatureTool: React.FC = () => {
                       <img
                         src={processedImageUrl}
                         alt="Signature Output"
-                        style={{ width: `${width}px`, height: `${height}px` }}
+                        style={{
+                          maxWidth: '260px',
+                          maxHeight: '120px',
+                          width: 'auto',
+                          height: 'auto'
+                        }}
                         className="object-contain"
                       />
                     </div>
                     <div className="text-xs font-bold text-neutral-600">
-                      आयाम: {width} x {height} px • साइज़: {processedSizeKb} KB
+                      आयाम: {applyDimensions ? `${width} x ${height} px` : `${originalDimensions.width || 300} x ${originalDimensions.height || 100} px (मूल अनुपात)`} • साइज़: {processedSizeKb} KB
                     </div>
                   </div>
                 ) : (
@@ -396,7 +501,7 @@ export const SignatureTool: React.FC = () => {
               {processedImageUrl ? (
                 <a
                   href={processedImageUrl}
-                  download={`signature_${width}x${height}_${processedSizeKb}KB.jpg`}
+                  download={`signature_${applyDimensions ? `${width}x${height}` : 'original'}_${processedSizeKb}KB.jpg`}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
@@ -410,6 +515,12 @@ export const SignatureTool: React.FC = () => {
                   डाउनलोड करने हेतु पहले सिग्नेचर अपलोड करें
                 </button>
               )}
+
+              {/* Security Guarantee Text */}
+              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+              </div>
             </div>
           </div>
         </div>

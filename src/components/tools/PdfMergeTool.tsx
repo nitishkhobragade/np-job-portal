@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, Layers } from 'lucide-react';
+import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, Layers, ShieldCheck } from 'lucide-react';
 
 interface PdfFileItem {
   id: string;
@@ -257,6 +257,12 @@ export const PdfMergeTool: React.FC = () => {
                   <Download className="w-5 h-5" />
                   <span>जुड़ा हुआ PDF डाउनलोड करें ({mergedSizeKb} KB)</span>
                 </a>
+
+                {/* Security Guarantee Text */}
+                <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+                </div>
               </div>
             )}
 

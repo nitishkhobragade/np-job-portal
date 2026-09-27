@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { Upload, Download, RefreshCw, Image as ImageIcon, ShieldCheck } from 'lucide-react';
 
 interface Preset {
   name: string;
@@ -14,6 +14,15 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
+  {
+    name: 'Custom (अपनी पसंद अनुसार)',
+    category: 'Custom',
+    width: 200,
+    height: 250,
+    minKb: 20,
+    maxKb: 100,
+    description: 'कस्टम साइज़ व अपनी इच्छानुसार KB सेट करें'
+  },
   {
     name: 'SSC (CGL/CHSL/MTS/GD)',
     category: 'Central',
@@ -58,15 +67,6 @@ const PRESETS: Preset[] = [
     minKb: 20,
     maxKb: 50,
     description: 'पासपोर्ट फोटो • 20 KB से 50 KB'
-  },
-  {
-    name: 'Custom (अपनी पसंद अनुसार)',
-    category: 'Custom',
-    width: 200,
-    height: 230,
-    minKb: 20,
-    maxKb: 50,
-    description: 'कस्टम साइज़ व KB सेट करें'
   }
 ];
 
@@ -76,11 +76,14 @@ export const PhotoResizerTool: React.FC = () => {
   const [originalSizeKb, setOriginalSizeKb] = useState<number>(0);
   const [originalDimensions, setOriginalDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  const [selectedPreset, setSelectedPreset] = useState<string>('SSC (CGL/CHSL/MTS/GD)');
+  // By default, Custom preset is selected as requested
+  const [selectedPreset, setSelectedPreset] = useState<string>('Custom (अपनी पसंद अनुसार)');
+  // Dimensions only applied when user checks the checkbox
+  const [applyDimensions, setApplyDimensions] = useState<boolean>(false);
   const [width, setWidth] = useState<number>(200);
-  const [height, setHeight] = useState<number>(230);
+  const [height, setHeight] = useState<number>(250);
   const [maintainAspect, setMaintainAspect] = useState<boolean>(false);
-  const [targetKb, setTargetKb] = useState<number>(45);
+  const [targetKb, setTargetKb] = useState<number>(50);
   const [rotation, setRotation] = useState<number>(0);
 
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
@@ -92,9 +95,15 @@ export const PhotoResizerTool: React.FC = () => {
     setSelectedPreset(presetName);
     const p = PRESETS.find((item) => item.name === presetName);
     if (p) {
-      setWidth(p.width);
-      setHeight(p.height);
-      setTargetKb(Math.round((p.minKb + p.maxKb) / 2));
+      if (p.category === 'Custom') {
+        setApplyDimensions(false);
+        setTargetKb(50);
+      } else {
+        setApplyDimensions(true);
+        setWidth(p.width);
+        setHeight(p.height);
+        setTargetKb(Math.round((p.minKb + p.maxKb) / 2));
+      }
     }
   };
 
@@ -115,13 +124,17 @@ export const PhotoResizerTool: React.FC = () => {
     const img = new Image();
     img.onload = () => {
       setOriginalDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      if (!applyDimensions) {
+        setWidth(img.naturalWidth);
+        setHeight(img.naturalHeight);
+      }
     };
     img.src = url;
   };
 
   // Re-process image whenever parameters change
   useEffect(() => {
-    if (!originalImageUrl || width <= 0 || height <= 0) return;
+    if (!originalImageUrl) return;
 
     let isMounted = true;
     const timer = setTimeout(() => {
@@ -134,13 +147,17 @@ export const PhotoResizerTool: React.FC = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      // Determine effective render dimensions
+      const effectiveWidth = applyDimensions && width > 0 ? width : (originalDimensions.width || img.naturalWidth || 400);
+      const effectiveHeight = applyDimensions && height > 0 ? height : (originalDimensions.height || img.naturalHeight || 500);
+
       // Handle rotation
       if (rotation % 180 !== 0) {
-        canvas.width = height;
-        canvas.height = width;
+        canvas.width = effectiveHeight;
+        canvas.height = effectiveWidth;
       } else {
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = effectiveWidth;
+        canvas.height = effectiveHeight;
       }
 
       ctx.save();
@@ -150,17 +167,17 @@ export const PhotoResizerTool: React.FC = () => {
       if (rotation === 90) {
         ctx.translate(canvas.width, 0);
         ctx.rotate(Math.PI / 2);
-        ctx.drawImage(img, 0, 0, height, width);
+        ctx.drawImage(img, 0, 0, effectiveHeight, effectiveWidth);
       } else if (rotation === 180) {
         ctx.translate(canvas.width, canvas.height);
         ctx.rotate(Math.PI);
-        ctx.drawImage(img, 0, 0, width, height);
+        ctx.drawImage(img, 0, 0, effectiveWidth, effectiveHeight);
       } else if (rotation === 270) {
         ctx.translate(0, canvas.height);
         ctx.rotate((3 * Math.PI) / 2);
-        ctx.drawImage(img, 0, 0, height, width);
+        ctx.drawImage(img, 0, 0, effectiveHeight, effectiveWidth);
       } else {
-        ctx.drawImage(img, 0, 0, width, height);
+        ctx.drawImage(img, 0, 0, effectiveWidth, effectiveHeight);
       }
       ctx.restore();
 
@@ -207,7 +224,7 @@ export const PhotoResizerTool: React.FC = () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [originalImageUrl, width, height, targetKb, rotation]);
+  }, [originalImageUrl, originalDimensions.width, originalDimensions.height, applyDimensions, width, height, targetKb, rotation]);
 
   const handleRotate = () => {
     setRotation((prev) => (prev + 90) % 360);
@@ -298,7 +315,7 @@ export const PhotoResizerTool: React.FC = () => {
           </div>
 
           {/* Manual Fine Tuning Controls */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-neutral-800 uppercase tracking-wider">
                 3. आयाम व KB सेटिंग्स (Dimensions & KB)
@@ -313,38 +330,77 @@ export const PhotoResizerTool: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">चौड़ाई (Width px)</label>
+            {/* Checkbox for Dimensions - When unchecked, original photo dimensions are preserved */}
+            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
-                  type="number"
-                  value={width}
-                  onChange={(e) => handleWidthChange(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-hidden font-bold"
+                  type="checkbox"
+                  id="applyDimensionsCheck"
+                  checked={applyDimensions}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setApplyDimensions(checked);
+                    if (checked && originalDimensions.width > 0 && (!width || width === 200)) {
+                      setWidth(originalDimensions.width);
+                      setHeight(originalDimensions.height);
+                    }
+                  }}
+                  className="w-4 h-4 text-red-600 rounded border-neutral-300 focus:ring-red-500 cursor-pointer"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">ऊंचाई (Height px)</label>
-                <input
-                  type="number"
-                  value={height}
-                  onChange={(e) => handleHeightChange(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-hidden font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="aspectRatioCheck"
-                checked={maintainAspect}
-                onChange={(e) => setMaintainAspect(e.target.checked)}
-                className="w-4 h-4 text-red-600 rounded border-neutral-300 focus:ring-red-500"
-              />
-              <label htmlFor="aspectRatioCheck" className="text-xs font-semibold text-neutral-700 cursor-pointer">
-                आस्पेक्ट रेश्यो बनाए रखें (Keep Aspect Ratio)
+                <span className="text-xs font-bold text-neutral-900">
+                  फोटो के Dimensions (चौड़ाई व ऊंचाई px) बदलें
+                </span>
               </label>
+
+              {!applyDimensions ? (
+                <p className="text-[11px] text-neutral-500 pl-6.5 leading-relaxed">
+                  {originalDimensions.width > 0 ? (
+                    <>
+                      मूल फोटो के आयाम सुरक्षित रहेंगे: <span className="font-bold text-neutral-800">{originalDimensions.width} x {originalDimensions.height} px</span>। फोटो बिना खींचे/दबे प्राकृतिक अनुपात में कंप्रेस होगी। (बदलने के लिए बॉक्स चेक करें)
+                    </>
+                  ) : (
+                    <>मूल फोटो का अनुपात सुरक्षित रहेगा। विशेष परीक्षा हेतु चौड़ाई/ऊंचाई बदलने के लिए ही चेकबॉक्स टिक करें।</>
+                  )}
+                </p>
+              ) : (
+                <div className="pt-2 border-t border-neutral-200 space-y-3 pl-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">चौड़ाई (Width px)</label>
+                      <input
+                        type="number"
+                        value={width || ''}
+                        onChange={(e) => handleWidthChange(Number(e.target.value))}
+                        placeholder="200"
+                        className="w-full px-3 py-2 text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-hidden font-mono text-neutral-900 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">ऊंचाई (Height px)</label>
+                      <input
+                        type="number"
+                        value={height || ''}
+                        onChange={(e) => handleHeightChange(Number(e.target.value))}
+                        placeholder="250"
+                        className="w-full px-3 py-2 text-sm font-bold border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-hidden font-mono text-neutral-900 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="aspectRatioCheck"
+                      checked={maintainAspect}
+                      onChange={(e) => setMaintainAspect(e.target.checked)}
+                      className="w-4 h-4 text-red-600 rounded border-neutral-300 focus:ring-red-500 cursor-pointer"
+                    />
+                    <label htmlFor="aspectRatioCheck" className="text-xs font-semibold text-neutral-700 cursor-pointer">
+                      आस्पेक्ट रेश्यो बनाए रखें (Keep Aspect Ratio)
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -420,11 +476,16 @@ export const PhotoResizerTool: React.FC = () => {
                     <img
                       src={processedImageUrl}
                       alt="Resized Preview"
-                      style={{ width: `${Math.min(width, 240)}px`, height: `${Math.min(height, 280)}px` }}
+                      style={{
+                        maxWidth: '240px',
+                        maxHeight: '280px',
+                        width: 'auto',
+                        height: 'auto'
+                      }}
                       className="mx-auto rounded-lg shadow-md object-contain border border-neutral-300 bg-white"
                     />
                     <div className="text-[11px] font-semibold text-neutral-600">
-                      {width} x {height} px • {processedSizeKb} KB
+                      {applyDimensions ? `${width} x ${height} px` : `${originalDimensions.width || 400} x ${originalDimensions.height || 500} px (मूल आयाम)`} • {processedSizeKb} KB
                     </div>
                   </div>
                 ) : (
@@ -445,7 +506,9 @@ export const PhotoResizerTool: React.FC = () => {
                   </div>
                   <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
                     <span className="text-[10px] text-emerald-700 font-semibold block">नया साइज़ (Compressed):</span>
-                    <span className="font-extrabold text-emerald-800">{processedSizeKb} KB ({width}x{height}px)</span>
+                    <span className="font-extrabold text-emerald-800">
+                      {processedSizeKb} KB ({applyDimensions ? `${width}x${height}px` : `${originalDimensions.width}x${originalDimensions.height}px`})
+                    </span>
                   </div>
                 </div>
               )}
@@ -456,7 +519,7 @@ export const PhotoResizerTool: React.FC = () => {
               {processedImageUrl ? (
                 <a
                   href={processedImageUrl}
-                  download={`photo_resized_${width}x${height}_${processedSizeKb}KB.jpg`}
+                  download={`photo_resized_${applyDimensions ? `${width}x${height}` : 'original'}_${processedSizeKb}KB.jpg`}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
@@ -470,6 +533,12 @@ export const PhotoResizerTool: React.FC = () => {
                   डाउनलोड करने हेतु पहले फोटो अपलोड करें
                 </button>
               )}
+
+              {/* Security Guarantee Text */}
+              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+              </div>
             </div>
           </div>
         </div>

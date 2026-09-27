@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, RefreshCw, Type, Calendar, CheckCircle2 } from 'lucide-react';
+import { Upload, Download, RefreshCw, Type, Calendar, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export const NameDateOnPhotoTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -413,6 +413,12 @@ export const NameDateOnPhotoTool: React.FC = () => {
                   डाउनलोड करने हेतु पहले फोटो अपलोड करें
                 </button>
               )}
+
+              {/* Security Guarantee Text */}
+              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+              </div>
             </div>
           </div>
         </div>

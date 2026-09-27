@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, RefreshCw, FileText, CheckCircle2, Minimize2, AlertCircle } from 'lucide-react';
+import { Upload, Download, RefreshCw, FileText, CheckCircle2, Minimize2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export const PdfCompressTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -229,6 +229,12 @@ export const PdfCompressTool: React.FC = () => {
                   कंप्रेस होने के बाद डाउनलोड बटन सक्रिय होगा
                 </button>
               )}
+
+              {/* Security Guarantee Text */}
+              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+              </div>
             </div>
           </div>
         </div>
