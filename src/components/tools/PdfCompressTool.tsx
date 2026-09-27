@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, RefreshCw, FileText, CheckCircle2, ShieldCheck, Sparkles, Minimize2, AlertCircle } from 'lucide-react';
+import { Upload, Download, RefreshCw, FileText, CheckCircle2, Minimize2, AlertCircle } from 'lucide-react';
 
 export const PdfCompressTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -68,50 +68,40 @@ export const PdfCompressTool: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-rose-700 via-red-700 to-amber-700 text-white p-5 rounded-2xl shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>200 KB / 300 KB पोर्टल लिमिट हेतु</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black">PDF कंप्रेसर व साइज़ कम करें (PDF Compressor)</h2>
-            <p className="text-xs sm:text-sm text-rose-100 mt-1 max-w-2xl">
-              सरकारी नौकरी पोर्टल (MP Online, SSC, UPSC, PEB) पर अक्सर 200KB या 300KB से कम PDF मांगी जाती है। अपनी बड़ी PDF फाइल को यहाँ तुरंत छोटा करें।
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>100% प्राइवेट / सुरक्षित</span>
-          </div>
-        </div>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Compact Tool Header Strip */}
+      <div className="bg-gradient-to-r from-rose-700 to-red-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black truncate">
+          PDF कंप्रेसर व साइज़ कम करें (PDF Compressor)
+        </h2>
+        <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
+          पोर्टल लिमिट &lt; 200 KB / 300 KB
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         {/* Left Column */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
               1. बड़ी PDF फाइल अपलोड करें
             </label>
-            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-rose-300 hover:border-rose-500 rounded-xl bg-rose-50/50 hover:bg-rose-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-9 h-9 text-rose-600 mb-2 animate-bounce" />
-              <span className="text-sm font-bold text-neutral-900">PDF फाइल चुनें</span>
-              <span className="text-xs text-neutral-500 mt-1">मार्कशीट, जाति, निवास या अन्य दस्तावेज</span>
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-rose-300 hover:border-rose-500 rounded-xl bg-rose-50/50 hover:bg-rose-50 cursor-pointer transition-colors text-center">
+              <Upload className="w-7 h-7 text-rose-600 mb-1.5 animate-bounce" />
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">PDF फाइल चुनें</span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">मार्कशीट, जाति, निवास या अन्य दस्तावेज</span>
               <input type="file" accept="application/pdf" onChange={handleFileChange} className="hidden" />
             </label>
 
             {selectedFile && (
-              <div className="mt-3 flex items-center justify-between text-xs bg-neutral-100 p-2.5 rounded-lg border border-neutral-200">
+              <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
                 <span className="font-semibold text-neutral-800 truncate max-w-[200px]">{selectedFile.name}</span>
                 <span className="font-bold text-neutral-600">मूल साइज़: <span className="text-rose-700">{originalSizeKb} KB</span></span>
               </div>
             )}
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               2. कंप्रेशन लेवल चुनें (Compression Level)
             </label>

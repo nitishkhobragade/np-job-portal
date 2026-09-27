@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, ShieldCheck, Sparkles, RefreshCw, Layers } from 'lucide-react';
+import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, Layers } from 'lucide-react';
 
 interface PdfFileItem {
   id: string;
@@ -98,38 +98,28 @@ export const PdfMergeTool: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-slate-900 text-white p-5 rounded-2xl shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>सभी PDF एक साथ जोड़ें (Merge PDF)</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black">PDF जोड़ें व कम्बाइन करें (PDF Merge Tool)</h2>
-            <p className="text-xs sm:text-sm text-purple-100 mt-1 max-w-2xl">
-              अलग-अलग PDF फाइलों (जैसे 10वीं व 12वीं मार्कशीट, जाति व मूल निवासी) को मिलाकर एक सिंगल PDF फाइल बनाएं। 100% सुरक्षित और आपके फोन/कंप्यूटर में प्रोसेस।
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>ब्राउज़र में प्रोसेस / नो अपलोड</span>
-          </div>
-        </div>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Compact Tool Header Strip */}
+      <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black truncate">
+          PDF जोड़ें व कम्बाइन करें (PDF Merge Tool)
+        </h2>
+        <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
+          मार्कशीट व प्रमाण पत्र कम्बाइन
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         {/* Left Column: Upload & List */}
-        <div className="lg:col-span-7 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
+        <div className="lg:col-span-7 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
               1. जोड़ने वाली PDF फाइलें चुनें (Select PDF Files)
             </label>
-            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl bg-purple-50/50 hover:bg-purple-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-9 h-9 text-purple-600 mb-2 animate-bounce" />
-              <span className="text-sm font-bold text-neutral-900">2 या अधिक PDF फाइलें चुनें</span>
-              <span className="text-xs text-neutral-500 mt-1">
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl bg-purple-50/50 hover:bg-purple-50 cursor-pointer transition-colors text-center">
+              <Upload className="w-7 h-7 text-purple-600 mb-1.5 animate-bounce" />
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">2 या अधिक PDF फाइलें चुनें</span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">
                 (मार्कशीट, सर्टिफिकेट, फॉर्म - एक साथ कई चुनें)
               </span>
               <input
@@ -143,7 +133,7 @@ export const PdfMergeTool: React.FC = () => {
           </div>
 
           {pdfFiles.length > 0 && (
-            <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-3">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2.5">
               <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
                 <span className="text-xs font-black text-neutral-800 uppercase tracking-wider">
                   फाइलों का क्रम ({pdfFiles.length} फाइलें):

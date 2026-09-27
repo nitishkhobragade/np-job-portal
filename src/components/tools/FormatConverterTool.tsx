@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Upload, Download, RefreshCw, Sparkles, ShieldCheck, CheckCircle2, FileType } from 'lucide-react';
+import { Upload, Download, RefreshCw, CheckCircle2, FileType } from 'lucide-react';
 
 export const FormatConverterTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -75,24 +75,14 @@ export const FormatConverterTool: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-700 text-white p-5 rounded-2xl shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-              <span>JPG • PNG • WEBP • JPEG परिवर्तक</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black">फोटो फॉर्मेट कनवर्टर (Image Format Converter)</h2>
-            <p className="text-xs sm:text-sm text-amber-100 mt-1 max-w-2xl">
-              सरकारी नौकरी फॉर्म में केवल JPG/JPEG मांगा जाता है। यदि आपकी फोटो PNG या WEBP है, तो उसे यहाँ बिना किसी क्वालिटी नुकसान के तुरंत JPG में बदलें।
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>100% प्राइवेट / कोई सर्वर नहीं</span>
-          </div>
-        </div>
+      {/* Compact Tool Header Strip */}
+      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black truncate">
+          फोटो फॉर्मेट कनवर्टर (Image Format Converter)
+        </h2>
+        <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
+          PNG / WEBP से तुरंत JPG
+        </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -168,18 +158,38 @@ export const FormatConverterTool: React.FC = () => {
 
             {targetFormat !== 'image/png' && (
               <div>
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="font-semibold text-neutral-700">इमेज क्वालिटी (Quality):</span>
-                  <span className="font-bold text-amber-700">{quality}%</span>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">
+                  इमेज क्वालिटी दर्ज करें (Quality % दर्ज करें):
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    min="10"
+                    max="100"
+                    value={quality}
+                    onChange={(e) => setQuality(Math.min(100, Math.max(10, Number(e.target.value))))}
+                    className="w-full px-3 py-2 pr-10 text-sm font-black border border-neutral-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-hidden text-neutral-900 bg-white"
+                  />
+                  <span className="absolute right-3 text-xs font-black text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
+                    %
+                  </span>
                 </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  value={quality}
-                  onChange={(e) => setQuality(Number(e.target.value))}
-                  className="w-full accent-amber-600 cursor-pointer"
-                />
+                <div className="flex gap-2 mt-2">
+                  {[60, 75, 85, 95].map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setQuality(q)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                        quality === q
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                          : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-300'
+                      }`}
+                    >
+                      {q}%
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

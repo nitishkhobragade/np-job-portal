@@ -123,27 +123,27 @@ const HeaderInner: React.FC<HeaderProps> = ({
       <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600"></div>
 
       {/* Main Brand & Contact Bar */}
-      <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 overflow-hidden box-border">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 py-1.5 sm:py-2 overflow-hidden box-border">
         <div className="w-full max-w-full flex items-center justify-between gap-2 sm:gap-3 overflow-hidden">
           
           {/* Logo & Portal Identity - Clicking Logo routes to / and immediately resets to HOME */}
-          <Link href="/" onClick={handleHomeClick} className="flex items-center gap-2 sm:gap-3 shrink min-w-0 cursor-pointer group">
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-rose-900 text-white flex flex-col items-center justify-center font-black shadow-md border border-red-500/30 shrink-0 group-hover:scale-102 transition-transform">
-              <span className="text-base sm:text-2xl leading-none tracking-tight">NP</span>
-              <span className="text-[7px] sm:text-[9px] uppercase tracking-wider font-semibold text-amber-300">PORTAL</span>
+          <Link href="/" onClick={handleHomeClick} className="flex items-center gap-2 sm:gap-2.5 shrink min-w-0 cursor-pointer group">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-rose-900 text-white flex flex-col items-center justify-center font-black shadow-md border border-red-500/30 shrink-0 group-hover:scale-102 transition-transform">
+              <span className="text-sm sm:text-xl leading-none tracking-tight">NP</span>
+              <span className="text-[6px] sm:text-[8px] uppercase tracking-wider font-semibold text-amber-300">PORTAL</span>
             </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-base sm:text-2xl font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-red-700 transition-colors truncate">
+                <span className="text-sm sm:text-xl font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-red-700 transition-colors truncate">
                   NP <span className="text-red-600">Job Portal</span>
                 </span>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200 shrink-0">
-                  <CheckCircle2 className="w-3 h-3 text-red-600" />
+                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-red-100 text-red-800 border border-red-200 shrink-0">
+                  <CheckCircle2 className="w-2.5 h-2.5 text-red-600" />
                   MP & Central
                 </span>
               </div>
-              <p className="hidden md:block text-[11px] sm:text-xs text-neutral-600 font-medium line-clamp-1 mt-0.5">
+              <p className="hidden md:block text-[10px] sm:text-[11px] text-neutral-600 font-medium line-clamp-1 mt-0.5">
                 घर बैठे सुरक्षित फॉर्म भरवाएं • Nitish Khobragade (8982324497)
               </p>
             </div>
@@ -236,7 +236,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
             <Link
               href="/"
               onClick={handleHomeClick}
-              className={`px-4 py-3 transition-colors uppercase flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase flex items-center gap-1 cursor-pointer ${
                 activeTab === 'home'
                   ? 'bg-red-700 text-white shadow-sm'
                   : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
@@ -250,7 +250,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (setSelectedCategory) setSelectedCategory('Latest Jobs');
               }}
-              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'latest-jobs'
                   ? 'bg-red-700 text-white shadow-sm'
                   : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
@@ -264,7 +264,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (setSelectedCategory) setSelectedCategory('Admit Card');
               }}
-              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'admit-card'
                   ? 'bg-red-700 text-white shadow-sm'
                   : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
@@ -278,7 +278,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (setSelectedCategory) setSelectedCategory('Results');
               }}
-              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'results'
                   ? 'bg-red-700 text-white shadow-sm'
                   : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
@@ -292,7 +292,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (setSelectedCategory) setSelectedCategory('MP Special');
               }}
-              className={`px-3.5 py-3 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
                 activeTab === 'mp-special'
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
                   : 'text-amber-400 hover:bg-amber-600 hover:text-slate-950'
@@ -306,14 +306,14 @@ const HeaderInner: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (setSelectedCategory) setSelectedCategory('Tech Jobs');
               }}
-              className={`px-3.5 py-3 transition-colors uppercase font-bold flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase font-bold flex items-center gap-1 cursor-pointer ${
                 activeTab === 'tech-jobs'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-blue-300 hover:bg-blue-600 hover:text-white'
               }`}
             >
               <span>Tech Jobs</span>
-              <span className="bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">IT/MNC</span>
+              <span className="bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">IT</span>
             </Link>
 
             <Link
@@ -321,7 +321,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (setSelectedCategory) setSelectedCategory('SSC/UPSC');
               }}
-              className={`px-3.5 py-3 transition-colors uppercase cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'central-ssc'
                   ? 'bg-red-700 text-white shadow-sm'
                   : 'text-slate-200 hover:bg-red-700/80 hover:text-white'
@@ -332,26 +332,26 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/blogs"
-              className={`px-3.5 py-3 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
                 pathname.startsWith('/blogs')
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
                   : 'text-amber-300 hover:bg-amber-600 hover:text-slate-950'
               }`}
             >
-              <span>📖 ब्लॉग (Blogs)</span>
+              <span>📖 ब्लॉग</span>
             </Link>
 
             {/* Tools Link in Navbar */}
             <Link
               href="/tools"
-              className={`px-3.5 py-3 transition-colors uppercase font-black flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
                 pathname.startsWith('/tools')
                   ? 'bg-violet-600 text-white shadow-sm'
                   : 'text-violet-300 hover:bg-violet-700 hover:text-white'
               }`}
             >
               <Wrench className="w-3.5 h-3.5 text-amber-300" />
-              <span>🛠️ टूल्स (Tools)</span>
+              <span>🛠️ टूल्स</span>
               <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">Free</span>
             </Link>
 

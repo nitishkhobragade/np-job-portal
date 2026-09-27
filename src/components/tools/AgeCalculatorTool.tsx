@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, CheckCircle2, AlertCircle, Sparkles, UserCheck, ShieldCheck } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, AlertCircle, UserCheck } from 'lucide-react';
 
 export const AgeCalculatorTool: React.FC = () => {
   const [dob, setDob] = useState<string>('2002-05-15');
@@ -75,25 +75,15 @@ export const AgeCalculatorTool: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-blue-700 via-sky-700 to-indigo-900 text-white p-5 rounded-2xl shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>वर्ष, माह, दिन व कट-ऑफ तारीख कैलकुलेटर</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black">सरकारी नौकरी आयु कैलकुलेटर (Sarkari Age Calculator)</h2>
-            <p className="text-xs sm:text-sm text-blue-100 mt-1 max-w-2xl">
-              विभिन्न सरकारी परीक्षाओं (MP Police, SSC, Railway, UPSC) की कट-ऑफ तारीख के अनुसार अपनी सटीक आयु (वर्ष, माह, दिन) जानें और पात्रता जांचें।
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>100% सटीक व तुरंत</span>
-          </div>
-        </div>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Compact Tool Header Strip */}
+      <div className="bg-gradient-to-r from-blue-700 via-sky-700 to-indigo-900 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black truncate">
+          सरकारी नौकरी आयु कैलकुलेटर (Sarkari Age Calculator)
+        </h2>
+        <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
+          कट-ऑफ तारीख • वर्ष-माह-दिन
+        </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

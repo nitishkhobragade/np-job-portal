@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, RefreshCw, ShieldCheck, Sparkles, CheckCircle2, Feather } from 'lucide-react';
+import { Upload, Download, RefreshCw, CheckCircle2, Feather } from 'lucide-react';
 
 export const SignatureTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -149,44 +149,34 @@ export const SignatureTool: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-slate-900 text-white p-5 rounded-2xl shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>10 KB से 20 KB मानक • SSC, व्यापम, UPSC, बैंक</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black">हस्ताक्षर (Signature) रिसाइज़र व बैकग्राउंड क्लीनर</h2>
-            <p className="text-xs sm:text-sm text-emerald-100 mt-1 max-w-2xl">
-              कागज पर किए गए हस्ताक्षर की फोटो से पीलापन और छाया हटाकर उसे एकदम सफेद बैकग्राउंड और डार्क काली स्याही में बदलें और 10KB से 20KB में डाउनलोड करें।
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>100% प्राइवेट / कोई अपलोड नहीं</span>
-          </div>
-        </div>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Compact Tool Header Strip */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black truncate">
+          हस्ताक्षर (Signature) रिसाइज़र व बैकग्राउंड क्लीनर
+        </h2>
+        <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
+          10-20 KB • SSC / व्यापम / UPSC
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         {/* Left Column */}
-        <div className="lg:col-span-6 space-y-5">
+        <div className="lg:col-span-6 space-y-3">
           {/* 1. Upload */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
               1. अपने हस्ताक्षर (Signature) की फोटो अपलोड करें
             </label>
-            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl bg-emerald-50/50 hover:bg-emerald-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-9 h-9 text-emerald-600 mb-2 animate-bounce" />
-              <span className="text-sm font-bold text-neutral-900">सिग्नेचर फोटो चुनें</span>
-              <span className="text-xs text-neutral-500 mt-1">मोबाइल से खींची गई फोटो भी चलेगी</span>
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl bg-emerald-50/50 hover:bg-emerald-50 cursor-pointer transition-colors text-center">
+              <Upload className="w-7 h-7 text-emerald-600 mb-1.5 animate-bounce" />
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">सिग्नेचर फोटो चुनें</span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">मोबाइल से खींची गई फोटो भी चलेगी</span>
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             </label>
 
             {selectedFile && (
-              <div className="mt-3 flex items-center justify-between text-xs bg-neutral-100 p-2.5 rounded-lg border border-neutral-200">
+              <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
                 <span className="font-semibold text-neutral-800 truncate max-w-[200px]">{selectedFile.name}</span>
                 <span className="font-bold text-neutral-600">मूल साइज़: <span className="text-emerald-700">{originalSizeKb} KB</span></span>
               </div>
@@ -194,7 +184,7 @@ export const SignatureTool: React.FC = () => {
           </div>
 
           {/* 2. Fast Exam Presets */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-2">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               2. परीक्षा अनुसार मानक साइज़ चुनें (Exam Presets)
             </label>
@@ -305,23 +295,39 @@ export const SignatureTool: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-semibold text-neutral-700">वांछित फाइल साइज़ (Target KB):</span>
-                <span className="font-black text-emerald-700 text-sm">{targetKb} KB</span>
+              <label className="block text-xs font-bold text-neutral-800 mb-1">
+                टारगेट फाइल साइज़ दर्ज करें (अपनी पसंद का Size KB में डालें):
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type="number"
+                  min="5"
+                  max="100"
+                  value={targetKb || ''}
+                  onChange={(e) => setTargetKb(Math.max(1, Number(e.target.value)))}
+                  placeholder="उदा. 10, 15, 20"
+                  className="w-full px-3 py-2 pr-12 text-sm font-black border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden text-neutral-900 bg-white"
+                />
+                <span className="absolute right-3 text-xs font-black text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
+                  KB
+                </span>
               </div>
-              <input
-                type="range"
-                min="5"
-                max="50"
-                step="1"
-                value={targetKb}
-                onChange={(e) => setTargetKb(Number(e.target.value))}
-                className="w-full accent-emerald-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-neutral-500 mt-0.5">
-                <span>10 KB (न्यूनतम SSC)</span>
-                <span>18 KB (सर्वश्रेष्ठ)</span>
-                <span>50 KB (अधिकतम)</span>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <span className="text-[10px] text-neutral-500 font-semibold self-center">क्विक साइज़:</span>
+                {[10, 15, 18, 20, 30, 50].map((kb) => (
+                  <button
+                    key={kb}
+                    type="button"
+                    onClick={() => setTargetKb(kb)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                      targetKb === kb
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                        : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-300'
+                    }`}
+                  >
+                    {kb} KB
+                  </button>
+                ))}
               </div>
             </div>
           </div>

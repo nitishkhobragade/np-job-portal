@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, RefreshCw, Type, Calendar, Sparkles, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Upload, Download, RefreshCw, Type, Calendar, CheckCircle2 } from 'lucide-react';
 
 export const NameDateOnPhotoTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -158,45 +158,35 @@ export const NameDateOnPhotoTool: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 text-white p-5 rounded-2xl shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>MP Police Constable 2026 • SSC • व्यापम • Railway</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black">फोटो पर नाम व फोटो की दिनांक लिखें (Name & DOP on Photo)</h2>
-            <p className="text-xs sm:text-sm text-blue-100 mt-1 max-w-2xl">
-              SSC, MP Police और व्यापम फॉर्म के नियम अनुसार अपनी फोटो के नीचे सफेद पट्टी में अपना नाम और फोटो खिंचवाने की दिनांक (D.O.P.) जोड़ें। 100% सटीक और सरकारी मापदंडों अनुसार।
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>100% प्राइवेट / सुरक्षित</span>
-          </div>
-        </div>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Compact Tool Header Strip */}
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black truncate">
+          फोटो पर नाम व फोटो की दिनांक लिखें (Name & DOP on Photo)
+        </h2>
+        <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
+          SSC • MP Police • व्यापम नियम
+        </span>
       </div>
 
       {/* Main Form & Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
         {/* Left: Input Form */}
-        <div className="lg:col-span-6 space-y-5">
+        <div className="lg:col-span-6 space-y-3">
           {/* 1. Upload */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
               1. अपनी पासपोर्ट फोटो अपलोड करें
             </label>
-            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl bg-indigo-50/50 hover:bg-indigo-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-9 h-9 text-indigo-600 mb-2 animate-bounce" />
-              <span className="text-sm font-bold text-neutral-900">फोटो चुनें या यहाँ खींचकर छोड़ें</span>
-              <span className="text-xs text-neutral-500 mt-1">JPG, JPEG, PNG सपोर्टेड</span>
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl bg-indigo-50/50 hover:bg-indigo-50 cursor-pointer transition-colors text-center">
+              <Upload className="w-7 h-7 text-indigo-600 mb-1.5 animate-bounce" />
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">फोटो चुनें या यहाँ खींचकर छोड़ें</span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">JPG, JPEG, PNG सपोर्टेड</span>
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             </label>
 
             {selectedFile && (
-              <div className="mt-3 flex items-center justify-between text-xs bg-neutral-100 p-2.5 rounded-lg border border-neutral-200">
+              <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
                 <span className="font-semibold text-neutral-800 truncate max-w-[200px]">{selectedFile.name}</span>
                 <span className="font-bold text-neutral-600">मूल साइज़: <span className="text-indigo-700">{Math.round((selectedFile.size / 1024) * 10) / 10} KB</span></span>
               </div>
@@ -204,7 +194,7 @@ export const NameDateOnPhotoTool: React.FC = () => {
           </div>
 
           {/* 2. Candidate Name & Date Details */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
               2. नाम व दिनांक की जानकारी (Details on Photo)
             </label>
@@ -310,23 +300,39 @@ export const NameDateOnPhotoTool: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-semibold text-neutral-700">टारगेट साइज़ (Target KB):</span>
-                <span className="font-black text-indigo-700 text-sm">{targetKb} KB</span>
+              <label className="block text-xs font-bold text-neutral-800 mb-1">
+                टारगेट फाइल साइज़ दर्ज करें (अपनी पसंद का Size KB में डालें):
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type="number"
+                  min="5"
+                  max="500"
+                  value={targetKb || ''}
+                  onChange={(e) => setTargetKb(Math.max(1, Number(e.target.value)))}
+                  placeholder="उदा. 45"
+                  className="w-full px-3 py-2 pr-12 text-sm font-black border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-hidden text-neutral-900 bg-white"
+                />
+                <span className="absolute right-3 text-xs font-black text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
+                  KB
+                </span>
               </div>
-              <input
-                type="range"
-                min="15"
-                max="100"
-                step="5"
-                value={targetKb}
-                onChange={(e) => setTargetKb(Number(e.target.value))}
-                className="w-full accent-indigo-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-neutral-500 mt-0.5">
-                <span>20 KB</span>
-                <span>45 KB (अनुशंसित / Recommended)</span>
-                <span>100 KB</span>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <span className="text-[10px] text-neutral-500 font-semibold self-center">क्विक साइज़:</span>
+                {[20, 35, 45, 50, 100].map((kb) => (
+                  <button
+                    key={kb}
+                    type="button"
+                    onClick={() => setTargetKb(kb)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                      targetKb === kb
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                        : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-300'
+                    }`}
+                  >
+                    {kb} KB
+                  </button>
+                ))}
               </div>
             </div>
           </div>
