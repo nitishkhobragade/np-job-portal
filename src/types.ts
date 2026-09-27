@@ -291,6 +291,11 @@ export interface PostRecord {
   // Custom Poster Engine
   customPosterUrl?: string;
   useCustomPoster?: boolean;
+  // Programmatic SEO & JobPosting Schema
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string[];
+  jobPostingSchema?: Record<string, unknown>;
 }
 
 // Scraper Target Feeds & Sources

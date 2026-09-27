@@ -68,70 +68,148 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      // Fallback if no API key in environment
+      // High-Value Deep Fallback if no API key in environment (800+ words structured Markdown)
       const slug = trimmedPrompt
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
         .replace(/[\s_-]+/g, '-')
         .replace(/^-+|-+$/g, '') || 'recruitment-guide-2026';
 
+      const fallbackContent = `# ${trimmedPrompt}: सम्पूर्ण गाइड, पात्रता, परीक्षा पैटर्न व ऑनलाइन आवेदन
+
+मध्य प्रदेश और केंद्र सरकार की विभिन्न भर्ती परीक्षाओं की तैयारी कर रहे सभी प्रिय अभ्यर्थियों का **NP Job Portal (A Unit of NTechBay)** पर हार्दिक स्वागत है। हमारे 8+ वर्षों के साइबर कैफ़े संचालन एवं ऑनलाइन फॉर्म परामर्श अनुभव में हमने देखा है कि हजारों योग्य अभ्यर्थी केवल छोटी-छोटी तकनीकी गलतियों (जैसे गलत फोटो बैकग्राउंड, एक्सपायर्ड रोजगार पंजीयन, या अंतिम तिथि का इंतजार) के कारण परीक्षा से वंचित रह जाते हैं। इस विस्तृत लेख में हम आपको **${trimmedPrompt}** के हर एक पहलू, पात्रता, चयन प्रक्रिया एवं फॉर्म भरने के आवश्यक नियमों की 100% सटीक जानकारी प्रदान कर रहे हैं।
+
+---
+
+## 1. भर्ती का अवलोकन (Quick Overview Table)
+
+नीचे दी गई तालिका में भर्ती से संबंधित सभी महत्वपूर्ण विवरण संक्षेप में दिए गए हैं:
+
+| विवरण (Parameter) | महत्वपूर्ण जानकारी (Details) |
+| :--- | :--- |
+| **भर्ती का नाम (Recruitment)** | ${trimmedPrompt} |
+| **संबंधित विभाग (Department)** | मध्य प्रदेश / केंद्र सरकार अधिकृत बोर्ड |
+| **कुल पद संख्या (Total Vacancies)** | विज्ञप्ति अनुसार (Official Notification देखें) |
+| **आवेदन का माध्यम (Mode of Apply)** | ऑनलाइन (Online Portal) |
+| **शैक्षणिक योग्यता (Eligibility)** | 10वीं / 12वीं / स्नातक / डिप्लोमा (पदानुसार) |
+| **आयु सीमा (Age Limit)** | 18 वर्ष से 33/40 वर्ष (नियमानुसार छूट लागू) |
+| **आवेदन शुल्क (Application Fee)** | सामान्य/ओबीसी: ₹500/-, एससी/एसटी: ₹250/- (अनुमानित) |
+| **ऑनलाइन फॉर्म सहायता** | Nitish Khobragade (हेल्पलाइन: 8982324497) |
+
+---
+
+## 2. विस्तृत शैक्षणिक योग्यता एवं पद-वार विवरण (Educational Eligibility & Vacancy Breakdown)
+
+इस भर्ती में आवेदन करने से पहले सभी उम्मीदवारों को अपनी योग्यता की जांच अनिवार्य रूप से कर लेनी चाहिए:
+1. **सामान्य ड्यूटी / लिपिकीय पद:** भारत में किसी भी मान्यता प्राप्त बोर्ड से न्यूनतम 10वीं अथवा 12वीं कक्षा उत्तीर्ण होना आवश्यक है।
+2. **तकनीकी व विशेषज्ञ पद:** संबंधित ट्रेड में ITI प्रमाण पत्र, कंप्यूटर प्रोफिशिएंसी सर्टिफिकेशन टेस्ट (CPCT स्कोर कार्ड), अथवा इंजीनियरिंग में डिप्लोमा/डिग्री धारक।
+3. **रोजगार पंजीयन नियम (MP Candidates):** मध्य प्रदेश के मूल निवासियों के लिए 'MP रोजगार पोर्टल' पर जीवित पंजीयन (Live Registration) होना अत्यंत अनिवार्य है। यदि आपका पंजीयन एक्सपायर हो चुका है, तो आवेदन से पूर्व उसे तत्काल रिन्यू कराएं।
+
+> **महत्वपूर्ण सूचना:** अपने 10वीं की अंकसूची में दर्ज नाम, पिता का नाम और जन्मतिथि का मिलान आधार कार्ड और समग्र आईडी (Samagra e-KYC) से अवश्य करें। स्पेलिंग में अंतर होने पर दस्तावेज सत्यापन (Document Verification) में उम्मीदवारी रद्द हो सकती है।
+
+---
+
+## 3. चयन प्रक्रिया एवं परीक्षा पैटर्न (Selection Process & Syllabus Overview)
+
+उम्मीदवारों का अंतिम चयन निम्नलिखित चरणों के आधार पर किया जाएगा:
+- **प्रथम चरण: ऑनलाइन कंप्यूटर आधारित परीक्षा (CBT):** 100 अंकों का वस्तुनिष्ठ प्रश्नपत्र जिसमें सामान्य ज्ञान, तार्किक क्षमता (Reasoning), गणित और हिंदी/अंग्रेजी के प्रश्न शामिल होंगे।
+- **द्वितीय चरण: शारीरिक दक्षता / स्किल टेस्ट (PST/PET/Typing):** वर्दीधारी पदों के लिए 800 मीटर दौड़, लंबी कूद व गोला फेंक। लिपिकीय पदों के लिए हिंदी/अंग्रेजी टाइपिंग टेस्ट।
+- **तृतीय चरण: दस्तावेज सत्यापन (Document Verification) एवं मेडिकल परीक्षण:** सभी मूल शैक्षणिक दस्तावेजों, जाति, निवास व आय प्रमाण पत्रों की गहन जांच।
+
+---
+
+## 4. ऑनलाइन फॉर्म भरने की चरणबद्ध प्रक्रिया (Step-by-Step Application Guide)
+
+ऑनलाइन आवेदन करते समय किसी भी प्रकार की त्रुटि से बचने के लिए निम्न चरणों का पालन करें:
+1. सबसे पहले अधिकृत पोर्टल पर जाएं और नए कैंडिडेट रजिस्ट्रेशन पर क्लिक करें।
+2. अपनी बेसिक प्रोफाइल (नाम, माता-पिता का नाम, जन्मतिथि, मोबाइल व ईमेल) दर्ज करें।
+3. **फोटो व हस्ताक्षर अपलोड नियम:** 
+   - पासपोर्ट फोटो 3.5cm × 4.5cm साइज़ में, हल्के बैकग्राउंड के साथ और 20KB से 50KB के बीच होनी चाहिए।
+   - हस्ताक्षर सफेद कागज पर काली स्याही से 10KB से 20KB के बीच होना चाहिए।
+   - आप हमारे पोर्टल के **[Tools Menu](/tools)** से फोटो रिसाइज़र व सिग्नेचर क्लीनर का 100% फ्री उपयोग कर सकते हैं।
+4. शैक्षणिक विवरण एवं श्रेणी (UR/OBC/SC/ST/EWS) की सटीक प्रविष्टि करें।
+5. आवेदन शुल्क का ऑनलाइन भुगतान (Net Banking / UPI / Debit Card) करें और फाइनल सबमिशन रसीद की 2 प्रिंट कॉपी सुरक्षित रखें।
+
+> 💡 **घर बैठे सुरक्षित फॉर्म भरवाएं:** यदि आपके पास इंटरनेट, प्रिंटर या कंप्यूटर की सुविधा नहीं है, तो आप अपने दस्तावेज **Nitish Khobragade (8982324497)** को WhatsApp पर भेजकर घर बैठे 100% त्रुटिरहित फॉर्म भरवा सकते हैं और अधिकृत पोर्टल रसीद प्राप्त कर सकते हैं।
+
+---
+
+## 5. अक्सर पूछे जाने वाले प्रश्न (Frequently Asked Questions - FAQs)
+
+**प्रश्न 1: क्या अन्य राज्यों के उम्मीदवार इस भर्ती के लिए आवेदन कर सकते हैं?**  
+**उत्तर:** हाँ, अधिकांश भर्तियों में अन्य राज्यों के अभ्यर्थी सामान्य श्रेणी (Unreserved) के अंतर्गत आवेदन करने हेतु पात्र होते हैं।
+
+**प्रश्न 2: फोटो पर नाम और तारीख (DOP) लिखना जरूरी है क्या?**  
+**उत्तर:** SSC और MP Police जैसे कई आयोगों में फोटो खींचने की तारीख (Date of Photo) लिखना अनिवार्य होता है। आप हमारे [Passport Size Photo Maker Tool](/tools) से एक क्लिक में नाम व तारीख जोड़ सकते हैं।
+
+**प्रश्न 3: फॉर्म भरने की अंतिम तिथि के दिन क्या सर्वर चलता है?**  
+**उत्तर:** अंतिम 48 घंटों में MP Online और SSC सर्वर पर भारी ट्रैफिक के कारण गेटवे टाइमआउट और पेमेंट फेलियर की समस्याएं आती हैं। अतः अंतिम तिथि से कम से कम 5 दिन पूर्व आवेदन पूर्ण करें।
+
+---
+
+## 6. महत्वपूर्ण आधिकारिक लिंक्स (Official Links Table)
+
+| सेवा / दस्तावेज | आधिकारिक लिंक |
+| :--- | :--- |
+| **विस्तृत अधिसूचना (Notification PDF)** | [यहाँ से डाउनलोड करें (Official Notice)](https://npjobportal.com) |
+| **ऑनलाइन आवेदन लिंक (Apply Online)** | [ऑनलाइन फॉर्म भरें (Official Portal)](https://npjobportal.com) |
+| **फोटो व PDF टूल्स (Free Tools)** | [NP Job Portal Tools](/tools) |
+| **WhatsApp फॉर्म हेल्पलाइन** | [8982324497 पर संपर्क करें](https://wa.me/918982324497) |`;
+
       return NextResponse.json({
         success: true,
-        title: trimmedPrompt,
+        title: `${trimmedPrompt}: सम्पूर्ण गाइड एवं ऑनलाइन आवेदन 2026`,
         slug,
         category: category || 'Exam Preparation',
-        excerpt: `${trimmedPrompt} के संबंध में विस्तृत जानकारी, पात्रता, चयन प्रक्रिया एवं ऑनलाइन फॉर्म भरने के महत्वपूर्ण नियम।`,
+        excerpt: `${trimmedPrompt} के संबंध में 800+ शब्दों की विस्तृत गाइड: शैक्षणिक योग्यता, आयु सीमा, चयन प्रक्रिया, पाठ्यक्रम एवं घर बैठे फॉर्म भरने की जानकारी।`,
         bannerUrl,
-        tags: ['NP Job Portal', 'Govt Jobs 2026', 'Sarkari Bharti'],
-        seoKeywords: [trimmedPrompt, 'Online Form 2026', 'Exam Preparation', 'MP Govt Jobs'],
-        content: `## ${trimmedPrompt}\n\nमध्य प्रदेश एवं केंद्र सरकार की भर्तियों में आवेदन करने से पहले सभी नियमों को ध्यानपूर्वक समझें।\n\n### महत्वपूर्ण दस्तावेज:\n- 10वीं/12वीं अंकसूची\n- आधार कार्ड (मोबाइल लिंक)\n- रोजगार पंजीयन प्रमाण पत्र\n\nघर बैठे सुरक्षित फॉर्म भरवाने हेतु **Nitish Khobragade (8982324497)** से संपर्क करें।`
+        tags: ['NP Job Portal', 'Govt Jobs 2026', 'Sarkari Bharti', 'Exam Preparation'],
+        seoKeywords: [trimmedPrompt, 'Sarkari Bharti 2026', 'Exam Syllabus', 'Online Form', 'MP Govt Jobs', 'Nitish Khobragade'],
+        content: fallbackContent
       });
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemPrompt = `You are a legendary Indian cyber-cafe operator, career counselor, and senior recruitment editor named Nitish Khobragade for 'NP Job Portal'.
-You are writing a comprehensive, highly informative, and 100% human-sounding guide for competitive exam aspirants and job seekers in India (especially Madhya Pradesh and Central Govt exams).
+    const systemPrompt = `You are an elite Indian recruitment journalist, master blogger, and cyber-cafe founder named Nitish Khobragade writing for 'NP Job Portal (A Unit of NTechBay)'.
+Your mission is to generate a deep, comprehensive, and exhaustive 800+ word long-form recruitment & career guide in Hindi/Hinglish formatted in rich Markdown.
 
-CRITICAL REQUIREMENT - BYPASS ALL AI DETECTION (ZERO-GPT / GPTZERO / COPYLEAKS RESISTANT):
-1. HUMANIZED NATURAL VOICE: Write in an authentic, conversational yet deeply authoritative Indian mentor tone. Speak directly to students ('प्रिय अभ्यर्थियों', 'अक्सर हमारे केंद्र पर छात्र ये गलती करते हैं', 'हमारे 8+ वर्षों के साइबर कैफ़े संचालन अनुभव में...').
-2. BURSTINESS & SENTENCE VARIETY: Mix very short, crisp statements (e.g. 'जल्दबाजी बिल्कुल न करें।', 'एक छोटी सी गलती से फॉर्म निरस्त हो सकता है।') with detailed informative paragraphs. Avoid rhythmic, repetitive AI sentence starters.
-3. GROUND REALITIES & HYPER-LOCAL NUANCES: Incorporate real practical details:
-   - Mention the mandatory 'MP रोजगार पंजीयन' (MP Rojgar Panjiyan) status and live renewal check.
-   - Mention Samagra ID e-KYC name matching with Class 10th marksheet.
-   - Warn against waiting for the last 48 hours when MPESB / SSC servers face severe gateway timeout issues.
-   - Clarify correct document scanning resolutions (e.g. Photo under 50KB, Signature under 20KB).
-4. NO AI CLICHÉS: Never use generic bot phrases like 'In this fast-paced world', 'Delve into', 'In conclusion', 'A tapestry of opportunities', 'Furthermore', or mechanical textbook prose.
-5. ARTICLE STRUCTURE (Rich Markdown):
-   - Catchy, authentic H1 Title in Hindi with English year/terms.
-   - Engaging introduction addressing students' real anxieties.
-   - Key highlights & timeline table/bullets.
-   - Step-by-step document checklist and eligibility breakdown.
-   - 3-4 Deadly mistakes that cause form rejections (and how to avoid them).
-   - Practical preparation tips & strategy.
-   - Form Assistance Notice: Callout box explaining students can safely send their documents on WhatsApp to Nitish Khobragade (8982324497) to get their online application filled from home with verified official payment receipt.
-   - 3-4 Frequently Asked Questions (FAQ) with direct, honest answers.
+MANDATORY EDITORIAL REQUIREMENTS:
+1. MINIMUM LENGTH: The article content must strictly exceed 800 words. Never output shallow 1-2 paragraph summaries. Provide deep, actionable value.
+2. AUTHENTIC EXPERT VOICE: Speak with 8+ years of real field experience ('हमारे 8+ वर्षों के साइबर कैफ़े संचालन अनुभव में...', 'प्रिय अभ्यर्थियों').
+3. MANDATORY SECTIONS (MUST BE PRESENT IN THIS EXACT ORDER):
+   - Catchy H1 Heading & SEO Intro (Empathetic, engaging opening)
+   - Overview Table in Markdown (Post name, department, important dates, fees, age limit, helpline)
+   - Detailed Educational Eligibility & Post-wise Vacancy Breakdown (Academic criteria, MP Rojgar Panjiyan, Samagra e-KYC)
+   - Selection Process & Exam Pattern / Syllabus Overview (Stage-by-stage CBT, Physical, Skill Test, DV)
+   - Step-by-Step Online Application Guide (Detailed form submission steps + mention candidates can safely send documents on WhatsApp to Nitish Khobragade at 8982324497 to get forms filled with official payment slip)
+   - 3-4 Frequently Asked Questions (FAQs) with thorough, helpful answers
+   - Official Links Table (Notification PDF, Apply Online, NP Tools, WhatsApp Helpline)
+4. STYLING: Use Markdown headings (# H1, ## H2, ### H3), bold highlights (**text**), bullet points, blockquotes (>), and markdown tables (| Col 1 | Col 2 |).
 
-OUTPUT FORMAT:
-Return ONLY a valid JSON object with EXACTLY this structure:
+OUTPUT JSON SPECIFICATION:
+Return ONLY a valid JSON object:
 {
-  "title": "string (Catchy, authentic headline in Hindi)",
+  "title": "string (Catchy, authentic headline in Hindi with English year/terms)",
   "slug": "string (clean-url-slug-in-english-without-spaces)",
   "category": "Exam Preparation" | "Career Guidance" | "Tech Jobs" | "Notifications" | "Portal Guides",
-  "excerpt": "string (compelling meta description, approx 140-160 characters)",
+  "excerpt": "string (compelling 140-160 character meta description)",
   "tags": ["Tag1", "Tag2", "Tag3", "Tag4"],
-  "seoKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"],
-  "content": "string (complete 700-1100 word rich Markdown article with proper ## H2, ### H3, bullet points, callout blockquotes)"
+  "seoKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5", "kw6", "kw7", "kw8"],
+  "content": "string (an exhaustive 800+ word complete Markdown article with all 7 mandatory sections)"
 }`;
 
-    const userPrompt = `Generate a full, humanized, high-CTR blog article for:
+    const userPrompt = `Generate an exhaustive, high-value 800+ word long-form guide for:
 Topic / Title / Notes: "${trimmedPrompt}"
-Additional Keywords: "${keywords || 'Sarkari Bharti 2026, Online Form, Eligibility'}"
+Additional Keywords: "${keywords || 'Sarkari Bharti 2026, Online Form, Eligibility, Syllabus'}"
 Preferred Category: "${category || 'Exam Preparation'}"`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
-      contents: `${systemPrompt}\n\n${userPrompt}`
+      contents: `${systemPrompt}\n\n${userPrompt}`,
+      config: {
+        maxOutputTokens: 6000
+      }
     });
 
     const responseText = response.text || '';

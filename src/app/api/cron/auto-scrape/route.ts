@@ -201,39 +201,90 @@ Return pure valid JSON with audited facts:
       }
       const auditedFacts = JSON.parse(factJsonMatch[0]);
 
-      // PASS 2: Humanized Content Generator for Google AdSense Compliance
-      const humanizePrompt = `You are an expert career counselor and education journalist writing for "NP Job Portal" (operated by Nitish Khobragade, Helpline 8982324497).
-Write a high-quality, completely unique, humanized job guide article for the following verified job:
+      // PASS 2: Humanized Content Generator for Google AdSense Compliance & Programmatic SEO
+      const humanizePrompt = `You are an expert career counselor, SEO Master, and education journalist writing for "NP Job Portal" (A Unit of NTechBay, operated by Nitish Khobragade, Helpline 8982324497).
+Write a high-quality, completely unique, humanized job guide article and programmatic SEO metadata for the following verified job:
 Title: ${auditedFacts.title}
 Department: ${auditedFacts.dept}
 Total Posts: ${auditedFacts.totalPosts}
 Qualification: ${auditedFacts.qualification}
 Last Date: ${auditedFacts.lastDate}
 
-Include the following structured sections formatted in clean Markdown with clear headings:
-## भर्ती का संक्षिप्त विवरण एवं महत्वपूर्ण बातें (Notification Overview & Highlights)
-(A warm, conversational, 2-paragraph explanation of what this recruitment is, who should apply, and why it is a golden opportunity)
+Return ONLY valid JSON with this structure:
+{
+  "seoTitle": "${auditedFacts.title} 2026: Notification, ${auditedFacts.totalPosts} Posts, Dates, Eligibility & Apply Online | NP Job Portal",
+  "seoDescription": "string (concise, click-worthy 140-160 character Hindi-English summary with exact last date and qualification)",
+  "seoKeywords": ["tag 1", "tag 2", "tag 3", "tag 4", "tag 5", "tag 6", "tag 7", "tag 8", "tag 9", "tag 10", "tag 11", "tag 12"],
+  "content": "string (full rich Markdown article with ## भर्ती का संक्षिप्त विवरण एवं महत्वपूर्ण बातें, ## पद विवरण एवं योग्यता मापदंड, ## चयन प्रक्रिया एवं परीक्षा पैटर्न गाइडेंस, ## फॉर्म भरते समय रखी जाने वाली सावधानियां mentioning Nitish Khobragade at 8982324497, ## ऑनलाइन आवेदन कैसे करें)"
+}`;
 
-## पद विवरण एवं योग्यता मापदंड (Vacancy Breakdown & Eligibility Criteria)
-(A clean breakdown of education, age limits, and trade/stream requirements)
+      let humanizedArticle = '';
+      let generatedSeoTitle = `${auditedFacts.title || candidate.rawTitle} 2026: Notification, ${auditedFacts.totalPosts || ''} Posts, Dates, Eligibility & Apply Online | NP Job Portal`;
+      let generatedSeoDesc = `${auditedFacts.dept}: कुल ${auditedFacts.totalPosts} पद। योग्यता: ${auditedFacts.qualification}। अंतिम तिथि: ${auditedFacts.lastDate || 'विज्ञप्ति अनुसार'}। ऑनलाइन आवेदन करें।`;
+      let generatedSeoKeywords = [
+        candidate.rawTitle,
+        `${auditedFacts.dept} Recruitment 2026`,
+        `${auditedFacts.shortTitle || 'Govt Job'} Syllabus`,
+        `${auditedFacts.shortTitle || 'Govt Job'} Last Date`,
+        'MP Online Form',
+        'Balaghat Jobs',
+        'NP Job Portal',
+        'Nitish Khobragade',
+        'NTechBay',
+        'Sarkari Result MP',
+        'MP Govt Jobs',
+        'Central Govt Jobs'
+      ];
 
-## चयन प्रक्रिया एवं परीक्षा पैटर्न गाइडेंस (Selection Process & Exam Pattern)
-(Stage-by-stage guide: Written Exam, Physical/Skill Test, Document Verification)
+      try {
+        const humanizeResponse = await ai.models.generateContent({
+          model: 'gemini-3.6-flash',
+          contents: humanizePrompt
+        });
 
-## फॉर्म भरते समय रखी जाने वाली सावधानियां (Key Precautions While Applying)
-(Crucial advice on photo size, signature, category certificate date, and mention that candidates can safely get their form submitted through Nitish Khobragade at 8982324497 for 100% error-free submission)
+        const humanizeText = humanizeResponse.text || '';
+        const jsonMatch = humanizeText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.content) humanizedArticle = parsed.content;
+          if (parsed.seoTitle) generatedSeoTitle = parsed.seoTitle;
+          if (parsed.seoDescription) generatedSeoDesc = parsed.seoDescription.slice(0, 160);
+          if (Array.isArray(parsed.seoKeywords) && parsed.seoKeywords.length > 0) {
+            generatedSeoKeywords = parsed.seoKeywords;
+          }
+        } else {
+          humanizedArticle = humanizeText;
+        }
+      } catch (genErr) {
+        console.warn('AI Humanize JSON parsing fallback:', genErr);
+      }
 
-## ऑनलाइन आवेदन कैसे करें (Step-by-Step Application Guide)
-(Clear bullet points explaining how to fill the application on the official portal)
-
-Do NOT use generic filler. Write in engaging Hindi-English (Hinglish/Hindi). Adhere strictly to Google AdSense original content and high-value journalism standards.`;
-
-      const humanizeResponse = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents: humanizePrompt
-      });
-
-      const humanizedArticle = humanizeResponse.text || '';
+      // Google JobPosting JSON-LD Schema
+      const jobPostingSchema = {
+        "@context": "https://schema.org/",
+        "@type": "JobPosting",
+        "title": auditedFacts.title || candidate.rawTitle,
+        "description": auditedFacts.description || `${auditedFacts.dept} invites online applications for ${auditedFacts.totalPosts} vacancies. Eligibility: ${auditedFacts.qualification}. Apply before last date ${auditedFacts.lastDate || 'soon'}.`,
+        "datePosted": new Date().toISOString().split('T')[0],
+        "validThrough": auditedFacts.lastDate ? `${auditedFacts.lastDate.split('/').reverse().join('-')}T23:59:59+05:30` : "2026-12-31T23:59:59+05:30",
+        "employmentType": "FULL_TIME",
+        "hiringOrganization": {
+          "@type": "Organization",
+          "name": auditedFacts.dept || "Government of Madhya Pradesh",
+          "sameAs": candidate.sourceUrl
+        },
+        "jobLocation": {
+          "@type": "Place",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Madhya Pradesh",
+            "addressRegion": "MP",
+            "addressCountry": "IN"
+          }
+        },
+        "qualifications": auditedFacts.qualification || "10th / 12th / Graduate as per official notification",
+        "directApply": true
+      };
 
       // STEP 3 - SAVE AS DRAFT IN FIRESTORE
       const blogNo = String(Date.now()).slice(-4);
@@ -264,6 +315,10 @@ Do NOT use generic filler. Write in engaging Hindi-English (Hinglish/Hindi). Adh
         isPublished: false, // Ensure public feeds filter this out until admin approves
         isAiVerified: true,
         aiAuditPassed: true,
+        seoTitle: generatedSeoTitle,
+        seoDescription: generatedSeoDesc,
+        seoKeywords: generatedSeoKeywords,
+        jobPostingSchema: jobPostingSchema,
         dates: {
           start: formatDateToDDMMYYYY(auditedFacts.startDate || '01/10/2026'),
           end: formatDateToDDMMYYYY(auditedFacts.lastDate || '15/10/2026'),

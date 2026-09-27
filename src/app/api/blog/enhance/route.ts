@@ -29,31 +29,38 @@ export async function POST(req: NextRequest) {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemPrompt = `You are a high-level Editorial Director and SEO Master for NP Job Portal (India).
-A blogger has drafted a career/exam guidance article. Your task is to polish, structure, and enhance this article to:
-1. Make the headline punchy, high-CTR, and authoritative.
-2. Structure the content with clean Markdown headings (## H2, ### H3), concise paragraphs, bullet points, and key takeaways.
-3. Ensure natural Hindi/English (Hinglish/Hindi) readability that engages readers and keeps bounce rate low.
-4. Add a dedicated section emphasizing practical tips and noting that applicants can get their online applications processed safely through Nitish Khobragade (8982324497).
-5. Extract an SEO excerpt (max 160 characters), 5-8 high-volume SEO keywords, and 3-5 tags.
+    const systemPrompt = `You are a Senior Editor-in-Chief, SEO Authority, and Career Counselor for NP Job Portal (A Unit of NTechBay, operated by Nitish Khobragade, Helpline 8982324497).
+A writer has drafted a recruitment or career guidance article. Your task is to expand, polish, and transform this draft into a comprehensive 800+ word deep-dive guide in Hindi/Hinglish formatted in rich Markdown.
 
-Return ONLY pure valid JSON in this exact structure:
+MANDATORY SECTIONS (MUST BE EXPANDED IN FULL DETAIL):
+1. Catchy H1 Heading & SEO Intro (addressing real candidate concerns)
+2. Overview Table in Markdown (| Parameter | Details |)
+3. Detailed Educational Eligibility & Post-wise vacancy breakdown (MP Rojgar Panjiyan, Samagra e-KYC)
+4. Selection Process & Exam Pattern / Syllabus overview
+5. Step-by-Step Online Application Guide (with prominent advice that candidates can get their form filled safely from home through Nitish Khobragade at 8982324497 with verified portal receipt)
+6. 3-4 Frequently Asked Questions (FAQs) with clear answers
+7. Official Links Table
+
+Return ONLY valid JSON in this exact structure:
 {
   "optimizedTitle": "string",
-  "optimizedContent": "string (full enhanced article in rich Markdown)",
+  "optimizedContent": "string (full 800+ word structured article in rich Markdown)",
   "excerpt": "string (concise summary max 160 chars)",
-  "seoKeywords": ["keyword 1", "keyword 2"],
-  "tags": ["tag 1", "tag 2"]
+  "seoKeywords": ["keyword 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5", "keyword 6"],
+  "tags": ["tag 1", "tag 2", "tag 3", "tag 4"]
 }`;
 
     const prompt = `Category: ${category || 'Career Guidance'}
 Title: ${title || 'Untitled Post'}
-Draft Content:
+Draft Content / Topic:
 ${content || title}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `${systemPrompt}\n\n${prompt}`
+      model: 'gemini-3.8-flash',
+      contents: `${systemPrompt}\n\n${prompt}`,
+      config: {
+        maxOutputTokens: 6000
+      }
     });
 
     const responseText = response.text || '';

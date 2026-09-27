@@ -257,6 +257,37 @@ export default function UniversalJobDetailPage() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8 w-full flex-1">
+        {/* Google JobPosting Schema JSON-LD for rich Google Jobs cards */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org/",
+              "@type": "JobPosting",
+              "title": job.title,
+              "description": job.description || `${job.department} invites applications for ${job.totalPosts}. Minimum qualification: ${job.qualificationSummary}. Apply online before ${job.lastDate}.`,
+              "datePosted": "2026-01-01",
+              "validThrough": "2026-12-31T23:59:59+05:30",
+              "employmentType": "FULL_TIME",
+              "hiringOrganization": {
+                "@type": "Organization",
+                "name": job.department || "Government of Madhya Pradesh / Central Govt",
+                "sameAs": job.officialWebsiteUrl || "https://npjobportal.com"
+              },
+              "jobLocation": {
+                "@type": "Place",
+                "address": {
+                  "@type": "PostalAddress",
+                  "addressRegion": job.state || "Madhya Pradesh",
+                  "addressCountry": "IN"
+                }
+              },
+              "qualifications": job.qualificationSummary || "10th / 12th / Graduate",
+              "directApply": true
+            })
+          }}
+        />
+
         {/* Breadcrumb with universal [year]/[month]/[blogNo]/[slug] tracking */}
         <nav className="flex items-center flex-wrap gap-1.5 text-xs font-medium text-neutral-500 mb-6 bg-white p-3 rounded-xl border border-neutral-200 shadow-xs">
           <Link href="/" className="flex items-center gap-1 text-red-600 hover:underline font-bold">
