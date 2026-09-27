@@ -2,15 +2,16 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Upload, Download, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { ToolErrorBanner } from './ToolErrorBanner';
+import { formatFileSize, getRealFileBytes } from '../../lib/fileHelper';
 
 interface UploadedImageItem {
   id: string;
   file: File;
   previewUrl: string;
   name: string;
-  sizeKb: number;
+  sizeBytes: number;
 }
 
 export const ImageToPdfTool: React.FC = () => {
@@ -21,33 +22,43 @@ export const ImageToPdfTool: React.FC = () => {
   const [compressionQuality, setCompressionQuality] = useState<'high' | 'medium' | 'low'>('medium');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const [pdfSizeKb, setPdfSizeKb] = useState<number>(0);
+  const [pdfSizeBytes, setPdfSizeBytes] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setErrorMessage(null);
-    const newItems: UploadedImageItem[] = Array.from(files).map((f) => ({
-      id: Math.random().toString(36).substring(2, 9),
-      file: f,
-      previewUrl: URL.createObjectURL(f),
-      name: f.name,
-      sizeKb: Math.round((f.size / 1024) * 10) / 10
-    }));
+    const newItems: UploadedImageItem[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const sizeBytes = await getRealFileBytes(f);
+      newItems.push({
+        id: Math.random().toString(36).substring(2, 9),
+        file: f,
+        previewUrl: URL.createObjectURL(f),
+        name: f.name,
+        sizeBytes,
+      });
+    }
 
     setImages((prev) => [...prev, ...newItems]);
-    // Reset previous generated PDF
     if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     setPdfBlobUrl(null);
+    e.target.value = '';
   };
 
   const removeImage = (id: string) => {
     setImages((prev) => {
-      const filtered = prev.filter((item) => item.id !== id);
-      const target = prev.find((item) => item.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
+      const filtered = prev.filter((item) => {
+        if (item.id === id) {
+          URL.revokeObjectURL(item.previewUrl);
+          return false;
+        }
+        return true;
+      });
       return filtered;
     });
     if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
@@ -58,21 +69,79 @@ export const ImageToPdfTool: React.FC = () => {
     if (index === 0) return;
     setImages((prev) => {
       const next = [...prev];
-      const temp = next[index - 1];
-      next[index - 1] = next[index];
-      next[index] = temp;
+      const temp = next[index];
+      next[index] = next[index - 1];
+      next[index - 1] = temp;
       return next;
     });
+    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+    setPdfBlobUrl(null);
   };
 
   const moveDown = (index: number) => {
-    if (index >= images.length - 1) return;
+    if (index === images.length - 1) return;
     setImages((prev) => {
       const next = [...prev];
-      const temp = next[index + 1];
-      next[index + 1] = next[index];
-      next[index] = temp;
+      const temp = next[index];
+      next[index] = next[index + 1];
+      next[index + 1] = temp;
       return next;
+    });
+    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+    setPdfBlobUrl(null);
+  };
+
+  // Convert image to optimized JPEG bytes
+  const getOptimizedJpegBytes = async (file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const canvas = document.createElement('canvas');
+        let scale = 1;
+
+        if (compressionQuality === 'low') {
+          scale = 0.6;
+        } else if (compressionQuality === 'medium') {
+          scale = 0.85;
+        }
+
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const qualityVal = compressionQuality === 'high' ? 0.92 : compressionQuality === 'medium' ? 0.8 : 0.6;
+
+        canvas.toBlob(
+          async (blob) => {
+            if (!blob) {
+              reject(new Error('Blob conversion failed'));
+              return;
+            }
+            const buf = await blob.arrayBuffer();
+            resolve(buf);
+          },
+          'image/jpeg',
+          qualityVal
+        );
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error(`Failed to load image: ${file.name}`));
+      };
+
+      img.src = objectUrl;
     });
   };
 
@@ -80,75 +149,57 @@ export const ImageToPdfTool: React.FC = () => {
     if (images.length === 0) return;
 
     setIsGenerating(true);
+    setErrorMessage(null);
+
     try {
       const pdfDoc = await PDFDocument.create();
 
-      // Quality mapping
-      const qualityMap = {
-        high: 0.9,
-        medium: 0.75,
-        low: 0.55
-      };
-      const jpegQuality = qualityMap[compressionQuality];
+      const a4Width = orientation === 'portrait' ? 595.28 : 841.89;
+      const a4Height = orientation === 'portrait' ? 841.89 : 595.28;
 
       for (const item of images) {
-        // Read file into image element to get dimensions & draw to canvas for compressed JPEG bytes
-        const img = new Image();
-        const loadedImg: HTMLImageElement = await new Promise((resolve) => {
-          img.onload = () => resolve(img);
-          img.src = item.previewUrl;
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = loadedImg.naturalWidth;
-        canvas.height = loadedImg.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) continue;
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(loadedImg, 0, 0);
-
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', jpegQuality);
-        const jpegBytes = await fetch(jpegDataUrl).then((res) => res.arrayBuffer());
+        const jpegBytes = await getOptimizedJpegBytes(item.file);
         const embeddedImage = await pdfDoc.embedJpg(jpegBytes);
 
-        if (pageSize === 'A4') {
-          // Standard A4 dimensions in points: 595.28 x 841.89
-          const a4Width = orientation === 'portrait' ? 595.28 : 841.89;
-          const a4Height = orientation === 'portrait' ? 841.89 : 595.28;
+        let pWidth = a4Width;
+        let pHeight = a4Height;
 
-          const page = pdfDoc.addPage([a4Width, a4Height]);
-          const availWidth = a4Width - margin * 2;
-          const availHeight = a4Height - margin * 2;
-
-          // Scale image proportionally to fit inside available area
-          const imgRatio = embeddedImage.width / embeddedImage.height;
-          let drawWidth = availWidth;
-          let drawHeight = availWidth / imgRatio;
-
-          if (drawHeight > availHeight) {
-            drawHeight = availHeight;
-            drawWidth = availHeight * imgRatio;
-          }
-
-          const x = margin + (availWidth - drawWidth) / 2;
-          const y = margin + (availHeight - drawHeight) / 2;
-
-          page.drawImage(embeddedImage, {
-            x,
-            y,
-            width: drawWidth,
-            height: drawHeight
-          });
-        } else {
-          // Exact image size page
-          const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
+        if (pageSize === 'FIT') {
+          pWidth = embeddedImage.width;
+          pHeight = embeddedImage.height;
+          const page = pdfDoc.addPage([pWidth, pHeight]);
           page.drawImage(embeddedImage, {
             x: 0,
             y: 0,
-            width: embeddedImage.width,
-            height: embeddedImage.height
+            width: pWidth,
+            height: pHeight,
+          });
+        } else {
+          // Standard A4
+          const page = pdfDoc.addPage([pWidth, pHeight]);
+          const availWidth = pWidth - margin * 2;
+          const availHeight = pHeight - margin * 2;
+
+          const imgRatio = embeddedImage.width / embeddedImage.height;
+          const availRatio = availWidth / availHeight;
+
+          let drawWidth = availWidth;
+          let drawHeight = availHeight;
+
+          if (imgRatio > availRatio) {
+            drawHeight = availWidth / imgRatio;
+          } else {
+            drawWidth = availHeight * imgRatio;
+          }
+
+          const posX = margin + (availWidth - drawWidth) / 2;
+          const posY = margin + (availHeight - drawHeight) / 2;
+
+          page.drawImage(embeddedImage, {
+            x: posX,
+            y: posY,
+            width: drawWidth,
+            height: drawHeight,
           });
         }
       }
@@ -159,7 +210,7 @@ export const ImageToPdfTool: React.FC = () => {
       if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
       const url = URL.createObjectURL(blob);
       setPdfBlobUrl(url);
-      setPdfSizeKb(Math.round((blob.size / 1024) * 10) / 10);
+      setPdfSizeBytes(blob.size);
       setErrorMessage(null);
     } catch (err: unknown) {
       console.error('PDF Generation Error:', err);
@@ -175,29 +226,58 @@ export const ImageToPdfTool: React.FC = () => {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* Compact Tool Header Strip */}
-      <div className="bg-gradient-to-r from-red-600 to-rose-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-xs sm:text-sm font-black truncate">
-          फोटो से PDF बनाएं (Images to PDF Converter)
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black flex items-center gap-1.5">
+          <FileText className="w-4 h-4" />
+          <span>Images to PDF Converter (फोटो से एक संयुक्त PDF बनाएं)</span>
         </h2>
         <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-          मार्कशीट • आधार • जाति • निवास
+          A4 रेडी • सभी सरकारी फॉर्म हेतु
         </span>
       </div>
 
+      {errorMessage && (
+        <ToolErrorBanner
+          toolName="Images to PDF Converter"
+          errorMessage={errorMessage}
+          onRetry={generatePdf}
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-        {/* Left Column: Upload & List */}
-        <div className="lg:col-span-7 space-y-3">
-          {/* Upload Dropzone */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
-            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
-              1. दस्तावेज़ों की फोटो चुनें (Upload Documents)
-            </label>
-            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-red-300 hover:border-red-500 rounded-xl bg-red-50/50 hover:bg-red-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-7 h-7 text-red-600 mb-1.5 animate-bounce" />
-              <span className="text-xs sm:text-sm font-bold text-neutral-900">एक या अधिक फोटो चुनें</span>
+        {/* Left Column: Upload & Options */}
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-neutral-800 uppercase tracking-wider">
+                1. तस्वीरें चुनें (Select Images)
+              </label>
+              {images.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    images.forEach((it) => URL.revokeObjectURL(it.previewUrl));
+                    setImages([]);
+                    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+                    setPdfBlobUrl(null);
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
+                >
+                  सभी हटाएं
+                </button>
+              )}
+            </div>
+
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-red-300 hover:border-red-500 rounded-xl bg-red-50/40 hover:bg-red-50 cursor-pointer transition-colors text-center group">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 mb-1.5 group-hover:scale-110 transition-transform">
+                <Upload className="w-4 h-4 animate-bounce" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">
+                तस्वीरें चुनें (एक साथ कई चुन सकते हैं)
+              </span>
               <span className="text-[10px] text-neutral-500 mt-0.5">
-                (मार्कशीट, आधार, जाति, निवास - एक साथ कई चुनें)
+                JPG, JPEG, PNG, WEBP समर्थित
               </span>
               <input
                 type="file"
@@ -207,259 +287,192 @@ export const ImageToPdfTool: React.FC = () => {
                 className="hidden"
               />
             </label>
-          </div>
 
-          {/* Selected Images List */}
-          {images.length > 0 && (
-            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
-                <span className="text-xs font-black text-neutral-800 uppercase tracking-wider">
-                  चुनी गई फोटो ({images.length} पेज) - क्रम व्यवस्थित करें:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    images.forEach((img) => URL.revokeObjectURL(img.previewUrl));
-                    setImages([]);
-                    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
-                    setPdfBlobUrl(null);
-                  }}
-                  className="text-xs text-rose-600 font-bold hover:underline cursor-pointer"
-                >
-                  सभी हटाएं
-                </button>
-              </div>
-
-              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                {images.map((item, index) => (
+            {/* Selected Images List with Thumbnail, Accurate Size, and Cross Delete */}
+            {images.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] font-black text-neutral-700">
+                  चुनी गई तस्वीरें ({images.length}) - क्रम बदलें या हटाएं:
+                </div>
+                {images.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-white transition-all shadow-2xs"
+                    className="flex items-center justify-between gap-2.5 p-2 bg-neutral-50 rounded-xl border border-neutral-200 shadow-2xs"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-red-700 text-white text-xs font-black flex items-center justify-center shrink-0">
-                        {index + 1}
-                      </span>
-                      <img
-                        src={item.previewUrl}
-                        alt={item.name}
-                        className="w-12 h-12 object-cover rounded-lg border border-neutral-300 shrink-0"
-                      />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-11 h-11 rounded-lg overflow-hidden bg-neutral-200 border border-neutral-300 shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.previewUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-neutral-900 truncate max-w-[200px] sm:max-w-xs">
-                          {item.name}
+                        <div className="text-xs font-black text-neutral-900 truncate max-w-[170px] sm:max-w-xs">
+                          {idx + 1}. {item.name}
                         </div>
-                        <div className="text-[10px] text-neutral-500 font-medium">{item.sizeKb} KB</div>
+                        <div className="text-[10px] text-neutral-500 font-semibold mt-0.5">
+                          साइज़: <strong className="text-red-700">{formatFileSize(item.sizeBytes)}</strong>
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
-                        onClick={() => moveUp(index)}
-                        disabled={index === 0}
+                        disabled={idx === 0}
+                        onClick={() => moveUp(idx)}
+                        className="p-1 rounded-md bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 cursor-pointer"
                         title="ऊपर ले जाएं"
-                        className="p-1.5 rounded-md hover:bg-neutral-200 disabled:opacity-30 cursor-pointer"
                       >
-                        <ArrowUp className="w-4 h-4 text-neutral-700" />
+                        <ArrowUp className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveDown(index)}
-                        disabled={index === images.length - 1}
+                        disabled={idx === images.length - 1}
+                        onClick={() => moveDown(idx)}
+                        className="p-1 rounded-md bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 cursor-pointer"
                         title="नीचे ले जाएं"
-                        className="p-1.5 rounded-md hover:bg-neutral-200 disabled:opacity-30 cursor-pointer"
                       >
-                        <ArrowDown className="w-4 h-4 text-neutral-700" />
+                        <ArrowDown className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => removeImage(item.id)}
+                        className="p-1.5 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 cursor-pointer"
                         title="हटाएं"
-                        className="p-1.5 rounded-md hover:bg-rose-100 text-rose-600 cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Right Column: Settings & Generate PDF */}
-        <div className="lg:col-span-5 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          {/* Settings Box */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
-              2. PDF लेआउट व कंप्रेशन सेटिंग्स (PDF Options)
+              2. PDF लेआउट व सेटिंग्स (Layout Options)
             </label>
 
-            {/* Page Size */}
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 mb-1">पेज साइज़ (Page Size):</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPageSize('A4')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    pageSize === 'A4'
-                      ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <div>A4 (मानक सरकारी फॉर्म)</div>
-                  <div className="text-[10px] text-neutral-500 font-normal">210 x 297 mm</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPageSize('FIT')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    pageSize === 'FIT'
-                      ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <div>फोटो अनुसार (Fit Image)</div>
-                  <div className="text-[10px] text-neutral-500 font-normal">बिना किसी मार्जिन के</div>
-                </button>
-              </div>
-            </div>
-
-            {/* Orientation */}
-            {pageSize === 'A4' && (
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">दिशा (Orientation):</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOrientation('portrait')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      orientation === 'portrait'
-                        ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                        : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                    }`}
-                  >
-                    लंबा (Portrait)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOrientation('landscape')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      orientation === 'landscape'
-                        ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                        : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                    }`}
-                  >
-                    आड़ा (Landscape)
-                  </button>
-                </div>
+                <span className="text-[11px] font-bold text-neutral-600 block mb-1">पेज साइज़:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(e.target.value === 'FIT' ? 'FIT' : 'A4')}
+                  className="w-full px-2.5 py-1.5 text-xs font-bold bg-neutral-50 border border-neutral-300 rounded-lg"
+                >
+                  <option value="A4">A4 (मानक सरकारी दस्तावेज़)</option>
+                  <option value="FIT">Fit to Image (तस्वीर के आकार अनुसार)</option>
+                </select>
               </div>
-            )}
 
-            {/* Compression Quality */}
+              <div>
+                <span className="text-[11px] font-bold text-neutral-600 block mb-1">दिशा (Orientation):</span>
+                <select
+                  value={orientation}
+                  onChange={(e) => setOrientation(e.target.value === 'landscape' ? 'landscape' : 'portrait')}
+                  className="w-full px-2.5 py-1.5 text-xs font-bold bg-neutral-50 border border-neutral-300 rounded-lg"
+                >
+                  <option value="portrait">Portrait (सीधा)</option>
+                  <option value="landscape">Landscape (आड़ा)</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="block text-xs font-bold text-neutral-700 mb-1">
-                कंप्रेशन लेवल (पोर्टल KB अनुसार):
-              </label>
+              <span className="text-[11px] font-bold text-neutral-600 block mb-1">कंप्रेशन स्तर (Compression Quality):</span>
               <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCompressionQuality('low')}
-                  className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    compressionQuality === 'low'
-                      ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <div>छोटा साइज़</div>
-                  <div className="text-[9px] text-neutral-500">&lt; 200 KB</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCompressionQuality('medium')}
-                  className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    compressionQuality === 'medium'
-                      ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <div>संतुलित</div>
-                  <div className="text-[9px] text-neutral-500">मानक क्वालिटी</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCompressionQuality('high')}
-                  className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    compressionQuality === 'high'
-                      ? 'border-red-600 bg-red-50 text-red-900 ring-2 ring-red-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <div>उच्चतम</div>
-                  <div className="text-[9px] text-neutral-500">HD स्पष्ट</div>
-                </button>
+                {([
+                  { id: 'high', name: 'हाई क्वालिटी', desc: 'बेस्ट प्रिंट' },
+                  { id: 'medium', name: 'मीडियम (200KB)', desc: 'अनुशंसित' },
+                  { id: 'low', name: 'लो (सुपर स्मॉल)', desc: 'कम से कम KB' },
+                ] as const).map((q) => (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => setCompressionQuality(q.id)}
+                    className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                      compressionQuality === q.id
+                        ? 'bg-rose-50 border-rose-600 text-rose-950 font-bold ring-1 ring-rose-600'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-700'
+                    }`}
+                  >
+                    <div className="text-xs font-black">{q.name}</div>
+                    <div className="text-[10px] text-neutral-500 mt-0.5">{q.desc}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Error Banner if error occurs */}
-            {errorMessage && (
-              <ToolErrorBanner
-                toolName="Images to PDF Converter"
-                errorMessage={errorMessage}
-                onRetry={generatePdf}
-              />
-            )}
+            <button
+              type="button"
+              onClick={generatePdf}
+              disabled={images.length === 0 || isGenerating}
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white text-xs sm:text-sm font-black shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>PDF बनाई जा रही है...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  <span>3. फोटो से PDF बनाएं (Generate PDF)</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
 
-            {/* Action Buttons */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={generatePdf}
-                disabled={images.length === 0 || isGenerating}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-neutral-300 text-white font-black text-sm shadow-md transition-all active:scale-98 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {isGenerating ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>PDF बन रहा है...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4" />
-                    <span>{images.length > 0 ? `${images.length} पेज का PDF बनाएं` : 'पहले फोटो अपलोड करें'}</span>
-                  </>
-                )}
-              </button>
-            </div>
+        {/* Right Column: PDF Download & Preview */}
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs flex flex-col justify-center min-h-[340px]">
+            {pdfBlobUrl ? (
+              <div className="w-full space-y-3 text-center">
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-xs font-black border border-emerald-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>PDF सफलतापूर्वक तैयार हुई!</span>
+                </div>
 
-            {/* Download Link when Ready */}
-            {pdfBlobUrl && (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>PDF सफलतापूर्वक तैयार है!</span>
-                  </span>
-                  <span className="text-xs font-black text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
-                    {pdfSizeKb} KB
-                  </span>
+                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 max-w-sm mx-auto">
+                  <FileText className="w-10 h-10 text-rose-600 mx-auto" />
+                  <div className="text-xs font-black text-neutral-800">
+                    {images.length} तस्वीरों से निर्मित PDF
+                  </div>
+                  <div className="text-xs font-bold text-red-700">
+                    PDF साइज़: {formatFileSize(pdfSizeBytes)}
+                  </div>
                 </div>
 
                 <a
                   href={pdfBlobUrl}
-                  download={`documents_${new Date().toISOString().slice(0, 10)}.pdf`}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md transition-all active:scale-98 cursor-pointer"
+                  download="combined_document.pdf"
+                  className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-sm transition-all"
                 >
-                  <Download className="w-5 h-5" />
-                  <span>तैयार PDF डाउनलोड करें ({pdfSizeKb} KB)</span>
+                  <Download className="w-4 h-4" />
+                  <span>PDF डाउनलोड करें ({formatFileSize(pdfSizeBytes)})</span>
                 </a>
 
-                {/* Security Guarantee Text */}
-                <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="text-[11px] text-neutral-500 flex items-center justify-center gap-1 pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
                 </div>
+              </div>
+            ) : (
+              <div className="text-center p-6 text-neutral-400 space-y-2">
+                <FileText className="w-12 h-12 mx-auto text-neutral-300 stroke-[1.5]" />
+                <p className="text-xs font-bold text-neutral-600">
+                  तस्वीरें जोड़ें और &apos;फोटो से PDF बनाएं&apos; पर क्लिक करें
+                </p>
+                <p className="text-[10px] text-neutral-400">
+                  मार्कशीट, आधार, जाति, निवास की कई फोटो से एक A4 PDF तैयार होगी
+                </p>
               </div>
             )}
           </div>

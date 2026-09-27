@@ -1,104 +1,129 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Upload, Download, RefreshCw, Trash2, ArrowRight, ArrowDown, ShieldCheck, CheckCircle2, Layers } from 'lucide-react';
+import { Download, Trash2, ArrowUp, ArrowDown, Layers, ShieldCheck, CheckCircle2, RefreshCw, Upload, X } from 'lucide-react';
 import { ToolErrorBanner } from './ToolErrorBanner';
+import { formatFileSize, getRealFileBytes } from '../../lib/fileHelper';
+import { compressCanvasStrictlyUnderTarget } from '../../lib/imageCompressionHelper';
 
-interface ImageItem {
+interface JoinedImageItem {
   id: string;
   file: File;
   previewUrl: string;
   name: string;
-  sizeKb: number;
+  sizeBytes: number;
   width: number;
   height: number;
 }
 
 export const ImageJoinerTool: React.FC = () => {
-  const [images, setImages] = useState<ImageItem[]>([]);
-  const [direction, setDirection] = useState<'horizontal' | 'vertical'>('vertical');
-  const [arrangeMode, setArrangeMode] = useState<'proper' | 'free'>('proper');
+  const [items, setItems] = useState<JoinedImageItem[]>([]);
+  const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
+  const [alignment, setAlignment] = useState<'match' | 'original'>('match');
   const [addBorder, setAddBorder] = useState<boolean>(true);
   const [borderWidth, setBorderWidth] = useState<number>(2);
-  const [targetKb, setTargetKb] = useState<number>(80);
 
-  // Output states
-  const [isJoining, setIsJoining] = useState<boolean>(false);
+  // Target KB Compression Checkbox (UNCHECKED by default = 100% Original Quality)
+  const [applyTargetKb, setApplyTargetKb] = useState<boolean>(false);
+  const [targetKb, setTargetKb] = useState<number | ''>(100);
+
+  // Output
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [joinedImageUrl, setJoinedImageUrl] = useState<string | null>(null);
-  const [joinedSizeKb, setJoinedSizeKb] = useState<number>(0);
+  const [joinedSizeBytes, setJoinedSizeBytes] = useState<number>(0);
+  const [joinedDimensions, setJoinedDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleFilesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  const handleFilesAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setErrorMessage(null);
-    setJoinedImageUrl(null);
-    setJoinedSizeKb(0);
+    const newItems: JoinedImageItem[] = [];
 
-    files.forEach((file) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        setImages((prev) => [
-          ...prev,
-          {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const previewUrl = URL.createObjectURL(file);
+      const sizeBytes = await getRealFileBytes(file);
+
+      // Read dimensions
+      await new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          newItems.push({
             id: Math.random().toString(36).substring(2, 9),
             file,
-            previewUrl: url,
+            previewUrl,
             name: file.name,
-            sizeKb: Math.round((file.size / 1024) * 10) / 10,
+            sizeBytes,
             width: img.naturalWidth,
             height: img.naturalHeight,
-          }
-        ]);
-      };
-      img.onerror = () => {
-        setErrorMessage('कुछ इमेज लोड करने में समस्या आई।');
-      };
-      img.src = url;
+          });
+          resolve();
+        };
+        img.onerror = () => {
+          resolve();
+        };
+        img.src = previewUrl;
+      });
+    }
+
+    setItems((prev) => [...prev, ...newItems]);
+    e.target.value = '';
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setItems((prev) => {
+      const filtered = prev.filter((item) => {
+        if (item.id === id) {
+          URL.revokeObjectURL(item.previewUrl);
+          return false;
+        }
+        return true;
+      });
+      return filtered;
     });
   };
 
-  const removeImage = (id: string) => {
-    setImages((prev) => {
-      const item = prev.find((x) => x.id === id);
-      if (item) URL.revokeObjectURL(item.previewUrl);
-      return prev.filter((x) => x.id !== id);
+  const handleClearAll = () => {
+    items.forEach((it) => URL.revokeObjectURL(it.previewUrl));
+    if (joinedImageUrl) URL.revokeObjectURL(joinedImageUrl);
+    setItems([]);
+    setJoinedImageUrl(null);
+    setJoinedSizeBytes(0);
+    setErrorMessage(null);
+  };
+
+  const handleMoveItem = (index: number, moveDirection: 'up' | 'down') => {
+    setItems((prev) => {
+      const next = [...prev];
+      const targetIndex = moveDirection === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= next.length) return prev;
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next;
     });
-    setJoinedImageUrl(null);
   };
 
-  const moveImage = (index: number, dir: -1 | 1) => {
-    const targetIndex = index + dir;
-    if (targetIndex < 0 || targetIndex >= images.length) return;
-    const copy = [...images];
-    const temp = copy[index];
-    copy[index] = copy[targetIndex];
-    copy[targetIndex] = temp;
-    setImages(copy);
-    setJoinedImageUrl(null);
-  };
-
-  // EXPLICIT ACTION TRIGGER: Join Images via Canvas
   const handleJoinImages = async () => {
-    if (images.length < 2) {
-      setErrorMessage('कृपया जोड़ने के लिए कम से कम 2 फोटो अपलोड करें (उदा. फोटो + हस्ताक्षर)।');
+    if (items.length < 2) {
+      setErrorMessage('कृपया जोड़ने के लिए कम से कम 2 तस्वीरें चुनें।');
       return;
     }
 
-    setIsJoining(true);
+    setIsProcessing(true);
     setErrorMessage(null);
 
     try {
-      // Load all images as HTMLImageElements
-      const loadedImgs = await Promise.all(
-        images.map(
+      // Pre-load all images
+      const loadedImages = await Promise.all(
+        items.map(
           (item) =>
             new Promise<HTMLImageElement>((resolve, reject) => {
               const img = new Image();
               img.onload = () => resolve(img);
-              img.onerror = () => reject(new Error(`चित्र लोड नहीं हो सका: ${item.name}`));
+              img.onerror = () => reject(new Error(`छवि ${item.name} लोड नहीं हो सकी`));
               img.src = item.previewUrl;
             })
         )
@@ -106,139 +131,141 @@ export const ImageJoinerTool: React.FC = () => {
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('ब्राउज़र Canvas 2D सपोर्ट नहीं करता।');
+      if (!ctx) throw new Error('कैनवास संदर्भ उपलब्ध नहीं है');
 
-      const gap = addBorder ? borderWidth * 2 : 0;
+      const sep = addBorder ? borderWidth : 0;
+
+      let totalWidth = 0;
+      let totalHeight = 0;
+      const drawOps: Array<{ img: HTMLImageElement; x: number; y: number; w: number; h: number }> = [];
 
       if (direction === 'vertical') {
-        // Vertical stacking (Photo on top, Signature on bottom)
-        let targetWidth = 400;
-        if (arrangeMode === 'proper') {
-          targetWidth = Math.max(...loadedImgs.map((img) => img.naturalWidth), 400);
-        }
+        // Find max width or base width
+        const baseWidth = alignment === 'match'
+          ? Math.max(...loadedImages.map((img) => img.naturalWidth))
+          : Math.max(...loadedImages.map((img) => img.naturalWidth));
 
-        const calculatedHeights = loadedImgs.map((img) => {
-          if (arrangeMode === 'proper') {
-            const ratio = targetWidth / img.naturalWidth;
-            return Math.round(img.naturalHeight * ratio);
-          }
-          return img.naturalHeight;
-        });
-
-        const totalHeight = calculatedHeights.reduce((acc, h) => acc + h, 0) + (loadedImgs.length - 1) * gap;
-        const finalWidth = arrangeMode === 'proper' ? targetWidth : Math.max(...loadedImgs.map((img) => img.naturalWidth));
-
-        canvas.width = finalWidth;
-        canvas.height = totalHeight;
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+        totalWidth = baseWidth;
         let currentY = 0;
-        loadedImgs.forEach((img, idx) => {
-          const h = calculatedHeights[idx];
-          const w = arrangeMode === 'proper' ? finalWidth : img.naturalWidth;
-          const x = arrangeMode === 'proper' ? 0 : Math.round((finalWidth - w) / 2);
 
-          ctx.drawImage(img, x, currentY, w, h);
+        loadedImages.forEach((img, idx) => {
+          let drawW = img.naturalWidth;
+          let drawH = img.naturalHeight;
 
-          // Draw border divider
-          if (addBorder && idx < loadedImgs.length - 1) {
-            ctx.fillStyle = '#d1d5db';
-            ctx.fillRect(0, currentY + h, finalWidth, gap);
+          if (alignment === 'match') {
+            const scale = baseWidth / img.naturalWidth;
+            drawW = baseWidth;
+            drawH = Math.round(img.naturalHeight * scale);
           }
 
-          currentY += h + gap;
+          const drawX = Math.round((totalWidth - drawW) / 2);
+          drawOps.push({ img, x: drawX, y: currentY, w: drawW, h: drawH });
+          currentY += drawH;
+
+          if (idx < loadedImages.length - 1 && addBorder) {
+            currentY += sep;
+          }
+        });
+        totalHeight = currentY;
+      } else {
+        // Horizontal layout
+        const baseHeight = alignment === 'match'
+          ? Math.max(...loadedImages.map((img) => img.naturalHeight))
+          : Math.max(...loadedImages.map((img) => img.naturalHeight));
+
+        totalHeight = baseHeight;
+        let currentX = 0;
+
+        loadedImages.forEach((img, idx) => {
+          let drawW = img.naturalWidth;
+          let drawH = img.naturalHeight;
+
+          if (alignment === 'match') {
+            const scale = baseHeight / img.naturalHeight;
+            drawH = baseHeight;
+            drawW = Math.round(img.naturalWidth * scale);
+          }
+
+          const drawY = Math.round((totalHeight - drawH) / 2);
+          drawOps.push({ img, x: currentX, y: drawY, w: drawW, h: drawH });
+          currentX += drawW;
+
+          if (idx < loadedImages.length - 1 && addBorder) {
+            currentX += sep;
+          }
+        });
+        totalWidth = currentX;
+      }
+
+      canvas.width = totalWidth;
+      canvas.height = totalHeight;
+
+      // Clean white background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw all images
+      drawOps.forEach((op) => {
+        ctx.drawImage(op.img, op.x, op.y, op.w, op.h);
+      });
+
+      // Draw dividing borders if selected
+      if (addBorder && sep > 0) {
+        ctx.fillStyle = '#cccccc';
+        let linePos = 0;
+        for (let i = 0; i < drawOps.length - 1; i++) {
+          if (direction === 'vertical') {
+            linePos += drawOps[i].h;
+            ctx.fillRect(0, linePos, totalWidth, sep);
+            linePos += sep;
+          } else {
+            linePos += drawOps[i].w;
+            ctx.fillRect(linePos, 0, sep, totalHeight);
+            linePos += sep;
+          }
+        }
+      }
+
+      let finalBlob: Blob | null = null;
+
+      // If user enabled Target KB compression
+      if (applyTargetKb) {
+        const effectiveTargetKb = typeof targetKb === 'number' && targetKb > 0 ? targetKb : 100;
+        finalBlob = await compressCanvasStrictlyUnderTarget(canvas, {
+          targetKb: effectiveTargetKb,
+          mimeType: 'image/jpeg',
+          safetyMarginBytes: 512,
         });
       } else {
-        // Horizontal stacking (side by side)
-        let targetHeight = 400;
-        if (arrangeMode === 'proper') {
-          targetHeight = Math.max(...loadedImgs.map((img) => img.naturalHeight), 300);
-        }
-
-        const calculatedWidths = loadedImgs.map((img) => {
-          if (arrangeMode === 'proper') {
-            const ratio = targetHeight / img.naturalHeight;
-            return Math.round(img.naturalWidth * ratio);
-          }
-          return img.naturalWidth;
-        });
-
-        const totalWidth = calculatedWidths.reduce((acc, w) => acc + w, 0) + (loadedImgs.length - 1) * gap;
-        const finalHeight = arrangeMode === 'proper' ? targetHeight : Math.max(...loadedImgs.map((img) => img.naturalHeight));
-
-        canvas.width = totalWidth;
-        canvas.height = finalHeight;
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        let currentX = 0;
-        loadedImgs.forEach((img, idx) => {
-          const w = calculatedWidths[idx];
-          const h = arrangeMode === 'proper' ? finalHeight : img.naturalHeight;
-          const y = arrangeMode === 'proper' ? 0 : Math.round((finalHeight - h) / 2);
-
-          ctx.drawImage(img, currentX, y, w, h);
-
-          if (addBorder && idx < loadedImgs.length - 1) {
-            ctx.fillStyle = '#d1d5db';
-            ctx.fillRect(currentX + w, 0, gap, finalHeight);
-          }
-
-          currentX += w + gap;
-        });
+        // 100% Original Quality
+        finalBlob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.98));
       }
 
-      // Target KB iterative compression
-      const targetBytes = targetKb * 1024;
-      let low = 0.1;
-      let high = 0.98;
-      let bestBlob: Blob | null = await new Promise((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', 0.85)
-      );
-
-      if (bestBlob && targetKb > 0) {
-        for (let i = 0; i < 6; i++) {
-          const mid = (low + high) / 2;
-          const testBlob: Blob | null = await new Promise((resolve) =>
-            canvas.toBlob(resolve, 'image/jpeg', mid)
-          );
-          if (testBlob) {
-            bestBlob = testBlob;
-            if (testBlob.size > targetBytes) {
-              high = mid;
-            } else {
-              low = mid;
-            }
-          }
-        }
-      }
-
-      if (!bestBlob) throw new Error('तस्वीरें जोड़ने में विफलता आई।');
+      if (!finalBlob || finalBlob.size === 0) throw new Error('इमेज कम्बाइन नहीं हो सकी।');
 
       if (joinedImageUrl) URL.revokeObjectURL(joinedImageUrl);
-      const url = URL.createObjectURL(bestBlob);
+      const url = URL.createObjectURL(finalBlob);
       setJoinedImageUrl(url);
-      setJoinedSizeKb(Math.round((bestBlob.size / 1024) * 10) / 10);
+      setJoinedSizeBytes(finalBlob.size);
+      setJoinedDimensions({ width: totalWidth, height: totalHeight });
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : 'अपेक्षित समस्या आई');
+      setErrorMessage(err instanceof Error ? err.message : 'इमेज जोड़ने में समस्या आई।');
     } finally {
-      setIsJoining(false);
+      setIsProcessing(false);
     }
   };
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* Compact Tool Header Strip */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-xs sm:text-sm font-black truncate">
-          फोटो व सिग्नेचर जॉइनर (Join Images Online)
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black flex items-center gap-1.5">
+          <Layers className="w-4 h-4" />
+          <span>Image Joiner (इमेज जॉइनर • तस्वीरें एक साथ जोड़ें)</span>
         </h2>
         <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-          Photo + Signature Merger • सरकारी फॉर्म स्पेशल
+          ओरिजिनल क्वालिटी • हॉरिजॉन्टल या वर्टिकल
         </span>
       </div>
 
@@ -251,73 +278,104 @@ export const ImageJoinerTool: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-        {/* Left Column: Configuration */}
+        {/* Left Column: Upload & Configuration */}
         <div className="lg:col-span-6 space-y-3">
-          {/* STEP 1: Upload Multiple Images */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
-            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
-              1. जोड़ने वाली फोटो चुनें (Select Images / Photo + Signature)
-            </label>
-            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl bg-indigo-50/50 hover:bg-indigo-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-7 h-7 text-indigo-600 mb-1.5 animate-bounce" />
-              <span className="text-xs sm:text-sm font-bold text-neutral-900">फोटो व सिग्नेचर चुनें</span>
-              <span className="text-[10px] text-neutral-500 mt-0.5">एक से अधिक फोटो एक साथ चुन सकते हैं</span>
-              <input type="file" accept="image/*" multiple onChange={handleFilesSelect} className="hidden" />
+          {/* STEP 1: Upload Multiple Images with Preview & Cross Removal */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-neutral-800 uppercase tracking-wider">
+                1. जोड़ने वाली तस्वीरें चुनें (Select Images to Join)
+              </label>
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>सभी हटाएं</span>
+                </button>
+              )}
+            </div>
+
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl bg-indigo-50/40 hover:bg-indigo-50 cursor-pointer transition-colors text-center group">
+              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 mb-1.5 group-hover:scale-110 transition-transform">
+                <Upload className="w-4 h-4 animate-bounce" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">
+                तस्वीरें चुनें (एक से अधिक चुन सकते हैं)
+              </span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">
+                JPG, JPEG, PNG, WEBP समर्थित
+              </span>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFilesAdd}
+                className="hidden"
+              />
             </label>
 
-            {/* List of uploaded items with reordering */}
-            {images.length > 0 && (
-              <div className="mt-3 space-y-2">
-                <div className="text-[11px] font-bold text-neutral-600">
-                  चुनी गई तस्वीरें ({images.length}) - क्रम बदलें या हटाएं:
+            {/* List of Selected Images with Thumbnail, Size, Reorder, and Cross Delete */}
+            {items.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] font-black text-neutral-700">
+                  चुनी गई तस्वीरें ({items.length}) - क्रम बदलें या हटाएं:
                 </div>
-                {images.map((item, idx) => (
+                {items.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-2 p-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs"
+                    className="flex items-center justify-between gap-2.5 p-2 bg-neutral-50 rounded-xl border border-neutral-200 shadow-2xs"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <img
-                        src={item.previewUrl}
-                        alt="thumb"
-                        className="w-9 h-9 rounded object-contain bg-white border border-neutral-300 shrink-0"
-                      />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {/* Thumbnail Preview */}
+                      <div className="w-11 h-11 rounded-lg overflow-hidden bg-neutral-200 border border-neutral-300 shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.previewUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-neutral-800 truncate max-w-[150px] sm:max-w-[200px]">
+                        <div className="text-xs font-black text-neutral-900 truncate max-w-[170px] sm:max-w-xs">
                           {idx + 1}. {item.name}
                         </div>
-                        <div className="text-[10px] text-neutral-500">
-                          {item.width}x{item.height}px • {item.sizeKb} KB
+                        <div className="text-[10px] text-neutral-500 font-semibold mt-0.5">
+                          {item.width}×{item.height}px •{' '}
+                          <strong className="text-indigo-700">{formatFileSize(item.sizeBytes)}</strong>
                         </div>
                       </div>
                     </div>
 
+                    {/* Actions: Reorder and Red Remove Cross */}
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
-                        onClick={() => moveImage(idx, -1)}
                         disabled={idx === 0}
-                        className="p-1 rounded bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 text-neutral-700 cursor-pointer"
-                        title="ऊपर करें"
+                        onClick={() => handleMoveItem(idx, 'up')}
+                        className="p-1 rounded-md bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 cursor-pointer"
+                        title="ऊपर ले जाएं"
                       >
-                        ▲
+                        <ArrowUp className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveImage(idx, 1)}
-                        disabled={idx === images.length - 1}
-                        className="p-1 rounded bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 text-neutral-700 cursor-pointer"
-                        title="नीचे करें"
+                        disabled={idx === items.length - 1}
+                        onClick={() => handleMoveItem(idx, 'down')}
+                        className="p-1 rounded-md bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 cursor-pointer"
+                        title="नीचे ले जाएं"
                       >
-                        ▼
+                        <ArrowDown className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeImage(item.id)}
-                        className="p-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 cursor-pointer ml-1"
-                        title="हटाएं"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="p-1.5 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 cursor-pointer"
+                        title="यह तस्वीर हटाएं"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
@@ -326,101 +384,90 @@ export const ImageJoinerTool: React.FC = () => {
             )}
           </div>
 
-          {/* STEP 2: Settings Configuration */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          {/* STEP 2: Settings (Direction, Border, Target KB Checkbox) */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
-              2. लेआउट व दिशा सेटिंग्स (Direction & Alignment)
+              2. लेआउट व दिशा सेटिंग्स (Direction &amp; Alignment)
             </label>
 
             {/* Direction Selection */}
             <div>
-              <span className="block text-xs font-bold text-neutral-700 mb-1.5">दिशा (Direction):</span>
+              <span className="text-[11px] font-bold text-neutral-600 block mb-1">दिशा (Direction):</span>
               <div className="grid grid-cols-2 gap-2">
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                  direction === 'vertical'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}>
-                  <input
-                    type="radio"
-                    name="direction"
-                    checked={direction === 'vertical'}
-                    onChange={() => setDirection('vertical')}
-                    className="hidden"
-                  />
-                  <ArrowDown className="w-4 h-4 text-indigo-600" />
-                  <span>↕ Vertical (ऊपर-नीचे - फोटो+सिग्नेचर)</span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setDirection('vertical')}
+                  className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                    direction === 'vertical'
+                      ? 'bg-indigo-50 border-indigo-600 text-indigo-950 font-bold ring-1 ring-indigo-600'
+                      : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-700'
+                  }`}
+                >
+                  <div className="text-xs font-black">↕ Vertical (ऊपर-नीचे)</div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">एक के नीचे एक जोड़ें</div>
+                </button>
 
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                  direction === 'horizontal'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}>
-                  <input
-                    type="radio"
-                    name="direction"
-                    checked={direction === 'horizontal'}
-                    onChange={() => setDirection('horizontal')}
-                    className="hidden"
-                  />
-                  <ArrowRight className="w-4 h-4 text-indigo-600" />
-                  <span>↔ Horizontal (अगल-बगल)</span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setDirection('horizontal')}
+                  className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                    direction === 'horizontal'
+                      ? 'bg-indigo-50 border-indigo-600 text-indigo-950 font-bold ring-1 ring-indigo-600'
+                      : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-700'
+                  }`}
+                >
+                  <div className="text-xs font-black">↔ Horizontal (अगल-बगल)</div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">साइड-बाई-साइड जोड़ें</div>
+                </button>
               </div>
             </div>
 
-            {/* Arrange Mode */}
+            {/* Arrangement Selection */}
             <div>
-              <span className="block text-xs font-bold text-neutral-700 mb-1.5">अरेंजमेंट (Arrange):</span>
+              <span className="text-[11px] font-bold text-neutral-600 block mb-1">अरेंजमेंट (Arrange):</span>
               <div className="grid grid-cols-2 gap-2">
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                  arrangeMode === 'proper'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}>
-                  <input
-                    type="radio"
-                    name="arrange"
-                    checked={arrangeMode === 'proper'}
-                    onChange={() => setArrangeMode('proper')}
-                    className="hidden"
-                  />
-                  <span>✓ Proper Align (समान चौड़ाई/ऊंचाई)</span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setAlignment('match')}
+                  className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                    alignment === 'match'
+                      ? 'bg-indigo-50 border-indigo-600 text-indigo-950 font-bold ring-1 ring-indigo-600'
+                      : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-700'
+                  }`}
+                >
+                  <div className="text-xs font-black">✓ Proper Align (समान चौड़ाई/ऊंचाई)</div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">एकसमान साफ लेआउट</div>
+                </button>
 
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                  arrangeMode === 'free'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                }`}>
-                  <input
-                    type="radio"
-                    name="arrange"
-                    checked={arrangeMode === 'free'}
-                    onChange={() => setArrangeMode('free')}
-                    className="hidden"
-                  />
-                  <span>Free Style (मूल आकार)</span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setAlignment('original')}
+                  className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                    alignment === 'original'
+                      ? 'bg-indigo-50 border-indigo-600 text-indigo-950 font-bold ring-1 ring-indigo-600'
+                      : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-700'
+                  }`}
+                >
+                  <div className="text-xs font-black">Free Style (मूल आकार)</div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">ओरिजिनल रेशियो सुरक्षित</div>
+                </button>
               </div>
             </div>
 
-            {/* Border to Images */}
+            {/* Divider Border */}
             <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={addBorder}
-                    onChange={(e) => setAddBorder(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 rounded border-neutral-300 focus:ring-indigo-500 cursor-pointer"
-                  />
-                  <span className="text-xs font-bold text-neutral-800">
-                    तस्वीरों के बीच विभाजक बॉर्डर (Border Divider) जोड़ें
-                  </span>
-                </label>
-              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={addBorder}
+                  onChange={(e) => setAddBorder(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 rounded border-neutral-300 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-neutral-800">
+                  तस्वीरों के बीच विभाजक बॉर्डर (Border Divider) जोड़ें
+                </span>
+              </label>
+
               {addBorder && (
                 <div className="flex items-center gap-2 pt-1 border-t border-neutral-200">
                   <span className="text-[10px] text-neutral-500 font-bold">बॉर्डर मोटाई:</span>
@@ -442,61 +489,87 @@ export const ImageJoinerTool: React.FC = () => {
               )}
             </div>
 
-            {/* Target KB Input Box + Quick Chips */}
-            <div>
-              <label className="block text-xs font-bold text-neutral-800 mb-1">
-                टारगेट फाइल साइज़ दर्ज करें (Target KB):
-              </label>
-              <div className="relative flex items-center">
+            {/* Target File Size Checkbox (User Controlled, Unchecked = Original Quality) */}
+            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
-                  type="number"
-                  min="20"
-                  max="2000"
-                  value={targetKb || ''}
-                  onChange={(e) => setTargetKb(Math.max(1, Number(e.target.value)))}
-                  placeholder="उदा. 50, 100, 200"
-                  className="w-full px-3 py-2 pr-12 text-sm font-black border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-hidden text-neutral-900 bg-white"
+                  type="checkbox"
+                  checked={applyTargetKb}
+                  onChange={(e) => setApplyTargetKb(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 rounded border-neutral-300 focus:ring-indigo-500 cursor-pointer"
                 />
-                <span className="absolute right-3 text-xs font-black text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
-                  KB
+                <span className="text-xs font-bold text-neutral-800">
+                  टारगेट फाइल साइज़ सीमित करें (Target KB Compression)
                 </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <span className="text-[10px] text-neutral-500 font-semibold self-center">क्विक साइज़:</span>
-                {[50, 80, 100, 150, 200].map((kb) => (
-                  <button
-                    key={kb}
-                    type="button"
-                    onClick={() => setTargetKb(kb)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
-                      targetKb === kb
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                        : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-300'
-                    }`}
-                  >
-                    {kb} KB
-                  </button>
-                ))}
-              </div>
+                {!applyTargetKb && (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    ओरिजिनल क्वालिटी
+                  </span>
+                )}
+              </label>
+
+              {applyTargetKb && (
+                <div className="pt-1 animate-in fade-in duration-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-neutral-600">लक्षित साइज़ दर्ज करें (अपनी पसंद का Size KB में डालें):</span>
+                    <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                      {targetKb !== '' ? `${targetKb} KB` : 'साइज़ दर्ज करें'}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={10}
+                    max={2000}
+                    value={targetKb}
+                    placeholder="उदा. 100"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setTargetKb('');
+                      } else {
+                        const n = parseInt(v, 10);
+                        setTargetKb(isNaN(n) ? '' : n);
+                      }
+                    }}
+                    className="w-full px-3 py-1.5 text-xs font-bold bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {[50, 80, 100, 150, 200, 300].map((kb) => (
+                      <button
+                        key={kb}
+                        type="button"
+                        onClick={() => setTargetKb(kb)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                          targetKb === kb
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white hover:bg-neutral-100 text-neutral-700 border-neutral-300'
+                        }`}
+                      >
+                        {kb} KB
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* STEP 3: EXPLICIT ACTION TRIGGER BUTTON */}
+            {/* Action Button */}
             <div className="pt-2">
               <button
                 type="button"
-                disabled={images.length < 2 || isJoining}
                 onClick={handleJoinImages}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                disabled={items.length < 2 || isProcessing}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white text-xs sm:text-sm font-black shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
               >
-                {isJoining ? (
+                {isProcessing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>तस्वीरें जुड़ रही हैं...</span>
+                    <span>तस्वीरें जोड़ी जा रही हैं...</span>
                   </>
                 ) : (
                   <>
                     <Layers className="w-4 h-4" />
-                    <span>फोटो व सिग्नेचर जोड़ें (Join Images)</span>
+                    <span>तस्वीरें जोड़ें (Join {items.length} Images Now)</span>
                   </>
                 )}
               </button>
@@ -504,105 +577,60 @@ export const ImageJoinerTool: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: STEP 4 - Live Preview & Download */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
-                <h3 className="text-sm font-black text-neutral-900 flex items-center gap-1.5">
+        {/* Right Column: Joined Result & Download */}
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs flex flex-col justify-center min-h-[340px]">
+            {joinedImageUrl ? (
+              <div className="w-full space-y-3 text-center">
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-xs font-black border border-emerald-200">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>जुड़ा हुआ परिणाम (Joined Preview)</span>
-                </h3>
-                {joinedSizeKb > 0 && (
-                  <span className="text-xs font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    आउटपुट: {joinedSizeKb} KB
+                  <span>तस्वीरें सफलतापूर्वक जुड़ गईं!</span>
+                </div>
+
+                <div className="max-w-[320px] mx-auto border border-neutral-300 rounded-xl overflow-hidden shadow-xs bg-neutral-100 p-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={joinedImageUrl}
+                    alt="Joined Result"
+                    className="w-full h-auto max-h-[300px] object-contain mx-auto rounded-lg"
+                  />
+                </div>
+
+                <div className="flex items-center justify-center gap-3 text-xs bg-neutral-50 p-2 rounded-xl border border-neutral-200 font-bold">
+                  <span className="text-neutral-600">
+                    आयाम: <strong>{joinedDimensions.width}×{joinedDimensions.height}px</strong>
                   </span>
-                )}
-              </div>
+                  <span className="text-neutral-400">•</span>
+                  <span className="text-indigo-700">
+                    साइज़: <strong>{formatFileSize(joinedSizeBytes)}</strong>
+                  </span>
+                </div>
 
-              {/* Preview Container */}
-              <div className="min-h-[300px] bg-neutral-100/80 rounded-xl border border-dashed border-neutral-300 flex items-center justify-center p-4 relative overflow-hidden">
-                {isJoining && (
-                  <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex items-center justify-center z-10">
-                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-700 bg-white px-3 py-1.5 rounded-full shadow-md">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>तस्वीरें जोड़ी जा रही हैं...</span>
-                    </div>
-                  </div>
-                )}
-
-                {joinedImageUrl ? (
-                  <div className="text-center space-y-2">
-                    <img
-                      src={joinedImageUrl}
-                      alt="Joined Output"
-                      className="mx-auto rounded-lg shadow-md max-h-[360px] max-w-[280px] object-contain border border-neutral-300 bg-white"
-                    />
-                    <div className="text-xs font-bold text-neutral-600">
-                      साइज: {joinedSizeKb} KB (टारगेट: {targetKb} KB)
-                    </div>
-                  </div>
-                ) : images.length > 0 ? (
-                  <div className="text-center space-y-2 p-4">
-                    <div className="flex justify-center gap-2 flex-wrap max-w-xs mx-auto">
-                      {images.map((item, idx) => (
-                        <div key={item.id} className="text-center">
-                          <img
-                            src={item.previewUrl}
-                            alt="preview"
-                            className="w-16 h-16 rounded object-contain bg-white border border-neutral-300"
-                          />
-                          <span className="text-[10px] text-neutral-500 font-bold block mt-0.5">#{idx + 1}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs font-bold text-neutral-700 mt-2">
-                      {images.length} फोटो चुनी गई हैं
-                    </p>
-                    <p className="text-[11px] text-indigo-700 font-medium">
-                      इन्हें जोड़ने हेतु बाईं तरफ &quot;फोटो व सिग्नेचर जोड़ें&quot; बटन दबाएं
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-center text-neutral-400 p-6">
-                    <Layers className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs font-medium">कृपया बाईं तरफ से 2 या अधिक फोटो अपलोड करें</p>
-                    <p className="text-[10px] text-neutral-400 mt-1">
-                      फोटो व सिग्नेचर एक साथ जुड़कर यहाँ दिखेंगे
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Download Button */}
-            <div className="mt-6 pt-4 border-t border-neutral-200">
-              {joinedImageUrl ? (
                 <a
                   href={joinedImageUrl}
-                  download={`joined_photo_signature_${joinedSizeKb}KB.jpg`}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer"
+                  download="joined_image.jpg"
+                  className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-sm transition-all"
                 >
-                  <Download className="w-5 h-5" />
-                  <span>जुड़ी हुई फोटो डाउनलोड करें ({joinedSizeKb} KB)</span>
+                  <Download className="w-4 h-4" />
+                  <span>डाउनलोड करें ({formatFileSize(joinedSizeBytes)})</span>
                 </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleJoinImages}
-                  disabled={images.length < 2}
-                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-500 font-bold text-sm cursor-pointer hover:bg-neutral-300 transition-colors text-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {images.length >= 2 ? 'पहले "फोटो व सिग्नेचर जोड़ें" बटन दबाएं' : 'डाउनलोड हेतु पहले कम से कम 2 फोटो अपलोड करें'}
-                </button>
-              )}
 
-              {/* Security Guarantee Text */}
-              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+                <div className="text-[11px] text-neutral-500 flex items-center justify-center gap-1 pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center p-6 text-neutral-400 space-y-2">
+                <Layers className="w-12 h-12 mx-auto text-neutral-300 stroke-[1.5]" />
+                <p className="text-xs font-bold text-neutral-600">
+                  बाईं ओर कम से कम 2 तस्वीरें चुनें और &apos;तस्वीरें जोड़ें&apos; पर क्लिक करें
+                </p>
+                <p className="text-[10px] text-neutral-400">
+                  हॉरिजॉन्टल या वर्टिकल क्रम में ओरिजिनल शार्पनेस के साथ जुड़ेगा
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

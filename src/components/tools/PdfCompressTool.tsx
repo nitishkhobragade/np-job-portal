@@ -2,35 +2,36 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, RefreshCw, FileText, CheckCircle2, Minimize2, ShieldCheck } from 'lucide-react';
+import { Download, RefreshCw, FileText, CheckCircle2, Minimize2, ShieldCheck } from 'lucide-react';
+import { ToolUploadBox } from './ToolUploadBox';
 import { ToolErrorBanner } from './ToolErrorBanner';
 import { renderPdfPageToCanvas, getPdfPageCount } from '../../lib/pdfHelper';
+import { formatFileSize, getRealFileBytes } from '../../lib/fileHelper';
 
 export const PdfCompressTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [originalSizeKb, setOriginalSizeKb] = useState<number>(0);
+  const [originalSizeBytes, setOriginalSizeBytes] = useState<number>(0);
   const [pageCount, setPageCount] = useState<number>(0);
 
-  const [targetKb, setTargetKb] = useState<number>(200);
+  const [targetKb, setTargetKb] = useState<number | ''>(200);
   const [compressionMode, setCompressionMode] = useState<'strong' | 'medium' | 'light'>('medium');
 
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [progressMsg, setProgressMsg] = useState<string>('');
   const [compressedPdfUrl, setCompressedPdfUrl] = useState<string | null>(null);
-  const [compressedSizeKb, setCompressedSizeKb] = useState<number>(0);
+  const [compressedSizeBytes, setCompressedSizeBytes] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleFileSelect = async (file: File) => {
     if (compressedPdfUrl) URL.revokeObjectURL(compressedPdfUrl);
 
     setSelectedFile(file);
-    setOriginalSizeKb(Math.round((file.size / 1024) * 10) / 10);
     setCompressedPdfUrl(null);
-    setCompressedSizeKb(0);
+    setCompressedSizeBytes(0);
     setErrorMessage(null);
+
+    const bytes = await getRealFileBytes(file);
+    setOriginalSizeBytes(bytes);
 
     try {
       const buffer = await file.arrayBuffer();
@@ -41,6 +42,16 @@ export const PdfCompressTool: React.FC = () => {
     }
   };
 
+  const handleFileRemove = () => {
+    if (compressedPdfUrl) URL.revokeObjectURL(compressedPdfUrl);
+    setSelectedFile(null);
+    setOriginalSizeBytes(0);
+    setPageCount(0);
+    setCompressedPdfUrl(null);
+    setCompressedSizeBytes(0);
+    setErrorMessage(null);
+  };
+
   // EXPLICIT ACTION TRIGGER: Target KB iterative compressor
   const handleCompress = async () => {
     if (!selectedFile) {
@@ -49,73 +60,89 @@ export const PdfCompressTool: React.FC = () => {
     }
 
     setIsCompressing(true);
-    setProgressMsg('PDF विश्लेषण हो रहा है...');
+    setProgressMsg('PDF संरचना का विश्लेषण किया जा रहा है...');
     setErrorMessage(null);
 
     try {
       const fileBuffer = await selectedFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
 
-      // Clean metadata
+      // Clean metadata to shed unnecessary bytes
       pdfDoc.setTitle('');
       pdfDoc.setAuthor('');
       pdfDoc.setSubject('');
-      pdfDoc.setKeywords([]);
-      pdfDoc.setProducer('');
       pdfDoc.setCreator('');
 
-      let compressedBytes = await pdfDoc.save({ useObjectStreams: true });
-      const currentSizeKb = compressedBytes.byteLength / 1024;
+      const effectiveTargetKb = typeof targetKb === 'number' && targetKb > 0 ? targetKb : 200;
+      const hardCeilingBytes = Math.floor(effectiveTargetKb * 1024);
 
-      // If current size is still higher than targetKb or user wants strong compression,
-      // rasterize and optimize scanned/image pages iteratively
-      if (currentSizeKb > targetKb && targetKb > 0) {
-        setProgressMsg('पेजों का आकार अनुकूलित (Raster Optimization) किया जा रहा है...');
+      let compressedBytes = await pdfDoc.save({ useObjectStreams: true });
+
+      // If current size exceeds hardCeilingBytes, rasterize and optimize scanned/image pages
+      if (compressedBytes.byteLength > hardCeilingBytes) {
+        setProgressMsg('पेजों का आकार अनुकूलित किया जा रहा है...');
 
         const totalPages = await getPdfPageCount(fileBuffer);
-        const newPdf = await PDFDocument.create();
+        const configs = [
+          { scale: 1.3, quality: 0.65 },
+          { scale: 1.1, quality: 0.48 },
+          { scale: 0.95, quality: 0.38 },
+          { scale: 0.8, quality: 0.28 },
+          { scale: 0.65, quality: 0.18 },
+        ];
 
-        // Calculate quality based on target ratio
-        const ratio = targetKb / currentSizeKb;
-        let quality = Math.max(0.35, Math.min(0.85, ratio));
-        if (compressionMode === 'strong') quality = Math.min(quality, 0.55);
-        if (compressionMode === 'light') quality = Math.max(quality, 0.75);
+        if (compressionMode === 'strong') {
+          configs.shift();
+        } else if (compressionMode === 'light') {
+          configs.unshift({ scale: 1.5, quality: 0.78 });
+        }
 
-        for (let i = 1; i <= totalPages; i++) {
-          setProgressMsg(`पेज ${i}/${totalPages} कंप्रेस किया जा रहा है...`);
-          const canvas = await renderPdfPageToCanvas(fileBuffer, i, 1.3);
+        let bestRasterBytes: Uint8Array | null = null;
 
-          const jpegBlob: Blob | null = await new Promise((resolve) =>
-            canvas.toBlob(resolve, 'image/jpeg', quality)
-          );
+        for (let attempt = 0; attempt < configs.length; attempt++) {
+          const cfg = configs[attempt];
+          const newPdf = await PDFDocument.create();
 
-          if (jpegBlob) {
-            const jpegBuffer = await jpegBlob.arrayBuffer();
-            const embeddedImage = await newPdf.embedJpg(jpegBuffer);
-            const page = newPdf.addPage([canvas.width, canvas.height]);
-            page.drawImage(embeddedImage, {
-              x: 0,
-              y: 0,
-              width: canvas.width,
-              height: canvas.height,
-            });
+          for (let i = 1; i <= totalPages; i++) {
+            setProgressMsg(`पेज ${i}/${totalPages} अनुकूलित हो रहा है (पास ${attempt + 1})...`);
+            const canvas = await renderPdfPageToCanvas(fileBuffer, i, cfg.scale);
+
+            const jpegBlob: Blob | null = await new Promise((resolve) =>
+              canvas.toBlob(resolve, 'image/jpeg', cfg.quality)
+            );
+
+            if (jpegBlob) {
+              const jpegBuffer = await jpegBlob.arrayBuffer();
+              const embeddedImage = await newPdf.embedJpg(jpegBuffer);
+              const page = newPdf.addPage([canvas.width, canvas.height]);
+              page.drawImage(embeddedImage, {
+                x: 0,
+                y: 0,
+                width: canvas.width,
+                height: canvas.height,
+              });
+            }
+          }
+
+          const rasterAttemptBytes = await newPdf.save({ useObjectStreams: true });
+          bestRasterBytes = rasterAttemptBytes;
+
+          // If this pass fits strictly under hardCeilingBytes, break successfully
+          if (rasterAttemptBytes.byteLength <= hardCeilingBytes) {
+            break;
           }
         }
 
-        const rasterCompressedBytes = await newPdf.save({ useObjectStreams: true });
-        // Use rasterized version if smaller
-        if (rasterCompressedBytes.byteLength < compressedBytes.byteLength) {
-          compressedBytes = rasterCompressedBytes;
+        if (bestRasterBytes && (bestRasterBytes.byteLength < compressedBytes.byteLength || compressedBytes.byteLength > hardCeilingBytes)) {
+          compressedBytes = bestRasterBytes;
         }
       }
 
       const finalBlob = new Blob([compressedBytes], { type: 'application/pdf' });
-      const finalSizeKb = Math.round((finalBlob.size / 1024) * 10) / 10;
-
       if (compressedPdfUrl) URL.revokeObjectURL(compressedPdfUrl);
       const url = URL.createObjectURL(finalBlob);
       setCompressedPdfUrl(url);
-      setCompressedSizeKb(finalSizeKb);
+      setCompressedSizeBytes(finalBlob.size);
     } catch (err: unknown) {
       console.error('Compress Error:', err);
       setErrorMessage(
@@ -150,142 +177,111 @@ export const PdfCompressTool: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-        {/* Left Column: 3-Step Configuration */}
+        {/* Left Column: Upload & Options */}
         <div className="lg:col-span-6 space-y-3">
-          {/* STEP 1: Upload */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
-            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
-              1. बड़ी PDF फाइल अपलोड करें (Upload PDF)
-            </label>
-            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-rose-300 hover:border-rose-500 rounded-xl bg-rose-50/50 hover:bg-rose-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-7 h-7 text-rose-600 mb-1.5 animate-bounce" />
-              <span className="text-xs sm:text-sm font-bold text-neutral-900">PDF फाइल चुनें</span>
-              <span className="text-[10px] text-neutral-500 mt-0.5">मार्कशीट, जाति, निवास या अन्य दस्तावेज</span>
-              <input type="file" accept="application/pdf" onChange={handleFileChange} className="hidden" />
-            </label>
+          <ToolUploadBox
+            label="1. अपनी PDF फ़ाइल चुनें (Select PDF)"
+            subLabel="PDF फ़ाइलें (.pdf) समर्थित हैं"
+            accept=".pdf,application/pdf"
+            selectedFile={selectedFile}
+            onFileSelect={handleFileSelect}
+            onFileRemove={handleFileRemove}
+            fileType="pdf"
+          />
 
-            {selectedFile && (
-              <div className="mt-2.5 flex items-center justify-between text-xs bg-neutral-100 p-2 rounded-lg border border-neutral-200">
-                <div className="truncate max-w-[200px]">
-                  <span className="font-semibold text-neutral-800 block truncate">{selectedFile.name}</span>
-                  {pageCount > 0 && <span className="text-[10px] text-neutral-500">कुल पेज: {pageCount}</span>}
-                </div>
-                <span className="font-bold text-neutral-600 shrink-0">
-                  मूल साइज़: <span className="text-rose-700">{originalSizeKb} KB</span>
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* STEP 2: Target KB & Compression Mode Configuration */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          {/* STEP 2: Target Size Input & Quick Chips */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
             <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
-              2. टारगेट साइज़ व कंप्रेशन मोड (Target KB & Level)
+              2. लक्षित फाइल साइज़ दर्ज करें (Target KB)
             </label>
 
-            {/* Target KB Input Box + Quick Chips */}
             <div>
-              <label className="block text-xs font-bold text-neutral-800 mb-1">
-                टारगेट फाइल साइज़ (Target KB में दर्ज करें):
-              </label>
-              <div className="relative flex items-center">
-                <input
-                  type="number"
-                  min="30"
-                  max="5000"
-                  value={targetKb || ''}
-                  onChange={(e) => setTargetKb(Math.max(10, Number(e.target.value)))}
-                  placeholder="उदा. 100, 200, 300"
-                  className="w-full px-3 py-2 pr-12 text-sm font-black border border-neutral-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-hidden text-neutral-900 bg-white"
-                />
-                <span className="absolute right-3 text-xs font-black text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
-                  KB
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-neutral-600">आवश्यक साइज़ (अपनी पसंद का Size KB में डालें):</span>
+                <span className="text-xs font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                  {targetKb !== '' ? `< ${targetKb} KB` : 'साइज़ दर्ज करें'}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <span className="text-[10px] text-neutral-500 font-semibold self-center">क्विक साइज़:</span>
-                {[100, 200, 300, 400, 500].map((kb) => (
+              <input
+                type="number"
+                min={20}
+                max={5000}
+                value={targetKb}
+                placeholder="उदा. 200"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '') {
+                    setTargetKb('');
+                  } else {
+                    const n = parseInt(v, 10);
+                    setTargetKb(isNaN(n) ? '' : n);
+                  }
+                }}
+                className="w-full px-3 py-1.5 text-xs font-bold bg-neutral-50 border border-neutral-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+              />
+            </div>
+
+            {/* Quick KB Chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {[100, 150, 200, 300, 400, 500].map((kb) => (
+                <button
+                  key={kb}
+                  type="button"
+                  onClick={() => setTargetKb(kb)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors cursor-pointer ${
+                    targetKb === kb
+                      ? 'bg-rose-700 text-white border-rose-700 shadow-2xs'
+                      : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-300'
+                  }`}
+                >
+                  {kb} KB
+                </button>
+              ))}
+            </div>
+
+            {/* Mode Selector */}
+            <div className="pt-2 border-t border-neutral-200">
+              <span className="text-[11px] font-bold text-neutral-600 block mb-1">कंप्रेशन स्तर (Level):</span>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'light', label: 'हल्का (Light)', desc: 'अधिकतम स्पष्टता' },
+                  { id: 'medium', label: 'संतुलित (Medium)', desc: 'अनुशंसित स्तर' },
+                  { id: 'strong', label: 'तीव्र (Strong)', desc: 'अत्यधिक छोटा साइज़' },
+                ] as const).map((mode) => (
                   <button
-                    key={kb}
+                    key={mode.id}
                     type="button"
-                    onClick={() => setTargetKb(kb)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
-                      targetKb === kb
-                        ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                        : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border-neutral-300'
+                    onClick={() => setCompressionMode(mode.id)}
+                    className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
+                      compressionMode === mode.id
+                        ? 'border-rose-600 bg-rose-50 text-rose-950 font-bold ring-1 ring-rose-600'
+                        : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700'
                     }`}
                   >
-                    &lt; {kb} KB
+                    <div className="text-xs font-black">{mode.label}</div>
+                    <div className="text-[9px] text-neutral-500 mt-0.5">{mode.desc}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Compression Levels */}
-            <div>
-              <span className="block text-xs font-bold text-neutral-700 mb-1.5">कंप्रेशन मोड:</span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCompressionMode('strong')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    compressionMode === 'strong'
-                      ? 'border-rose-600 bg-rose-50 text-rose-900 ring-2 ring-rose-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <Minimize2 className="w-4 h-4 text-rose-600" />
-                  <span className="font-black text-xs">अत्यधिक (Max)</span>
-                  <span className="text-[10px] text-neutral-500">&lt; 150 KB</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCompressionMode('medium')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    compressionMode === 'medium'
-                      ? 'border-rose-600 bg-rose-50 text-rose-900 ring-2 ring-rose-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <Minimize2 className="w-4 h-4 text-amber-600" />
-                  <span className="font-black text-xs">संतुलित</span>
-                  <span className="text-[10px] text-neutral-500">200-300 KB</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCompressionMode('light')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    compressionMode === 'light'
-                      ? 'border-rose-600 bg-rose-50 text-rose-900 ring-2 ring-rose-500/20'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700'
-                  }`}
-                >
-                  <Minimize2 className="w-4 h-4 text-blue-600" />
-                  <span className="font-black text-xs">हल्का</span>
-                  <span className="text-[10px] text-neutral-500">बेहतर टेक्स्ट</span>
-                </button>
-              </div>
-            </div>
-
-            {/* STEP 3: EXPLICIT ACTION TRIGGER BUTTON */}
+            {/* Action Trigger Button */}
             <div className="pt-2">
               <button
                 type="button"
-                disabled={!selectedFile || isCompressing}
                 onClick={handleCompress}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                disabled={!selectedFile || isCompressing}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-700 to-red-800 hover:from-rose-800 hover:to-red-900 text-white text-xs sm:text-sm font-black shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
               >
                 {isCompressing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>{progressMsg || 'PDF साइज़ कम हो रहा है...'}</span>
+                    <span>{progressMsg || 'कंप्रेशन हो रहा है...'}</span>
                   </>
                 ) : (
                   <>
                     <Minimize2 className="w-4 h-4" />
-                    <span>PDF साइज़ कम करें (Compress PDF)</span>
+                    <span>3. PDF साइज़ कम करें (Compress Now)</span>
                   </>
                 )}
               </button>
@@ -293,99 +289,61 @@ export const PdfCompressTool: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: STEP 4 - Output Preview & Download */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200 shadow-xs h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
-                <h3 className="text-sm font-black text-neutral-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-rose-600" />
-                  <span>कंप्रेस आउटपुट (Output)</span>
-                </h3>
-                {compressedSizeKb > 0 && (
-                  <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                    compressedSizeKb <= targetKb ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    आउटपुट: {compressedSizeKb} KB
+        {/* Right Column: Output & Download */}
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs flex flex-col justify-center min-h-[340px]">
+            {compressedPdfUrl ? (
+              <div className="w-full space-y-3 text-center">
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-xs font-black border border-emerald-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>PDF सफलतापूर्वक कंप्रेस हुई!</span>
+                </div>
+
+                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 max-w-sm mx-auto">
+                  <FileText className="w-10 h-10 text-rose-600 mx-auto" />
+                  <div className="text-xs font-black text-neutral-800 truncate">
+                    {selectedFile?.name}
+                  </div>
+                  <div className="text-[11px] text-neutral-500 font-bold">
+                    कुल पृष्ठ: {pageCount} पृष्ठ
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 text-xs bg-neutral-50 p-2 rounded-xl border border-neutral-200 font-bold">
+                  <span className="text-neutral-500">
+                    मूल: <strong className="text-neutral-700">{formatFileSize(originalSizeBytes)}</strong>
                   </span>
-                )}
-              </div>
+                  <span className="text-emerald-600">➔</span>
+                  <span className="text-emerald-700">
+                    नया साइज़: <strong className="text-emerald-800">{formatFileSize(compressedSizeBytes)}</strong>
+                  </span>
+                </div>
 
-              {/* Status Box */}
-              <div className="min-h-[220px] bg-neutral-100/80 rounded-xl border border-dashed border-neutral-300 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
-                {isCompressing && (
-                  <div className="absolute inset-0 bg-white/85 backdrop-blur-2xs flex flex-col items-center justify-center z-10 p-4">
-                    <RefreshCw className="w-6 h-6 text-rose-600 animate-spin mb-2" />
-                    <span className="text-xs font-black text-neutral-800">{progressMsg}</span>
-                    <span className="text-[10px] text-neutral-500 mt-1">ब्राउज़र में सुरक्षित लोकल प्रोसेसिंग</span>
-                  </div>
-                )}
-
-                {compressedPdfUrl ? (
-                  <div className="space-y-3">
-                    <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-                      <FileText className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full inline-block">
-                        ✓ कंप्रेस सफल: {originalSizeKb} KB ➔ {compressedSizeKb} KB
-                      </div>
-                      <p className="text-[11px] text-neutral-500 mt-1">
-                        फाइल साइज में लगभग {Math.max(0, Math.round(((originalSizeKb - compressedSizeKb) / originalSizeKb) * 100))}% की बचत हुई!
-                      </p>
-                    </div>
-                  </div>
-                ) : selectedFile ? (
-                  <div className="space-y-2">
-                    <div className="w-12 h-12 rounded-xl bg-neutral-200 text-neutral-600 flex items-center justify-center mx-auto">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <div className="text-xs font-bold text-neutral-800">{selectedFile.name}</div>
-                    <div className="text-[11px] text-neutral-500">मूल साइज़: {originalSizeKb} KB</div>
-                    <p className="text-[11px] text-rose-600 font-medium">
-                      कंप्रेस करने के लिए बाईं तरफ &quot;PDF साइज़ कम करें&quot; बटन दबाएं
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-neutral-400">
-                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                    <p className="text-xs font-medium">कृपया बाईं तरफ से PDF अपलोड करें</p>
-                    <p className="text-[10px] text-neutral-400 mt-1">
-                      आउटपुट साइज व डाउनलोड लिंक यहाँ दिखेगा
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Download Button */}
-            <div className="mt-6 pt-4 border-t border-neutral-200">
-              {compressedPdfUrl ? (
                 <a
                   href={compressedPdfUrl}
                   download={`compressed_${selectedFile?.name || 'document.pdf'}`}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md transition-all active:scale-98 cursor-pointer"
+                  className="w-full py-2.5 px-4 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-sm transition-all"
                 >
-                  <Download className="w-5 h-5" />
-                  <span>कंप्रेस PDF डाउनलोड करें ({compressedSizeKb} KB)</span>
+                  <Download className="w-4 h-4" />
+                  <span>कंप्रेस्ड PDF डाउनलोड करें ({formatFileSize(compressedSizeBytes)})</span>
                 </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCompress}
-                  disabled={!selectedFile}
-                  className="w-full py-3 px-4 rounded-xl bg-neutral-200 text-neutral-500 font-bold text-sm cursor-pointer hover:bg-neutral-300 transition-colors text-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {selectedFile ? 'पहले "PDF साइज़ कम करें" बटन दबाएं' : 'कंप्रेस होने के बाद डाउनलोड बटन सक्रिय होगा'}
-                </button>
-              )}
 
-              {/* Security Guarantee Text */}
-              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+                <div className="text-[11px] text-neutral-500 flex items-center justify-center gap-1 pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center p-6 text-neutral-400 space-y-2">
+                <FileText className="w-12 h-12 mx-auto text-neutral-300 stroke-[1.5]" />
+                <p className="text-xs font-bold text-neutral-600">
+                  बाईं ओर PDF अपलोड करें, Target KB चुनें और कंप्रेस करें
+                </p>
+                <p className="text-[10px] text-neutral-400">
+                  सरकारी फॉर्म अपलोड की 200KB लिमिट में आसानी से तैयार होगा
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

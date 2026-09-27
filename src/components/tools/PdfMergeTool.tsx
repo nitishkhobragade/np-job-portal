@@ -2,38 +2,46 @@
 
 import React, { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, Download, Trash2, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, Layers, ShieldCheck } from 'lucide-react';
+import { Upload, Download, ArrowUp, ArrowDown, FileText, CheckCircle2, RefreshCw, Layers, ShieldCheck, X } from 'lucide-react';
 import { ToolErrorBanner } from './ToolErrorBanner';
+import { formatFileSize, getRealFileBytes } from '../../lib/fileHelper';
 
 interface PdfFileItem {
   id: string;
   file: File;
   name: string;
-  sizeKb: number;
+  sizeBytes: number;
 }
 
 export const PdfMergeTool: React.FC = () => {
   const [pdfFiles, setPdfFiles] = useState<PdfFileItem[]>([]);
   const [isMerging, setIsMerging] = useState<boolean>(false);
   const [mergedPdfUrl, setMergedPdfUrl] = useState<string | null>(null);
-  const [mergedSizeKb, setMergedSizeKb] = useState<number>(0);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [mergedSizeBytes, setMergedSizeBytes] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setErrorMsg(null);
-    const newItems: PdfFileItem[] = Array.from(files).map((f) => ({
-      id: Math.random().toString(36).substring(2, 9),
-      file: f,
-      name: f.name,
-      sizeKb: Math.round((f.size / 1024) * 10) / 10
-    }));
+    setErrorMessage(null);
+    const newItems: PdfFileItem[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const sizeBytes = await getRealFileBytes(f);
+      newItems.push({
+        id: Math.random().toString(36).substring(2, 9),
+        file: f,
+        name: f.name,
+        sizeBytes,
+      });
+    }
 
     setPdfFiles((prev) => [...prev, ...newItems]);
     if (mergedPdfUrl) URL.revokeObjectURL(mergedPdfUrl);
     setMergedPdfUrl(null);
+    e.target.value = '';
   };
 
   const removeFile = (id: string) => {
@@ -64,35 +72,39 @@ export const PdfMergeTool: React.FC = () => {
     });
   };
 
-  const handleMergePdfs = async () => {
+  const mergePdfs = async () => {
     if (pdfFiles.length < 2) {
-      setErrorMsg('कृपया कम से कम 2 PDF फाइलें अपलोड करें जिन्हें आप जोड़ना चाहते हैं।');
+      setErrorMessage('कृपया जोड़ने के लिए कम से कम 2 PDF फाइलें चुनें।');
       return;
     }
 
     setIsMerging(true);
-    setErrorMsg(null);
+    setErrorMessage(null);
 
     try {
       const mergedPdf = await PDFDocument.create();
 
       for (const item of pdfFiles) {
         const fileBuffer = await item.file.arrayBuffer();
-        const donorPdf = await PDFDocument.load(fileBuffer);
-        const copiedPages = await mergedPdf.copyPages(donorPdf, donorPdf.getPageIndices());
+        const pdf = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         copiedPages.forEach((page) => mergedPdf.addPage(page));
       }
 
-      const mergedBytes = await mergedPdf.save();
-      const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+      const mergedPdfBytes = await mergedPdf.save({ useObjectStreams: true });
+      const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
 
       if (mergedPdfUrl) URL.revokeObjectURL(mergedPdfUrl);
       const url = URL.createObjectURL(blob);
       setMergedPdfUrl(url);
-      setMergedSizeKb(Math.round((blob.size / 1024) * 10) / 10);
+      setMergedSizeBytes(blob.size);
     } catch (err: unknown) {
-      console.error('PDF Merge Error:', err);
-      setErrorMsg('PDF जोड़ने में समस्या आई। सुनिश्चित करें कि फाइलें पासवर्ड प्रोटेक्टेड नहीं हैं।');
+      console.error(err);
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : 'PDF जोड़ने में समस्या आई। यदि कोई फाइल पासवर्ड प्रोटेक्टेड है तो पहले उसे अनलॉक करें।'
+      );
     } finally {
       setIsMerging(false);
     }
@@ -100,45 +112,34 @@ export const PdfMergeTool: React.FC = () => {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* Compact Tool Header Strip */}
-      <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-xs sm:text-sm font-black truncate">
-          PDF जोड़ें व कम्बाइन करें (PDF Merge Tool)
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-xs sm:text-sm font-black flex items-center gap-1.5">
+          <Layers className="w-4 h-4" />
+          <span>PDF Merge / Combine (PDF फाइलें जोड़ें)</span>
         </h2>
         <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-          मार्कशीट व प्रमाण पत्र कम्बाइन
+          एकल संयुक्त PDF तैयार करें
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-        {/* Left Column: Upload & List */}
-        <div className="lg:col-span-7 space-y-3">
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs">
-            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider mb-2">
-              1. जोड़ने वाली PDF फाइलें चुनें (Select PDF Files)
-            </label>
-            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl bg-purple-50/50 hover:bg-purple-50 cursor-pointer transition-colors text-center">
-              <Upload className="w-7 h-7 text-purple-600 mb-1.5 animate-bounce" />
-              <span className="text-xs sm:text-sm font-bold text-neutral-900">2 या अधिक PDF फाइलें चुनें</span>
-              <span className="text-[10px] text-neutral-500 mt-0.5">
-                (मार्कशीट, सर्टिफिकेट, फॉर्म - एक साथ कई चुनें)
-              </span>
-              <input
-                type="file"
-                multiple
-                accept="application/pdf"
-                onChange={handleFilesChange}
-                className="hidden"
-              />
-            </label>
-          </div>
+      {errorMessage && (
+        <ToolErrorBanner
+          toolName="PDF Merge"
+          errorMessage={errorMessage}
+          onRetry={mergePdfs}
+        />
+      )}
 
-          {pdfFiles.length > 0 && (
-            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
-                <span className="text-xs font-black text-neutral-800 uppercase tracking-wider">
-                  फाइलों का क्रम ({pdfFiles.length} फाइलें):
-                </span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
+        {/* Left Column: Upload & File Management */}
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-neutral-800 uppercase tracking-wider">
+                1. जोड़ने वाली PDF फाइलें चुनें (Select PDFs)
+              </label>
+              {pdfFiles.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -146,133 +147,156 @@ export const PdfMergeTool: React.FC = () => {
                     if (mergedPdfUrl) URL.revokeObjectURL(mergedPdfUrl);
                     setMergedPdfUrl(null);
                   }}
-                  className="text-xs text-rose-600 font-bold hover:underline cursor-pointer"
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
                 >
                   सभी हटाएं
                 </button>
-              </div>
+              )}
+            </div>
 
-              <div className="space-y-2">
-                {pdfFiles.map((item, index) => (
+            <label className="flex flex-col items-center justify-center p-4 sm:p-5 border-2 border-dashed border-red-300 hover:border-red-500 rounded-xl bg-red-50/40 hover:bg-red-50 cursor-pointer transition-colors text-center group">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 mb-1.5 group-hover:scale-110 transition-transform">
+                <Upload className="w-4 h-4 animate-bounce" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-neutral-900">
+                PDF फाइलें चुनें (एक साथ 2 या अधिक)
+              </span>
+              <span className="text-[10px] text-neutral-500 mt-0.5">
+                .pdf समर्थित
+              </span>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,application/pdf"
+                onChange={handleFilesChange}
+                className="hidden"
+              />
+            </label>
+
+            {/* List of PDFs with Size and Cross Delete */}
+            {pdfFiles.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] font-black text-neutral-700">
+                  चुनी गई PDF फाइलें ({pdfFiles.length}) - क्रम बदलें या हटाएं:
+                </div>
+                {pdfFiles.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-white transition-all shadow-2xs"
+                    className="flex items-center justify-between gap-2.5 p-2 bg-neutral-50 rounded-xl border border-neutral-200 shadow-2xs"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-purple-700 text-white text-xs font-black flex items-center justify-center shrink-0">
-                        {index + 1}
-                      </span>
-                      <FileText className="w-6 h-6 text-purple-600 shrink-0" />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0 font-black text-[11px]">
+                        {idx + 1}
+                      </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-neutral-900 truncate max-w-[200px] sm:max-w-xs">
+                        <div className="text-xs font-black text-neutral-900 truncate max-w-[180px] sm:max-w-xs">
                           {item.name}
                         </div>
-                        <div className="text-[10px] text-neutral-500 font-medium">{item.sizeKb} KB</div>
+                        <div className="text-[10px] text-neutral-500 font-semibold mt-0.5">
+                          साइज़: <strong className="text-red-700">{formatFileSize(item.sizeBytes)}</strong>
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
-                        onClick={() => moveUp(index)}
-                        disabled={index === 0}
+                        disabled={idx === 0}
+                        onClick={() => moveUp(idx)}
+                        className="p-1 rounded-md bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 cursor-pointer"
                         title="ऊपर ले जाएं"
-                        className="p-1.5 rounded-md hover:bg-neutral-200 disabled:opacity-30 cursor-pointer"
                       >
-                        <ArrowUp className="w-4 h-4 text-neutral-700" />
+                        <ArrowUp className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveDown(index)}
-                        disabled={index === pdfFiles.length - 1}
+                        disabled={idx === pdfFiles.length - 1}
+                        onClick={() => moveDown(idx)}
+                        className="p-1 rounded-md bg-neutral-200 hover:bg-neutral-300 disabled:opacity-30 cursor-pointer"
                         title="नीचे ले जाएं"
-                        className="p-1.5 rounded-md hover:bg-neutral-200 disabled:opacity-30 cursor-pointer"
                       >
-                        <ArrowDown className="w-4 h-4 text-neutral-700" />
+                        <ArrowDown className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => removeFile(item.id)}
+                        className="p-1.5 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 cursor-pointer"
                         title="हटाएं"
-                        className="p-1.5 rounded-md hover:bg-rose-100 text-rose-600 cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column: Action & Download */}
-        <div className="lg:col-span-5 space-y-5">
-          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
-            <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
-              2. PDF जोड़ें व डाउनलोड करें
-            </label>
-
-            {errorMsg && (
-              <ToolErrorBanner
-                toolName="PDF Merge Tool"
-                errorMessage={errorMsg}
-                onRetry={handleMergePdfs}
-              />
             )}
 
             <button
               type="button"
-              onClick={handleMergePdfs}
+              onClick={mergePdfs}
               disabled={pdfFiles.length < 2 || isMerging}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-neutral-300 text-white font-black text-sm shadow-md transition-all active:scale-98 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white text-xs sm:text-sm font-black shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] mt-2"
             >
               {isMerging ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>PDF फाइलों को जोड़ा जा रहा है...</span>
+                  <span>PDF जोड़ी जा रही हैं...</span>
                 </>
               ) : (
                 <>
                   <Layers className="w-4 h-4" />
-                  <span>{pdfFiles.length >= 2 ? `${pdfFiles.length} PDF फाइलें आपस में जोड़ें` : 'कम से कम 2 PDF अपलोड करें'}</span>
+                  <span>2. सभी PDF फाइलें जोड़ें (Merge {pdfFiles.length} PDFs)</span>
                 </>
               )}
             </button>
+          </div>
+        </div>
 
-            {mergedPdfUrl && (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>सभी PDF सफलतापूर्वक जुड़ गई हैं!</span>
-                  </span>
-                  <span className="text-xs font-black text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
-                    {mergedSizeKb} KB
-                  </span>
+        {/* Right Column */}
+        <div className="lg:col-span-6 space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200 shadow-xs flex flex-col justify-center min-h-[340px]">
+            {mergedPdfUrl ? (
+              <div className="w-full space-y-3 text-center">
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-xs font-black border border-emerald-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>PDF फाइलें सफलतापूर्वक जुड़ गईं!</span>
+                </div>
+
+                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 max-w-sm mx-auto">
+                  <FileText className="w-10 h-10 text-rose-600 mx-auto" />
+                  <div className="text-xs font-black text-neutral-800">
+                    {pdfFiles.length} फाइलों की संयुक्त PDF
+                  </div>
+                  <div className="text-xs font-bold text-red-700">
+                    कुल साइज़: {formatFileSize(mergedSizeBytes)}
+                  </div>
                 </div>
 
                 <a
                   href={mergedPdfUrl}
-                  download={`merged_document_${new Date().toISOString().slice(0, 10)}.pdf`}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md transition-all active:scale-98 cursor-pointer"
+                  download="merged_document.pdf"
+                  className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-sm transition-all"
                 >
-                  <Download className="w-5 h-5" />
-                  <span>जुड़ा हुआ PDF डाउनलोड करें ({mergedSizeKb} KB)</span>
+                  <Download className="w-4 h-4" />
+                  <span>संयुक्त PDF डाउनलोड करें ({formatFileSize(mergedSizeBytes)})</span>
                 </a>
 
-                {/* Security Guarantee Text */}
-                <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-neutral-600 font-medium text-center">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="text-[11px] text-neutral-500 flex items-center justify-center gap-1 pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>100% Safe data: आपका डेटा हमारे सर्वर पर सेव नहीं हो रहा है</span>
                 </div>
               </div>
+            ) : (
+              <div className="text-center p-6 text-neutral-400 space-y-2">
+                <Layers className="w-12 h-12 mx-auto text-neutral-300 stroke-[1.5]" />
+                <p className="text-xs font-bold text-neutral-600">
+                  कम से कम 2 PDF फाइलें अपलोड करें और &apos;PDF फाइलें जोड़ें&apos; पर क्लिक करें
+                </p>
+                <p className="text-[10px] text-neutral-400">
+                  क्रम व्यवस्थित करके एक सिंगल कम्बांइड फाइल डाउनलोड करें
+                </p>
+              </div>
             )}
-
-            <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-200 text-[11px] text-neutral-600 space-y-1">
-              <span className="font-bold block text-neutral-800">💡 उपयोगी टिप:</span>
-              <p>ऊपर दिए गए बाण (Arrows) का उपयोग करके आप फाइलों का क्रम आगे-पीछे कर सकते हैं। उसी क्रम में पेज एक के बाद एक जुड़ेंगे।</p>
-            </div>
           </div>
         </div>
       </div>

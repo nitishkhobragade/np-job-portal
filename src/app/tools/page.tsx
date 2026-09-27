@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Camera,
@@ -18,8 +18,13 @@ import {
   Image as ImageIcon,
   Scissors,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  ArrowUpRight,
+  RotateCw,
+  AlertTriangle
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { ToolErrorBoundary } from '../../components/tools/ToolErrorBanner';
@@ -63,6 +68,11 @@ const SignatureTool = dynamic(
   { loading: () => <ToolLoadingSkeleton />, ssr: false }
 );
 
+const ImageSizeIncreaserTool = dynamic(
+  () => import('../../components/tools/ImageSizeIncreaserTool').then((m) => m.ImageSizeIncreaserTool),
+  { loading: () => <ToolLoadingSkeleton />, ssr: false }
+);
+
 const ImageJoinerTool = dynamic(
   () => import('../../components/tools/ImageJoinerTool').then((m) => m.ImageJoinerTool),
   { loading: () => <ToolLoadingSkeleton />, ssr: false }
@@ -103,6 +113,26 @@ const PdfSplitUnlockTool = dynamic(
   { loading: () => <ToolLoadingSkeleton />, ssr: false }
 );
 
+const PdfToWordTool = dynamic(
+  () => import('../../components/tools/PdfToWordTool').then((m) => m.PdfToWordTool),
+  { loading: () => <ToolLoadingSkeleton />, ssr: false }
+);
+
+const WordToPdfTool = dynamic(
+  () => import('../../components/tools/WordToPdfTool').then((m) => m.WordToPdfTool),
+  { loading: () => <ToolLoadingSkeleton />, ssr: false }
+);
+
+const OcrWordTool = dynamic(
+  () => import('../../components/tools/OcrWordTool').then((m) => m.OcrWordTool),
+  { loading: () => <ToolLoadingSkeleton />, ssr: false }
+);
+
+const PdfRotateOrganizeTool = dynamic(
+  () => import('../../components/tools/PdfRotateOrganizeTool').then((m) => m.PdfRotateOrganizeTool),
+  { loading: () => <ToolLoadingSkeleton />, ssr: false }
+);
+
 const AgeCalculatorTool = dynamic(
   () => import('../../components/tools/AgeCalculatorTool').then((m) => m.AgeCalculatorTool),
   { loading: () => <ToolLoadingSkeleton />, ssr: false }
@@ -112,6 +142,7 @@ export type ToolId =
   | 'photo-resizer'
   | 'name-date-photo'
   | 'signature-resizer'
+  | 'image-increaser'
   | 'image-joiner'
   | 'format-converter'
   | 'document-enhancer'
@@ -120,16 +151,20 @@ export type ToolId =
   | 'image-to-pdf'
   | 'pdf-merge'
   | 'pdf-split-unlock'
+  | 'pdf-to-word'
+  | 'word-to-pdf'
+  | 'ocr-word'
+  | 'pdf-rotate-organize'
   | 'age-calculator';
 
-export type CategoryFilter = 'all' | 'photo' | 'pdf' | 'utility';
+export type CategoryFilter = 'all' | 'photo' | 'pdf' | 'word-ocr' | 'utility';
 
 interface ToolItem {
   id: ToolId;
   name: string;
   shortName: string;
   hindiName: string;
-  category: 'photo' | 'pdf' | 'utility';
+  category: 'photo' | 'pdf' | 'word-ocr' | 'utility';
   categoryLabel: string;
   badge: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -172,20 +207,32 @@ const TOOLS_CONFIG: ToolItem[] = [
     categoryLabel: '📷 Image Tools',
     badge: '10-20 KB',
     icon: Feather,
-    description: 'सिग्नेचर से छाया हटाएं, डार्क B&W थ्रेशोल्डिंग करें और 10-20KB पोर्टल लिमिट में डाउनलोड करें',
-    keywords: ['signature', 'sign', '10kb', '20kb', 'हस्ताक्षर', 'सिग्नेचर', 'दस्तखत']
+    description: 'सिग्नेचर के आयाम (Dimensions) बदलें, छाया हटाएं, डार्क B&W इंक व ओरिजिनल क्वालिटी या 10-20KB में डाउनलोड करें',
+    keywords: ['signature', 'sign', '10kb', '20kb', 'हस्ताक्षर', 'सिग्नेचर', 'दस्तखत', 'dimension']
   },
   {
-    id: 'image-joiner',
-    name: 'Image Joiner / Photo Merger',
-    shortName: 'Image Joiner',
-    hindiName: 'फोटो व सिग्नेचर जोड़ें',
+    id: 'image-increaser',
+    name: 'Image Size Increaser (Target KB Boost)',
+    shortName: 'Image Size Increaser',
+    hindiName: 'इमेज साइज़ बढ़ाएं (Min KB)',
     category: 'photo',
     categoryLabel: '📷 Image Tools',
     badge: 'नया टूल',
+    icon: ArrowUpRight,
+    description: 'यदि सरकारी पोर्टल पर फोटो 20KB/50KB से कम है, तो बिना क्वालिटी घटे फाइल साइज़ तुरंत बढ़ाएं',
+    keywords: ['increase', 'size', 'increaser', 'boost', 'kb', 'साइज़ बढ़ाएं', 'बढ़ाएं']
+  },
+  {
+    id: 'image-joiner',
+    name: 'Image Joiner (इमेज जॉइनर)',
+    shortName: 'Image Joiner',
+    hindiName: 'तस्वीरें जोड़ें (Merge Images)',
+    category: 'photo',
+    categoryLabel: '📷 Image Tools',
+    badge: 'ओरिजिनल क्वालिटी',
     icon: Layers,
-    description: 'उम्मीदवार की फोटो और हस्ताक्षर को एक साथ जोड़ें (Horizontal ↔ या Vertical ↕, बॉर्डर व अलाइनमेंट)',
-    keywords: ['join', 'merge', 'photo', 'signature', 'combine', 'जोड़ें', 'मर्जर', 'फोटो सिग्नेचर']
+    description: '2 या अधिक तस्वीरों को एक साथ जोड़ें (Horizontal ↔ या Vertical ↕, ओरिजिनल क्वालिटी या टारगेट KB)',
+    keywords: ['join', 'merge', 'image joiner', 'combine', 'जोड़ें', 'इमेज जॉइनर', 'तस्वीरें']
   },
   {
     id: 'format-converter',
@@ -227,19 +274,19 @@ const TOOLS_CONFIG: ToolItem[] = [
   },
   {
     id: 'pdf-to-images',
-    name: 'PDF to Images Converter',
+    name: 'PDF to Images 300 DPI Ultra HD',
     shortName: 'PDF to Images',
-    hindiName: 'PDF से फोटो निकालें (JPG/PNG)',
+    hindiName: 'PDF से फोटो निकालें (300 DPI)',
     category: 'pdf',
     categoryLabel: '📄 PDF Tools',
-    badge: 'नया टूल',
+    badge: '300 DPI HD',
     icon: ImageIcon,
-    description: 'PDF के सभी पेजों को हाई-रेज़ोल्यूशन JPG, PNG या WEBP इमेज में निकालें और ZIP में डाउनलोड करें',
-    keywords: ['pdf', 'images', 'jpg', 'png', 'extract', 'zip', 'पीडीएफ फोटो', 'इमेज']
+    description: 'PDF के सभी पेजों को 300 DPI क्रिस्टल क्लियर हाई-रेज़ोल्यूशन JPG, PNG में निकालें और ZIP में डाउनलोड करें',
+    keywords: ['pdf', 'images', 'jpg', 'png', 'extract', 'zip', '300 dpi', 'पीडीएफ फोटो', 'इमेज']
   },
   {
     id: 'image-to-pdf',
-    name: 'Images to PDF Converter',
+    name: 'Images to PDF Converter (A4)',
     shortName: 'Images to PDF',
     hindiName: 'फोटो से PDF बनाएं (A4)',
     category: 'pdf',
@@ -268,10 +315,60 @@ const TOOLS_CONFIG: ToolItem[] = [
     hindiName: 'PDF अलग करें या अनलॉक करें',
     category: 'pdf',
     categoryLabel: '📄 PDF Tools',
-    badge: 'नया टूल',
+    badge: 'पासवर्ड हटाएं',
     icon: Scissors,
     description: 'PDF से विशिष्ट पेज रेंज निकालें या पासवर्ड हटाकर बिना लॉक वाली PDF सुरक्षित डाउनलोड करें',
     keywords: ['split', 'unlock', 'password', 'range', 'extract', 'अनलॉक', 'पासवर्ड', 'पेज']
+  },
+  {
+    id: 'pdf-rotate-organize',
+    name: 'Rotate & Organize PDF Pages',
+    shortName: 'Rotate / Organize PDF',
+    hindiName: 'PDF पेज घुमाएं व हटाएं',
+    category: 'pdf',
+    categoryLabel: '📄 PDF Tools',
+    badge: 'पेज मैनेजमेंट',
+    icon: RotateCw,
+    description: 'PDF के किसी भी पेज को 90° घुमाएं, अवांछित पेज हटाएं या पेजों का क्रम आसानी से बदलें',
+    keywords: ['rotate', 'organize', 'remove page', 'reorder', 'पेज घुमाएं', 'हटाएं']
+  },
+
+  // 📝 WORD & OCR TOOLS (वर्ड व ओसीआर टूल्स)
+  {
+    id: 'pdf-to-word',
+    name: 'PDF to Word Converter (.docx)',
+    shortName: 'PDF to Word',
+    hindiName: 'PDF से वर्ड फाइल (.docx) बनाएं',
+    category: 'word-ocr',
+    categoryLabel: '📝 Word & OCR',
+    badge: '.docx वर्ड',
+    icon: FileType,
+    description: 'PDF से टेक्स्ट व संरचना निकालकर वास्तविक एडिटेबल Microsoft Word (.docx) फाइल तैयार करें',
+    keywords: ['pdf to word', 'docx', 'word', 'convert', 'पीडीएफ वर्ड']
+  },
+  {
+    id: 'word-to-pdf',
+    name: 'Word to PDF Converter (.docx to PDF)',
+    shortName: 'Word to PDF',
+    hindiName: 'Word फाइल से PDF बनाएं',
+    category: 'word-ocr',
+    categoryLabel: '📝 Word & OCR',
+    badge: 'A4 PDF',
+    icon: FileText,
+    description: 'Microsoft Word (.docx) दस्तावेज को सरकारी पोर्टल अपलोड हेतु तैयार A4 PDF में बदलें',
+    keywords: ['word to pdf', 'docx to pdf', 'convert', 'वर्ड से पीडीएफ']
+  },
+  {
+    id: 'ocr-word',
+    name: 'PDF / Image to OCR Word & Text',
+    shortName: 'OCR to Word',
+    hindiName: 'स्कैन फोटो से टेक्स्ट व Word बनाएं',
+    category: 'word-ocr',
+    categoryLabel: '📝 Word & OCR',
+    badge: 'हिंदी + English',
+    icon: Sparkles,
+    description: 'स्कैन की गई मार्कशीट या फोटो से हिंदी व अंग्रेज़ी टेक्स्ट पहचानकर एडिटेबल Word (.docx) व Text बनाएं',
+    keywords: ['ocr', 'text', 'scanned', 'marksheet', 'hindi ocr', 'ओसीआर', 'टेक्स्ट पहचानें']
   },
 
   // 🧮 UTILITY TOOLS (अन्य सरकारी उपयोगिता)
@@ -299,18 +396,54 @@ export default function ToolsPage() {
     return 'photo-resizer';
   });
 
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+  const [showExitModal, setShowExitModal] = useState<boolean>(false);
+
+  // ACCIDENTAL BACK BUTTON PREVENTION
+  useEffect(() => {
+    // Push internal history state
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ page: 'tools-active' }, '');
+
+      const handlePopState = () => {
+        // Intercept back button, re-push state and display modal prompt
+        window.history.pushState({ page: 'tools-active' }, '');
+        setShowExitModal(true);
+      };
+
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = '';
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }
+  }, []);
+
+  const handleConfirmExit = useCallback(() => {
+    setShowExitModal(false);
+    router.push('/');
+  }, [router]);
+
+  const handleCancelExit = useCallback(() => {
+    setShowExitModal(false);
+  }, []);
 
   // Filter tools based on category and search query
   const filteredTools = useMemo(() => {
     return TOOLS_CONFIG.filter((tool) => {
-      // Category check
       if (activeCategory !== 'all' && tool.category !== activeCategory) {
         return false;
       }
-      // Search check
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
       const inName = tool.name.toLowerCase().includes(q);
@@ -340,10 +473,52 @@ export default function ToolsPage() {
 
   const photoCount = TOOLS_CONFIG.filter((t) => t.category === 'photo').length;
   const pdfCount = TOOLS_CONFIG.filter((t) => t.category === 'pdf').length;
+  const wordOcrCount = TOOLS_CONFIG.filter((t) => t.category === 'word-ocr').length;
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col font-sans text-neutral-900">
       <Header />
+
+      {/* ACCIDENTAL BACK BUTTON PREVENTION CONFIRMATION MODAL */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-neutral-200 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-black text-neutral-900">
+                  पेज छोड़ने की पुष्टि (Unsaved Work Warning)
+                </h3>
+                <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
+                  आपके कोई unsaved changes / unfinished task इस पेज पर तो नहीं हैं? क्या आप सच में वापस जाना चाहते हैं?
+                </p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  (Do you really want to leave this page?)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={handleCancelExit}
+                className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-black shadow-xs cursor-pointer transition-colors"
+              >
+                नहीं, यहीं रहें (No, Stay on Page)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExit}
+                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold cursor-pointer transition-colors"
+              >
+                हाँ, वापस जाएं (Yes, Go Back)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TOP DESKTOP & TABLET SUB-HEADER: CATEGORY TABS & QUICK SEARCH */}
       <nav className="bg-white border-b border-neutral-200 sticky top-[48px] sm:top-[52px] z-30 shadow-xs">
@@ -391,6 +566,19 @@ export default function ToolsPage() {
 
               <button
                 type="button"
+                onClick={() => setActiveCategory('word-ocr')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all cursor-pointer ${
+                  activeCategory === 'word-ocr'
+                    ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-xs'
+                    : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>📝 Word &amp; OCR ({wordOcrCount})</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveCategory('utility')}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
                   activeCategory === 'utility'
@@ -403,7 +591,7 @@ export default function ToolsPage() {
               </button>
             </div>
 
-            {/* Quick Search & Privacy Assurance Indicator */}
+            {/* Quick Search */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1 md:w-64">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -411,7 +599,7 @@ export default function ToolsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="टूल खोजें... (e.g. compress, merge)"
+                  placeholder="टूल खोजें... (उदा. word, compress, merge)"
                   className="w-full pl-8 pr-7 py-1.5 text-xs bg-neutral-100 border border-neutral-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-red-500 focus:outline-hidden text-neutral-900 font-medium"
                 />
                 {searchQuery && (
@@ -465,13 +653,11 @@ export default function ToolsPage() {
       {/* MOBILE SLIDE-OVER DRAWER WITH CATEGORIZATION & SEARCH */}
       {mobileSidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileSidebarOpen(false)}
           />
 
-          {/* Drawer content */}
           <div className="fixed inset-y-0 left-0 w-[88%] max-w-sm bg-white shadow-2xl flex flex-col z-50 animate-in slide-in-from-left duration-200">
             {/* Drawer Header */}
             <div className="p-3.5 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
@@ -501,7 +687,7 @@ export default function ToolsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="टूल खोजें... (उदा. फोटो, compress, PDF)"
+                  placeholder="टूल खोजें... (उदा. photo, docx, PDF)"
                   className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-hidden text-neutral-900"
                 />
                 {searchQuery && (
@@ -552,75 +738,59 @@ export default function ToolsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveCategory('utility')}
+                  onClick={() => setActiveCategory('word-ocr')}
                   className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 cursor-pointer ${
-                    activeCategory === 'utility'
-                      ? 'bg-neutral-800 text-white'
-                      : 'bg-neutral-200 text-neutral-700'
+                    activeCategory === 'word-ocr'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-100 text-blue-800'
                   }`}
                 >
-                  🧮 अन्य
+                  📝 Word &amp; OCR
                 </button>
               </div>
             </div>
 
             {/* Tool List in Drawer */}
             <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-              {filteredTools.length === 0 ? (
-                <div className="text-center py-8 text-neutral-500 text-xs">
-                  <p>कोई टूल नहीं मिला।</p>
+              {filteredTools.map((t) => {
+                const Icon = t.icon;
+                const isActive = activeTool === t.id;
+                return (
                   <button
+                    key={t.id}
                     type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setActiveCategory('all');
-                    }}
-                    className="mt-2 text-red-600 font-bold underline"
+                    onClick={() => selectTool(t.id)}
+                    className={`w-full flex items-center justify-between gap-2.5 p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-red-50 border-2 border-red-600 text-red-950 shadow-xs'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 text-neutral-800'
+                    }`}
                   >
-                    सभी टूल्स देखें
-                  </button>
-                </div>
-              ) : (
-                filteredTools.map((t) => {
-                  const Icon = t.icon;
-                  const isActive = activeTool === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => selectTool(t.id)}
-                      className={`w-full flex items-center justify-between gap-2.5 p-2.5 rounded-xl text-left transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-red-50 border-2 border-red-600 text-red-950 shadow-xs'
-                          : 'bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 text-neutral-800'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            isActive ? 'bg-red-600 text-white' : 'bg-neutral-200 text-neutral-700'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-black truncate">{t.shortName}</div>
-                          <div className="text-[10px] text-neutral-500 font-medium truncate">
-                            {t.hindiName}
-                          </div>
-                        </div>
-                      </div>
-                      <span
-                        className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                           isActive ? 'bg-red-600 text-white' : 'bg-neutral-200 text-neutral-700'
                         }`}
                       >
-                        {t.badge}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-black truncate">{t.shortName}</div>
+                        <div className="text-[10px] text-neutral-500 font-medium truncate">
+                          {t.hindiName}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                        isActive ? 'bg-red-600 text-white' : 'bg-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      {t.badge}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Privacy Trust Banner at Bottom */}
@@ -732,6 +902,7 @@ export default function ToolsPage() {
               {activeTool === 'photo-resizer' && <PhotoResizerTool />}
               {activeTool === 'name-date-photo' && <NameDateOnPhotoTool />}
               {activeTool === 'signature-resizer' && <SignatureTool />}
+              {activeTool === 'image-increaser' && <ImageSizeIncreaserTool />}
               {activeTool === 'image-joiner' && <ImageJoinerTool />}
               {activeTool === 'format-converter' && <FormatConverterTool />}
               {activeTool === 'document-enhancer' && <DocumentEnhancerTool />}
@@ -740,6 +911,10 @@ export default function ToolsPage() {
               {activeTool === 'image-to-pdf' && <ImageToPdfTool />}
               {activeTool === 'pdf-merge' && <PdfMergeTool />}
               {activeTool === 'pdf-split-unlock' && <PdfSplitUnlockTool />}
+              {activeTool === 'pdf-to-word' && <PdfToWordTool />}
+              {activeTool === 'word-to-pdf' && <WordToPdfTool />}
+              {activeTool === 'ocr-word' && <OcrWordTool />}
+              {activeTool === 'pdf-rotate-organize' && <PdfRotateOrganizeTool />}
               {activeTool === 'age-calculator' && <AgeCalculatorTool />}
             </ToolErrorBoundary>
           </main>
