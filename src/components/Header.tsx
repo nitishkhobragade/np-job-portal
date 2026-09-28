@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import {
   Phone,
   MessageCircle,
@@ -35,9 +35,36 @@ const HeaderInner: React.FC<HeaderProps> = ({
   selectedCategory = 'All Updates',
   setSelectedCategory
 }) => {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [localQuery, setLocalQuery] = useState(searchQuery || '');
+  const [prevPropQuery, setPrevPropQuery] = useState(searchQuery);
+
+  // Synchronize with external searchQuery prop during render
+  if (searchQuery !== prevPropQuery) {
+    setPrevPropQuery(searchQuery);
+    setLocalQuery(searchQuery || '');
+  }
+
+  const handleSearchChange = (val: string) => {
+    setLocalQuery(val);
+    if (setSearchQuery) {
+      setSearchQuery(val);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = localQuery.trim();
+    if (setSearchQuery) {
+      setSearchQuery(query);
+    }
+    if (pathname !== '/') {
+      router.push(`/?search=${encodeURIComponent(query)}`);
+    }
+  };
 
   const pathname = usePathname() || '/';
   const searchParams = useSearchParams();
@@ -414,26 +441,27 @@ const HeaderInner: React.FC<HeaderProps> = ({
           </div>
 
           {/* Quick Search Bar right inside navigation strip */}
-          <div className="py-1.5 w-full md:w-72">
+          <form onSubmit={handleSearchSubmit} className="py-1.5 w-full md:w-64 lg:w-72">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery?.(e.target.value)}
+                value={localQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="सर्च करें: MP Police, SSC, Admit Card..."
                 className="w-full pl-8 pr-7 py-1 text-xs bg-slate-900 border border-slate-700 rounded-md text-white placeholder:text-slate-400 focus:outline-hidden focus:border-red-500 focus:ring-1 focus:ring-red-500"
               />
-              {searchQuery && setSearchQuery && (
+              {localQuery && (
                 <button
-                  onClick={() => setSearchQuery('')}
+                  type="button"
+                  onClick={() => handleSearchChange('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white cursor-pointer"
                 >
                   ✕
                 </button>
               )}
             </div>
-          </div>
+          </form>
         </div>
       </nav>
 

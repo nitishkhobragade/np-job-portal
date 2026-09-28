@@ -262,7 +262,7 @@ export const ImageJoinerTool: React.FC = () => {
       <div className="bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 text-white px-3 py-1.5 rounded-lg shadow-2xs flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xs sm:text-sm font-black flex items-center gap-1.5">
           <Layers className="w-4 h-4" />
-          <span>Image Joiner (इमेज जॉइनर • तस्वीरें एक साथ जोड़ें)</span>
+          <span>Multi Image Joiner (मल्टी इमेज जॉइनर • फोटो, सिग्नेचर व डॉक्यूमेंट्स जोड़ें)</span>
         </h2>
         <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
           ओरिजिनल क्वालिटी • हॉरिजॉन्टल या वर्टिकल
@@ -271,7 +271,7 @@ export const ImageJoinerTool: React.FC = () => {
 
       {errorMessage && (
         <ToolErrorBanner
-          toolName="Image Joiner"
+          toolName="Multi Image Joiner"
           errorMessage={errorMessage}
           onRetry={handleJoinImages}
         />
