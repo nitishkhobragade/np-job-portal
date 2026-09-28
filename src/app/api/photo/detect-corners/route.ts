@@ -21,19 +21,24 @@ export async function POST(req: NextRequest) {
     const ai = new GoogleGenAI({ apiKey });
     const cleanImg = imageBase64.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, '');
 
-    const prompt = `You are an expert AI computer vision assistant specializing in document scanning and passport photo extraction.
+    const prompt = `You are a world-class AI computer vision assistant specializing in document scanning and passport photo extraction.
 Analyze this photo taken by a smartphone.
-In this scene, there is a physical printed passport-sized photo (or id photo) - it may be lying on a table, paper, bedsheet, placed inside a plastic sleeve, or held by human fingers/hands.
+In this scene, a physical printed passport-sized photo (or ID photo card) is visible. It might be held in human fingers/hands, placed inside a plastic sleeve/pouch, or lying on a paper/desk/bedsheet.
 
 YOUR MISSION:
-1. Detect the EXACT 4 corners of the printed passport photo (the physical rectangular photo itself, NOT the fingers holding it, NOT the plastic envelope, NOT the table/background).
-2. Determine if the photo is rotated and what clockwise rotation (0, 90, 180, or 270 degrees) is needed to make the person's face upright (head on top, chin on bottom, and any text like name/date at the bottom readable).
-3. Return the coordinates as normalized values from 0 to 1000 (where x=0 is left, x=1000 is right, y=0 is top, y=1000 is bottom).
+1. Locate the physical passport photo print held in hand or on surface.
+2. Return strictly the normalized coordinates bounding the inner photo paper print itself:
+   - NOT the fingers or hands holding it.
+   - NOT the plastic pouch or envelope border.
+   - NOT the desk, paper, or background.
+   - Strictly the 4 corners of the inner printed photo paper!
+3. Determine if the photo is rotated and what clockwise rotation (0, 90, 180, or 270 degrees) is needed to make the person's face upright (head at the top, chin at the bottom, upright posture).
+4. Return normalized coordinates from 0 to 1000 (where x=0 is left edge, x=1000 is right edge, y=0 is top edge, y=1000 is bottom edge).
 
 Return a JSON object in this exact schema:
 {
   "found": true,
-  "confidence": 0.95,
+  "confidence": 0.96,
   "corners": {
     "tl": { "x": 280, "y": 320 },
     "tr": { "x": 620, "y": 360 },
@@ -46,28 +51,33 @@ Return a JSON object in this exact schema:
     "ymax": 740,
     "xmax": 620
   },
-  "rotationNeeded": 90,
-  "reasoning": "Brief explanation of the detected passport photo position and required rotation"
+  "rotationNeeded": 0,
+  "reasoning": "Detected inner printed passport photo held in fingers. Excluded fingers and surrounding plastic pouch."
 }
 
-If no distinct physical photo is distinguishable, return:
+If no distinct physical photo print can be isolated, return:
 { "found": false, "corners": null, "rotationNeeded": 0 }
 
 Respond ONLY with valid JSON.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
-      contents: [
-        {
-          inlineData: {
-            data: cleanImg,
-            mimeType: 'image/jpeg'
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: cleanImg,
+              mimeType: 'image/jpeg'
+            }
+          },
+          {
+            text: prompt
           }
-        },
-        {
-          text: prompt
-        }
-      ]
+        ]
+      },
+      config: {
+        responseMimeType: 'application/json'
+      }
     });
 
     const responseText = response.text || '';
@@ -87,26 +97,26 @@ Respond ONLY with valid JSON.`;
       });
     }
 
-    // Convert 0..1000 normalized coords to actual image dimensions if supplied
+    // Convert 0..1000 normalized coords to actual image dimensions
     const w = Number(width) || 1000;
     const h = Number(height) || 1000;
 
     const corners = {
       tl: {
-        x: Math.round((parsed.corners.tl.x / 1000) * w),
-        y: Math.round((parsed.corners.tl.y / 1000) * h)
+        x: Math.max(0, Math.min(w, Math.round((parsed.corners.tl.x / 1000) * w))),
+        y: Math.max(0, Math.min(h, Math.round((parsed.corners.tl.y / 1000) * h)))
       },
       tr: {
-        x: Math.round((parsed.corners.tr.x / 1000) * w),
-        y: Math.round((parsed.corners.tr.y / 1000) * h)
+        x: Math.max(0, Math.min(w, Math.round((parsed.corners.tr.x / 1000) * w))),
+        y: Math.max(0, Math.min(h, Math.round((parsed.corners.tr.y / 1000) * h)))
       },
       br: {
-        x: Math.round((parsed.corners.br.x / 1000) * w),
-        y: Math.round((parsed.corners.br.y / 1000) * h)
+        x: Math.max(0, Math.min(w, Math.round((parsed.corners.br.x / 1000) * w))),
+        y: Math.max(0, Math.min(h, Math.round((parsed.corners.br.y / 1000) * h)))
       },
       bl: {
-        x: Math.round((parsed.corners.bl.x / 1000) * w),
-        y: Math.round((parsed.corners.bl.y / 1000) * h)
+        x: Math.max(0, Math.min(w, Math.round((parsed.corners.bl.x / 1000) * w))),
+        y: Math.max(0, Math.min(h, Math.round((parsed.corners.bl.y / 1000) * h)))
       }
     };
 
@@ -117,7 +127,7 @@ Respond ONLY with valid JSON.`;
       corners,
       normalizedCorners: parsed.corners,
       rotationNeeded,
-      confidence: parsed.confidence || 0.9,
+      confidence: parsed.confidence || 0.95,
       reasoning: parsed.reasoning || ''
     });
   } catch (error: unknown) {

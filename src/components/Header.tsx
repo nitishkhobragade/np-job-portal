@@ -205,19 +205,23 @@ const HeaderInner: React.FC<HeaderProps> = ({
               <span>Telegram</span>
             </a>
 
-            {/* Direct Tools Button (Replaced WhatsApp Button as requested) */}
+            {/* Direct Tools Button */}
             <Link
               href="/tools"
               className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs shadow-xs transition-all active:scale-95 cursor-pointer ${
                 pathname.startsWith('/tools')
-                  ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300'
+                  ? 'bg-red-600 text-white ring-2 ring-red-400 shadow-sm'
                   : 'bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800 text-white ring-1 ring-violet-400/40'
               }`}
               title="सरकारी फॉर्म टूल्स (Photo Resizer, Name on Photo, PDF Maker)"
             >
-              <Wrench className="w-4 h-4 text-amber-300" />
+              <Wrench className={`w-4 h-4 ${pathname.startsWith('/tools') ? 'text-white' : 'text-amber-300'}`} />
               <span>Tools</span>
-              <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase ml-0.5">Free</span>
+              <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase ml-0.5 ${
+                pathname.startsWith('/tools')
+                  ? 'bg-white text-red-700'
+                  : 'bg-amber-400 text-slate-950'
+              }`}>Free</span>
             </Link>
 
             <a
@@ -373,13 +377,15 @@ const HeaderInner: React.FC<HeaderProps> = ({
               href="/tools"
               className={`px-3 py-1.5 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
                 pathname.startsWith('/tools')
-                  ? 'bg-violet-600 text-white shadow-sm'
+                  ? 'bg-red-600 text-white shadow-sm'
                   : 'text-violet-300 hover:bg-violet-700 hover:text-white'
               }`}
             >
-              <Wrench className="w-3.5 h-3.5 text-amber-300" />
+              <Wrench className={`w-3.5 h-3.5 ${pathname.startsWith('/tools') ? 'text-white' : 'text-amber-300'}`} />
               <span>🛠️ टूल्स</span>
-              <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">Free</span>
+              <span className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
+                pathname.startsWith('/tools') ? 'bg-white text-red-700' : 'bg-amber-400 text-slate-950'
+              }`}>Free</span>
             </Link>
 
             {/* More Dropdown */}

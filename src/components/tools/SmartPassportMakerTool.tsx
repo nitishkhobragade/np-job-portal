@@ -17,7 +17,11 @@ import {
   Info,
   FolderOpen,
   RotateCw,
-  RotateCcw
+  RotateCcw,
+  Lock,
+  Unlock,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import {
   QuadCorners,
@@ -96,7 +100,7 @@ export const SmartPassportMakerTool: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
   const [fileName, setFileName] = useState<string>('passport-photo');
 
-  // Step 1: Corners & Perspective
+  // Step 2: Corners & Perspective
   const [corners, setCorners] = useState<QuadCorners | null>(null);
   const [activeCorner, setActiveCorner] = useState<'tl' | 'tr' | 'br' | 'bl' | null>(null);
   const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null);
@@ -106,7 +110,11 @@ export const SmartPassportMakerTool: React.FC = () => {
   const studioCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Step 2: Studio & Inpainting (Realme/Samsung Object Eraser)
+  // Step 3: Straightened Data & Studio State (Guarantees NO blank white canvas!)
+  const [straightenedDataUrl, setStraightenedDataUrl] = useState<string>('');
+  const [studioReady, setStudioReady] = useState<boolean>(false);
+
+  // Studio & Inpainting (Realme/Samsung Object Eraser)
   const [eraserMode, setEraserMode] = useState<boolean>(false);
   const [brushSize, setBrushSize] = useState<number>(24);
   const [isPaintingMask, setIsPaintingMask] = useState<boolean>(false);
@@ -119,11 +127,24 @@ export const SmartPassportMakerTool: React.FC = () => {
   const [saturation, setSaturation] = useState<number>(100);
   const [bgColor, setBgColor] = useState<'original' | 'white' | 'blue' | 'grey'>('original');
 
-  // Step 3: Exam Preset & Output Sheet
+  // Step 4: Exam Preset & Output Sheet
   const [selectedPreset, setSelectedPreset] = useState<ExamPreset>(EXAM_PRESETS[0]);
   const [printLayout, setPrintLayout] = useState<'single' | '4x' | '6x' | '8x' | '12x'>('single');
+
+  // CHECKBOX CONTROL 1: Custom Dimensions
+  const [enableCustomDimensions, setEnableCustomDimensions] = useState<boolean>(false);
+  const [dimensionUnit, setDimensionUnit] = useState<'cm' | 'mm' | 'px'>('cm');
+  const [customWidth, setCustomWidth] = useState<number>(3.5);
+  const [customHeight, setCustomHeight] = useState<number>(4.5);
+  const [lockAspectRatio, setLockAspectRatio] = useState<boolean>(true);
+
+  // CHECKBOX CONTROL 2: Target File Size (KB)
+  const [enableCustomKb, setEnableCustomKb] = useState<boolean>(false);
   const [targetKb, setTargetKb] = useState<number>(45);
+
+  // Output Stats
   const [finalFileSizeKb, setFinalFileSizeKb] = useState<number>(0);
+  const [finalDimensions, setFinalDimensions] = useState<{ width: number; height: number }>({ width: 413, height: 531 });
   const [finalDataUrl, setFinalDataUrl] = useState<string>('');
 
   // AI Corner Detection & Rotation State
@@ -131,26 +152,33 @@ export const SmartPassportMakerTool: React.FC = () => {
   const [aiDetectionStatus, setAiDetectionStatus] = useState<string>('');
   const [rotationAngle, setRotationAngle] = useState<number>(0);
 
-  // Run AI Corner Detection & Auto-Rotation via Gemini 3.8 Flash
-  const runAiDetection = useCallback(async (dataUrl: string, width: number, height: number) => {
+  // Run Client-Side Contour Detection + Gemini Free-Tier Vision AI
+  const runAiDetection = useCallback(async (dataUrl: string, width: number, height: number, sourceCanvas?: HTMLCanvasElement | null) => {
     setIsDetectingCorners(true);
-    setAiDetectionStatus('✨ AI विज़न फोटो के 4 कोने और ओरिएंटेशन पहचान रहा है...');
+    setAiDetectionStatus('🔍 AI विज़न व कंटूर डिटेक्टर फोटो के 4 कोने पहचान रहा है...');
 
+    // 1. Instant client-side contour & edge detection
+    if (sourceCanvas) {
+      try {
+        const clientCorners = autoDetectPhotoCorners(width, height, sourceCanvas);
+        setCorners(clientCorners);
+      } catch (err) {
+        console.warn('Local contour check:', err);
+      }
+    }
+
+    // 2. Gemini Free-Tier AI Vision for high-accuracy corners & rotation
     try {
       const result = await aiDetectPhotoCorners(dataUrl, width, height);
       if (result.success && result.corners) {
         setCorners(result.corners);
         if (result.rotationNeeded && result.rotationNeeded !== 0) {
           setRotationAngle(result.rotationNeeded);
-          setAiDetectionStatus(`✨ AI ने पासपोर्ट फोटो पहचान ली! (${result.rotationNeeded}° ऑटो-रोटेशन सेट किया गया)`);
+          setAiDetectionStatus(`✨ AI ने इनर पासपोर्ट फोटो पहचान ली! (${result.rotationNeeded}° ऑटो-रोटेशन सेट)`);
         } else {
           setAiDetectionStatus('✨ AI ने पासपोर्ट फोटो के 4 कोने सफलतापूर्वक पहचान लिए!');
         }
       } else {
-        if (cornerCanvasRef.current) {
-          const detected = autoDetectPhotoCorners(width, height, cornerCanvasRef.current);
-          setCorners(detected);
-        }
         setAiDetectionStatus('कोने सेट करें: लाल बिंदुओं को उंगली या माउस से खींचकर सही कोने पर रखें।');
       }
     } catch {
@@ -160,7 +188,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     }
   }, []);
 
-  // 1. File Upload Handler (Auto triggers AI Vision)
+  // 1. File Upload Handler (Auto triggers Client Contour + AI Vision)
   const handleFileUpload = (file: File) => {
     if (!file || !file.type.startsWith('image/')) return;
     setFileName(file.name.replace(/\.[^/.]+$/, ''));
@@ -169,17 +197,25 @@ export const SmartPassportMakerTool: React.FC = () => {
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.onload = () => {
         setOriginalImage(img);
         setRotationAngle(0);
 
-        // Immediate default corners while AI runs
+        // Immediate default corners while detection runs
         const initial = getCenteredDefaultCorners(img.width, img.height);
         setCorners(initial);
         setStep('corners');
 
-        // Automatically run Gemini AI corner detection
-        runAiDetection(dataUrl, img.width, img.height);
+        // Create quick temp canvas for instant contour scanning
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        const ctx = tempCanvas.getContext('2d');
+        if (ctx) ctx.drawImage(img, 0, 0);
+
+        // Run detection
+        runAiDetection(dataUrl, img.width, img.height, tempCanvas);
       };
       img.src = dataUrl;
     };
@@ -200,10 +236,11 @@ export const SmartPassportMakerTool: React.FC = () => {
     const rotated = rotateCanvas(tempCanvas, deg);
     const dataUrl = rotated.toDataURL('image/jpeg', 0.95);
     const newImg = new Image();
+    newImg.crossOrigin = 'anonymous';
     newImg.onload = () => {
       setOriginalImage(newImg);
       setCorners(getCenteredDefaultCorners(newImg.width, newImg.height));
-      runAiDetection(dataUrl, newImg.width, newImg.height);
+      runAiDetection(dataUrl, newImg.width, newImg.height, rotated);
     };
     newImg.src = dataUrl;
   };
@@ -230,9 +267,12 @@ export const SmartPassportMakerTool: React.FC = () => {
       const mCtx = maskCanvas.getContext('2d');
       if (mCtx) mCtx.drawImage(rotMask, 0, 0);
     }
+
+    const newDataUrl = studioCanvas.toDataURL('image/jpeg', 0.95);
+    setStraightenedDataUrl(newDataUrl);
   };
 
-  // Draw Corners Canvas with Interactive Handles
+  // Draw Corners Canvas with Interactive Handles & Circular Magnifier Loupe
   const renderCornersCanvas = useCallback(() => {
     const canvas = cornerCanvasRef.current;
     if (!canvas || !originalImage || !corners) return;
@@ -240,11 +280,11 @@ export const SmartPassportMakerTool: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Keep internal canvas dimensions matching original image
+    // Keep internal canvas dimensions matching natural image resolution
     canvas.width = originalImage.width;
     canvas.height = originalImage.height;
 
-    // Draw background image
+    // Draw background original image
     ctx.drawImage(originalImage, 0, 0);
 
     // Dim the exterior area outside quadrilateral
@@ -252,7 +292,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Cut out quadrilateral
+    // Cut out quadrilateral to reveal inner photo brightly
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
     ctx.moveTo(corners.tl.x, corners.tl.y);
@@ -263,7 +303,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     ctx.fill();
     ctx.restore();
 
-    // Draw polygon borders
+    // Draw outer dashed red guideline
     ctx.save();
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = Math.max(3, Math.round(canvas.width / 220));
@@ -276,15 +316,15 @@ export const SmartPassportMakerTool: React.FC = () => {
     ctx.closePath();
     ctx.stroke();
 
-    // Draw solid inner guide
+    // Draw solid inner white guide
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = Math.max(1.5, Math.round(canvas.width / 440));
     ctx.setLineDash([]);
     ctx.stroke();
     ctx.restore();
 
-    // Draw 4 Corner Handles
-    const handleRadius = Math.max(14, Math.round(canvas.width / 45));
+    // Draw 4 Corner Handles with High-Visibility Labels
+    const handleRadius = Math.max(16, Math.round(canvas.width / 42));
     const handlePoints: Array<{ key: 'tl' | 'tr' | 'br' | 'bl'; pt: { x: number; y: number }; label: string }> = [
       { key: 'tl', pt: corners.tl, label: '1. ऊपर-बाएं' },
       { key: 'tr', pt: corners.tr, label: '2. ऊपर-दाएं' },
@@ -298,8 +338,8 @@ export const SmartPassportMakerTool: React.FC = () => {
       ctx.save();
       // Outer glow
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, handleRadius + (isCurrent ? 6 : 2), 0, Math.PI * 2);
-      ctx.fillStyle = isCurrent ? 'rgba(239, 68, 68, 0.4)' : 'rgba(0, 0, 0, 0.4)';
+      ctx.arc(pt.x, pt.y, handleRadius + (isCurrent ? 7 : 3), 0, Math.PI * 2);
+      ctx.fillStyle = isCurrent ? 'rgba(239, 68, 68, 0.45)' : 'rgba(0, 0, 0, 0.4)';
       ctx.fill();
 
       // Outer Circle
@@ -307,39 +347,39 @@ export const SmartPassportMakerTool: React.FC = () => {
       ctx.arc(pt.x, pt.y, handleRadius, 0, Math.PI * 2);
       ctx.fillStyle = isCurrent ? '#ef4444' : '#ffffff';
       ctx.fill();
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.5;
       ctx.strokeStyle = isCurrent ? '#ffffff' : '#ef4444';
       ctx.stroke();
 
-      // Center Dot
+      // Center Precision Dot
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, handleRadius / 3, 0, Math.PI * 2);
       ctx.fillStyle = isCurrent ? '#ffffff' : '#ef4444';
       ctx.fill();
 
-      // Text Tag
+      // Corner Label Tag
       ctx.fillStyle = '#1e293b';
-      ctx.font = `bold ${Math.max(10, Math.round(canvas.width / 50))}px sans-serif`;
+      ctx.font = `bold ${Math.max(11, Math.round(canvas.width / 48))}px sans-serif`;
       ctx.fillText(label, pt.x + handleRadius + 6, pt.y + 4);
       ctx.restore();
     });
 
-    // Draw Magnifier Loupe if dragging
+    // Draw Zoom Loupe / Magnifier Glass on Touch/Drag
     if (activeCorner && magnifierPos && corners) {
       const targetPt = corners[activeCorner];
-      const loupeRadius = Math.max(50, Math.round(canvas.width / 12));
+      const loupeRadius = Math.max(55, Math.round(canvas.width / 11));
       const zoom = 2.5;
 
-      // Position loupe offset from finger/cursor so finger doesn't block it
+      // Position loupe offset from finger/cursor so finger does not occlude it
       const loupeX = Math.min(canvas.width - loupeRadius - 10, Math.max(loupeRadius + 10, targetPt.x));
-      const loupeY = targetPt.y > loupeRadius * 2 + 30 ? targetPt.y - loupeRadius - 40 : targetPt.y + loupeRadius + 40;
+      const loupeY = targetPt.y > loupeRadius * 2 + 35 ? targetPt.y - loupeRadius - 45 : targetPt.y + loupeRadius + 45;
 
       ctx.save();
       ctx.beginPath();
       ctx.arc(loupeX, loupeY, loupeRadius, 0, Math.PI * 2);
       ctx.clip();
 
-      // Draw zoomed image
+      // Draw zoomed image portion
       ctx.drawImage(
         originalImage,
         targetPt.x - loupeRadius / zoom,
@@ -354,7 +394,7 @@ export const SmartPassportMakerTool: React.FC = () => {
 
       // Loupe Crosshair
       ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(loupeX - loupeRadius, loupeY);
       ctx.lineTo(loupeX + loupeRadius, loupeY);
@@ -364,7 +404,7 @@ export const SmartPassportMakerTool: React.FC = () => {
 
       ctx.restore();
 
-      // Loupe Border
+      // Loupe Outer Ring
       ctx.save();
       ctx.beginPath();
       ctx.arc(loupeX, loupeY, loupeRadius, 0, Math.PI * 2);
@@ -405,7 +445,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     if (!corners || !cornerCanvasRef.current) return;
     const { x, y } = getCanvasCoords(e);
     const canvas = cornerCanvasRef.current;
-    const hitRadius = Math.max(30, canvas.width / 20);
+    const hitRadius = Math.max(34, canvas.width / 18);
 
     const distTL = Math.hypot(corners.tl.x - x, corners.tl.y - y);
     const distTR = Math.hypot(corners.tr.x - x, corners.tr.y - y);
@@ -447,7 +487,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     setMagnifierPos(null);
   };
 
-  // Quick Corner Buttons (AI Vision and Manual)
+  // Quick Corner Buttons
   const handleAutoDetect = () => {
     if (!originalImage) return;
     const tempCanvas = document.createElement('canvas');
@@ -457,7 +497,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     if (!ctx) return;
     ctx.drawImage(originalImage, 0, 0);
     const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.85);
-    runAiDetection(dataUrl, originalImage.width, originalImage.height);
+    runAiDetection(dataUrl, originalImage.width, originalImage.height, tempCanvas);
   };
 
   const handleResetCenter = () => {
@@ -475,7 +515,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     });
   };
 
-  // Straighten & Warp Action with Auto-Rotation
+  // Straighten & Warp Action (FIX FOR BLANK WHITE CANVAS)
   const handleStraightenAndCrop = () => {
     if (!corners || !originalImage) return;
 
@@ -495,30 +535,44 @@ export const SmartPassportMakerTool: React.FC = () => {
       warpedCanvas = rotateCanvas(warpedCanvas, rotationAngle);
     }
 
-    // Initialize Studio Canvas
-    const studioCanvas = studioCanvasRef.current;
-    if (studioCanvas) {
-      studioCanvas.width = warpedCanvas.width;
-      studioCanvas.height = warpedCanvas.height;
-      const sCtx = studioCanvas.getContext('2d');
-      if (sCtx) {
-        sCtx.drawImage(warpedCanvas, 0, 0);
-      }
-    }
+    const dataUrl = warpedCanvas.toDataURL('image/jpeg', 0.95);
+    setStraightenedDataUrl(dataUrl);
+    setStudioReady(false);
 
-    // Initialize Mask Canvas
-    const maskCanvas = maskCanvasRef.current;
-    if (maskCanvas) {
-      maskCanvas.width = warpedCanvas.width;
-      maskCanvas.height = warpedCanvas.height;
-      const mCtx = maskCanvas.getContext('2d');
-      if (mCtx) {
-        mCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-      }
-    }
-
+    // Move to Studio step
     setStep('studio');
   };
+
+  // Initialize and Synchronize Studio Canvas when entering Step 3
+  useEffect(() => {
+    if (step === 'studio' && straightenedDataUrl) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const studioCanvas = studioCanvasRef.current;
+        if (studioCanvas) {
+          studioCanvas.width = img.width;
+          studioCanvas.height = img.height;
+          const sCtx = studioCanvas.getContext('2d');
+          if (sCtx) {
+            sCtx.drawImage(img, 0, 0);
+            setStudioReady(true);
+          }
+        }
+
+        const maskCanvas = maskCanvasRef.current;
+        if (maskCanvas) {
+          maskCanvas.width = img.width;
+          maskCanvas.height = img.height;
+          const mCtx = maskCanvas.getContext('2d');
+          if (mCtx) {
+            mCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+          }
+        }
+      };
+      img.src = straightenedDataUrl;
+    }
+  }, [step, straightenedDataUrl]);
 
   // Studio Mask Painting for AI Object Eraser
   const getMaskCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -584,10 +638,14 @@ export const SmartPassportMakerTool: React.FC = () => {
     setAiSuccessMessage('');
 
     try {
-      // 1. Instant client-side intelligent patch inpainting (diffusion)
+      // 1. Client-side patch inpainting
       clientInpaintObject(studio, mask);
 
-      // 2. Also call AI route for high-end multimodal analysis / enhancement
+      // Update straightenedDataUrl
+      const updatedUrl = studio.toDataURL('image/jpeg', 0.95);
+      setStraightenedDataUrl(updatedUrl);
+
+      // 2. Call AI cleaner route
       const imgDataUrl = studio.toDataURL('image/jpeg', 0.95);
       const maskDataUrl = mask.toDataURL('image/png');
 
@@ -629,7 +687,47 @@ export const SmartPassportMakerTool: React.FC = () => {
     setAiSuccessMessage('AI ऑटो एन्हांसमेंट लागू: चेहरे की चमक, शार्पनेस व कंट्रास्ट सरकारी मानक अनुसार बैलेंस किए गए!');
   };
 
-  // Generate Final Exam Output & Printable Sheet
+  // Dimension helpers: converts cm/mm/px to pixel width & height at 300 DPI
+  const getTargetPixelDimensions = useCallback((): { width: number; height: number } => {
+    if (!enableCustomDimensions) {
+      // Pre-filled standard: 3.5 x 4.5 cm (413 x 531 px at 300 DPI)
+      const w = Math.round((selectedPreset.widthCm * 300) / 2.54);
+      const h = Math.round((selectedPreset.heightCm * 300) / 2.54);
+      return { width: w, height: h };
+    }
+
+    if (dimensionUnit === 'cm') {
+      const w = Math.round((customWidth * 300) / 2.54);
+      const h = Math.round((customHeight * 300) / 2.54);
+      return { width: Math.max(50, w), height: Math.max(50, h) };
+    } else if (dimensionUnit === 'mm') {
+      const w = Math.round((customWidth * 300) / 25.4);
+      const h = Math.round((customHeight * 300) / 25.4);
+      return { width: Math.max(50, w), height: Math.max(50, h) };
+    } else {
+      return { width: Math.max(50, Math.round(customWidth)), height: Math.max(50, Math.round(customHeight)) };
+    }
+  }, [enableCustomDimensions, dimensionUnit, customWidth, customHeight, selectedPreset]);
+
+  // Handle custom width change with aspect ratio locking
+  const handleWidthChange = (val: number) => {
+    setCustomWidth(val);
+    if (lockAspectRatio) {
+      const ratio = 4.5 / 3.5;
+      setCustomHeight(Number((val * ratio).toFixed(dimensionUnit === 'px' ? 0 : 2)));
+    }
+  };
+
+  // Handle custom height change with aspect ratio locking
+  const handleHeightChange = (val: number) => {
+    setCustomHeight(val);
+    if (lockAspectRatio) {
+      const ratio = 3.5 / 4.5;
+      setCustomWidth(Number((val * ratio).toFixed(dimensionUnit === 'px' ? 0 : 2)));
+    }
+  };
+
+  // Generate Final Exam Output & Printable Sheet with Iterative Compression
   const generateFinalPhoto = useCallback(() => {
     const studio = studioCanvasRef.current;
     if (!studio) return;
@@ -659,7 +757,6 @@ export const SmartPassportMakerTool: React.FC = () => {
       else if (bgColor === 'grey') { fillR = 241; fillG = 245; fillB = 249; } // Neutral grey
 
       for (let i = 0; i < data.length; i += 4) {
-        // If color is very close to sampled corner background and brightness is high, tint it
         const diff = Math.hypot(data[i] - cornerR, data[i + 1] - cornerG, data[i + 2] - cornerB);
         if (diff < 40 && (data[i] + data[i + 1] + data[i + 2]) > 400) {
           data[i] = fillR;
@@ -670,14 +767,17 @@ export const SmartPassportMakerTool: React.FC = () => {
       fCtx.putImageData(imgData, 0, 0);
     }
 
-    // Now construct target layout (single or multi-photo printable sheet)
+    const { width: targetW, height: targetH } = getTargetPixelDimensions();
+    setFinalDimensions({ width: targetW, height: targetH });
+
+    // Construct target layout (single or multi-photo printable sheet)
     const exportCanvas = document.createElement('canvas');
     const pCtx = exportCanvas.getContext('2d');
     if (!pCtx) return;
 
     if (printLayout === 'single') {
-      exportCanvas.width = 413; // 3.5 cm at 300 DPI
-      exportCanvas.height = 531; // 4.5 cm at 300 DPI
+      exportCanvas.width = targetW;
+      exportCanvas.height = targetH;
       pCtx.fillStyle = '#ffffff';
       pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
       pCtx.drawImage(filteredCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
@@ -692,8 +792,8 @@ export const SmartPassportMakerTool: React.FC = () => {
       const cols = count <= 6 ? 2 : count <= 8 ? 2 : 3;
       const rows = Math.ceil(count / cols);
 
-      const pw = 360;
-      const ph = 460;
+      const pw = Math.round(targetW * (count >= 12 ? 0.6 : 0.85));
+      const ph = Math.round(targetH * (count >= 12 ? 0.6 : 0.85));
       const gapX = (exportCanvas.width - cols * pw) / (cols + 1);
       const gapY = (exportCanvas.height - rows * ph) / (rows + 1);
 
@@ -717,23 +817,43 @@ export const SmartPassportMakerTool: React.FC = () => {
       }
     }
 
-    // Convert to target KB quality
-    let quality = 0.92;
-    let dataUrl = exportCanvas.toDataURL('image/jpeg', quality);
+    // Client-Side Iterative Canvas JPEG Compression to match Target KB precisely
+    let dataUrl = exportCanvas.toDataURL('image/jpeg', 0.92);
     let sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
 
-    // Iteratively adjust quality to hit targetKb within range
-    if (printLayout === 'single' && targetKb > 0) {
-      if (sizeKb > targetKb + 5 && quality > 0.4) {
-        quality = Math.max(0.35, targetKb / sizeKb);
-        dataUrl = exportCanvas.toDataURL('image/jpeg', quality);
-        sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+    if (enableCustomKb && targetKb > 0) {
+      // Binary search over quality to match targetKb precisely
+      let minQ = 0.05;
+      let maxQ = 0.98;
+      for (let iter = 0; iter < 8; iter++) {
+        const midQ = (minQ + maxQ) / 2;
+        const testUrl = exportCanvas.toDataURL('image/jpeg', midQ);
+        const testSize = Math.round((testUrl.length * 3) / 4 / 1024);
+
+        dataUrl = testUrl;
+        sizeKb = testSize;
+
+        if (Math.abs(testSize - targetKb) <= 2) break;
+        if (testSize > targetKb) {
+          maxQ = midQ;
+        } else {
+          minQ = midQ;
+        }
       }
     }
 
     setFinalDataUrl(dataUrl);
     setFinalFileSizeKb(sizeKb);
-  }, [brightness, contrast, saturation, bgColor, printLayout, targetKb]);
+  }, [
+    brightness,
+    contrast,
+    saturation,
+    bgColor,
+    printLayout,
+    enableCustomKb,
+    targetKb,
+    getTargetPixelDimensions
+  ]);
 
   useEffect(() => {
     if (step === 'download') {
@@ -752,18 +872,18 @@ export const SmartPassportMakerTool: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-black uppercase">
               <Camera className="w-3.5 h-3.5" />
-              <span>Mobile Back-Camera Friendly • 4-Corner Straightener</span>
+              <span>AI Passport Photo Extractor & Straightener</span>
             </div>
             <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-1">
-              स्मार्ट पासपोर्ट साइज फोटो मेकर (AI Object Remover + Auto Straightener)
+              स्मार्ट पासपोर्ट साइज फोटो मेकर (AI 4-Corner Straightener + Object Eraser)
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              टेबल या कागज़ पर रखी टेढ़ी-मेढ़ी पासपोर्ट फोटो को मोबाइल से खींचकर अपलोड करें। 4 कॉर्नर चुनकर सीधा करें और AI से अनचाही उंगली/ऑब्जेक्ट हटाएं।
+              हाथ/पाउच में पकड़ी या टेबल पर रखी टेढ़ी-मेढ़ी पासपोर्ट फोटो को पहचानकर सीधा करें, उंगलियां हटाएं और टारगेट KB व सटीक साइज़ में डाउनलोड करें।
             </p>
           </div>
 
           {/* Steps Breadcrumb */}
-          <div className="flex items-center gap-1 text-[11px] font-black shrink-0">
+          <div className="flex items-center gap-1 text-[11px] font-black shrink-0 flex-wrap">
             <span className={`px-2.5 py-1 rounded-lg ${step === 'upload' ? 'bg-red-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
               1. अपलोड
             </span>
@@ -777,23 +897,23 @@ export const SmartPassportMakerTool: React.FC = () => {
             </span>
             <span>→</span>
             <span className={`px-2.5 py-1 rounded-lg ${step === 'download' ? 'bg-red-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
-              4. डाउनलोड
+              4. डाउनलोड व साइज़
             </span>
           </div>
         </div>
       </div>
 
-      {/* STEP 1: UPLOAD AREA */}
+      {/* STEP 1: UPLOAD AREA (Files/Storage & Camera buttons) */}
       {step === 'upload' && (
         <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-red-500 rounded-3xl p-8 sm:p-12 text-center transition-all">
           <div className="w-16 h-16 rounded-2xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
             <Camera className="w-8 h-8" />
           </div>
           <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-            टेबल पर रखी पासपोर्ट फोटो खींचकर या गैलरी से अपलोड करें
+            हाथ या टेबल पर रखी पासपोर्ट फोटो खींचें अथवा गैलरी से चुनें
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-            फोटो कैसी भी टेढ़ी-मेढ़ी (angled / skewed) हो, हमारा 4-Corner ट्रांसफ़ॉर्मर उसे ऑटोमैटिक सीधा (straight) व सपाट कर देगा।
+            फोटो प्लास्टिक पाउच में हो, हाथ में पकड़ी हो या टेढ़ी-मेढ़ी (angled) हो—AI व कंटूर डिटेक्टर तुरंत इनर फोटो को सीधा व क्रॉप्ड कर देता है।
           </p>
 
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto">
@@ -833,28 +953,28 @@ export const SmartPassportMakerTool: React.FC = () => {
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
               <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>1. 4 कॉर्नर डिटेक्शन</span>
+                <span>1. हाई-एक्यूरेसी 4 कॉर्नर</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                फोटो के चारों कोनों (TL, TR, BR, BL) को पहचानकर टेबल व बाहरी हिस्सा काट देता है।
+                कंटूर डिटेक्शन + AI विज़न फोटो के सटीक 4 कोनों को पहचानकर उंगली व टेबल को अलग करता है।
               </p>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
               <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>2. AI ऑब्जेक्ट इरेज़र</span>
+                <span>2. ज़ीरो ब्लैंक कैनवास गारंटी</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Realme/Samsung गैलरी जैसा ऑब्जेक्ट रिमूवर—फोटो पकड़ने वाली उंगली, परछाई व दाग साफ करें।
+                नेचुरल स्केल पर्सपेक्टिव मैपिंग से हमेशा समतल, क्रिस्टल क्लियर 3.5×4.5 फोटो मिलती है।
               </p>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
               <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>3. SSC / MP Online साइज़</span>
+                <span>3. टारगेट साइज़ व KB कंट्रोल</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                3.5x4.5 cm और 20-50 KB प्रीसेट के साथ 1, 4, 6, 8 फोटो प्रिंट शीट तैयार।
+                cm, mm, px डायमेंशन्स और 20 KB, 35 KB, 50 KB, 100 KB टारगेट कंप्रेसर।
               </p>
             </div>
           </div>
@@ -872,7 +992,7 @@ export const SmartPassportMakerTool: React.FC = () => {
               ) : (
                 <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
               )}
-              <span>{aiDetectionStatus || 'AI विज़न फोटो के 4 कोनों को ऑटोमैटिक पहचान रहा है...'}</span>
+              <span>{aiDetectionStatus || 'AI विज़न व कंटूर एल्गोरिद्म फोटो के 4 कोनों को पहचान रहा है...'}</span>
             </div>
 
             {rotationAngle !== 0 && (
@@ -890,7 +1010,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                 <span>फोटो के चारों कोने (4 Corners) सेट करें</span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                कोने को उंगली या माउस से खींचें। मैग्निफायर (Magnifier) में देखकर एकदम सही कोने पर रखें।
+                कोने को उंगली या माउस से खींचें। मैग्निफायर ग्लास (Magnifier Loupe) में ज़ूम देखकर कोने पर छोड़ें।
               </p>
             </div>
 
@@ -916,15 +1036,16 @@ export const SmartPassportMakerTool: React.FC = () => {
                 title="फोटो को 90 डिग्री घुमाएं (Rotate 90° Clockwise)"
               >
                 <RotateCw className="w-3.5 h-3.5 text-indigo-500" />
-                <span>↻ 90° घुमाएं</span>
+                <span>घूमाएं (Rotate 90°)</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleResetCenter}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
               >
-                3.5×4.5 रीसेट
+                <RefreshCw className="w-3 h-3 text-slate-500" />
+                <span>🔄 कोनों को पुनः सेट करें</span>
               </button>
 
               <button
@@ -937,7 +1058,7 @@ export const SmartPassportMakerTool: React.FC = () => {
             </div>
           </div>
 
-          {/* Interactive Canvas */}
+          {/* Interactive Canvas with Magnifier Loupe */}
           <div className="relative w-full max-w-2xl mx-auto overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-950 flex items-center justify-center select-none touch-none">
             <canvas
               ref={cornerCanvasRef}
@@ -956,7 +1077,7 @@ export const SmartPassportMakerTool: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
             <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span>यदि फोटो टेढ़ी है, तो चारों कोने मिलाएँ। सीधा होने पर टेबल व अतिरिक्त हिस्सा स्वतः कट जाएगा।</span>
+              <span>चारों कोनों को मिलाएं। सीधा करने पर टेबल, हाथ व बाहरी हिस्सा स्वतः हट जाएगा।</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -1002,7 +1123,7 @@ export const SmartPassportMakerTool: React.FC = () => {
         </div>
       )}
 
-      {/* STEP 3: STUDIO & AI OBJECT REMOVER (REALME/SAMSUNG STYLE) */}
+      {/* STEP 3: STUDIO & AI OBJECT REMOVER (GUARANTEED NO BLANK CANVAS) */}
       {step === 'studio' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row gap-5">
@@ -1031,9 +1152,17 @@ export const SmartPassportMakerTool: React.FC = () => {
                     title="फोटो 90° दाएँ घुमाएं"
                   >
                     <RotateCw className="w-3 h-3 text-indigo-500" />
-                    <span>↻ दाएँ</span>
+                    <span>↻ दाएँ (90°)</span>
                   </button>
-                  <span className="text-[10px] font-bold text-slate-400 ml-1">3.5 × 4.5 cm HD</span>
+                  <button
+                    type="button"
+                    onClick={() => setStep('corners')}
+                    className="px-2 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 cursor-pointer flex items-center gap-1 transition-all"
+                    title="कोने दोबारा सेट करें"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>🔄 कोने बदलें</span>
+                  </button>
                 </div>
               </div>
 
@@ -1046,6 +1175,18 @@ export const SmartPassportMakerTool: React.FC = () => {
                     filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`
                   }}
                 />
+                {/* Fallback preview while canvas initializes */}
+                {!studioReady && straightenedDataUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={straightenedDataUrl}
+                    alt="Straightened Preview"
+                    className="absolute inset-0 w-full h-full object-cover block pointer-events-none"
+                    style={{
+                      filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`
+                    }}
+                  />
+                )}
                 {/* Overlay canvas for object remover brush */}
                 <canvas
                   ref={maskCanvasRef}
@@ -1284,15 +1425,20 @@ export const SmartPassportMakerTool: React.FC = () => {
         </div>
       )}
 
-      {/* STEP 4: PRESETS, TARGET KB & DOWNLOAD */}
+      {/* STEP 4: PRESETS, TARGET KB & DIMENSION CONTROLS + DOWNLOAD */}
       {step === 'download' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row gap-5">
-            {/* Left: Final Preview */}
+            {/* Left: Final Preview & Real-Time Stats */}
             <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">
-                फाइनल आउटपुट प्रीव्यू ({printLayout === 'single' ? 'सिंगल पासपोर्ट फोटो' : `${printLayout.toUpperCase()} प्रिंटेबल शीट`})
-              </span>
+              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  फाइनल आउटपुट प्रीव्यू ({printLayout === 'single' ? 'सिंगल पासपोर्ट फोटो' : `${printLayout.toUpperCase()} प्रिंटेबल शीट`})
+                </span>
+                <span className="text-[11px] font-mono text-slate-500">
+                  {finalDimensions.width} × {finalDimensions.height} px
+                </span>
+              </div>
 
               {finalDataUrl ? (
                 <div className="p-2 bg-white rounded-xl shadow-lg border border-slate-300">
@@ -1300,32 +1446,56 @@ export const SmartPassportMakerTool: React.FC = () => {
                   <img
                     src={finalDataUrl}
                     alt="Final Passport Photo"
-                    className="max-h-[360px] w-auto object-contain rounded"
+                    className="max-h-[340px] w-auto object-contain rounded"
                   />
                 </div>
               ) : (
                 <div className="w-48 h-60 bg-slate-200 animate-pulse rounded-xl" />
               )}
 
-              <div className="mt-3 flex items-center gap-2 text-xs font-bold">
+              {/* Real-Time Stats Badges */}
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs font-bold">
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  अनुमानित साइज़: {finalFileSizeKb} KB
+                  📊 फाइल साइज़: {finalFileSizeKb} KB
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                  {selectedPreset.name} (300 DPI HD)
+                  📐 {finalDimensions.width} × {finalDimensions.height} px (300 DPI)
                 </span>
+                <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  {selectedPreset.name}
+                </span>
+              </div>
+
+              {/* Quick Actions in Preview Footer */}
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStep('corners')}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-500" />
+                  <span>🔄 कोनों को पुनः सेट करें</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRotateStudio('cw')}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>घूमाएं (Rotate 90°)</span>
+                </button>
               </div>
             </div>
 
-            {/* Right: Configuration & Download Buttons */}
-            <div className="w-full md:w-80 space-y-4">
+            {/* Right: Configuration, Checkbox Controls & Download Buttons */}
+            <div className="w-full md:w-84 space-y-3.5">
               {/* EXAM PRESETS SELECTION */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                   <FileCheck className="w-3.5 h-3.5 text-red-500" />
                   <span>सरकारी परीक्षा प्रीसेट (Exam Preset)</span>
                 </label>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {EXAM_PRESETS.map((p) => {
                     const isSelected = selectedPreset.id === p.id;
                     return (
@@ -1335,8 +1505,12 @@ export const SmartPassportMakerTool: React.FC = () => {
                         onClick={() => {
                           setSelectedPreset(p);
                           setTargetKb(Math.round((p.minKb + p.maxKb) / 2));
+                          if (!enableCustomDimensions) {
+                            setCustomWidth(p.widthCm);
+                            setCustomHeight(p.heightCm);
+                          }
                         }}
-                        className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        className={`w-full text-left p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
                             ? 'bg-red-50 dark:bg-red-950/30 border-red-500 text-red-950 dark:text-red-200 font-bold'
                             : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
@@ -1353,13 +1527,199 @@ export const SmartPassportMakerTool: React.FC = () => {
                 </div>
               </div>
 
+              {/* CHECKBOX CONTROL 1: Custom Dimensions Control */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <label
+                  onClick={() => setEnableCustomDimensions(!enableCustomDimensions)}
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  {enableCustomDimensions ? (
+                    <CheckSquare className="w-4 h-4 text-red-600 shrink-0" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                  <span className="text-xs font-black text-slate-900 dark:text-white">
+                    ☑ फोटो के Dimensions (चौड़ाई व ऊंचाई) सेट करें
+                  </span>
+                </label>
+
+                {enableCustomDimensions && (
+                  <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-700 animate-in fade-in duration-150">
+                    {/* Unit Selector */}
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[11px] font-bold text-slate-500">इकाई (Unit):</span>
+                      <div className="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden text-[11px]">
+                        {(['cm', 'mm', 'px'] as const).map((unit) => (
+                          <button
+                            key={unit}
+                            type="button"
+                            onClick={() => {
+                              // Convert values smoothly between units
+                              if (unit === 'px' && dimensionUnit === 'cm') {
+                                setCustomWidth(Math.round((customWidth * 300) / 2.54));
+                                setCustomHeight(Math.round((customHeight * 300) / 2.54));
+                              } else if (unit === 'px' && dimensionUnit === 'mm') {
+                                setCustomWidth(Math.round((customWidth * 300) / 25.4));
+                                setCustomHeight(Math.round((customHeight * 300) / 25.4));
+                              } else if (unit === 'cm' && dimensionUnit === 'px') {
+                                setCustomWidth(Number(((customWidth * 2.54) / 300).toFixed(1)));
+                                setCustomHeight(Number(((customHeight * 2.54) / 300).toFixed(1)));
+                              } else if (unit === 'mm' && dimensionUnit === 'px') {
+                                setCustomWidth(Number(((customWidth * 25.4) / 300).toFixed(0)));
+                                setCustomHeight(Number(((customHeight * 25.4) / 300).toFixed(0)));
+                              } else if (unit === 'mm' && dimensionUnit === 'cm') {
+                                setCustomWidth(Number((customWidth * 10).toFixed(0)));
+                                setCustomHeight(Number((customHeight * 10).toFixed(0)));
+                              } else if (unit === 'cm' && dimensionUnit === 'mm') {
+                                setCustomWidth(Number((customWidth / 10).toFixed(1)));
+                                setCustomHeight(Number((customHeight / 10).toFixed(1)));
+                              }
+                              setDimensionUnit(unit);
+                            }}
+                            className={`px-2.5 py-0.5 font-bold cursor-pointer transition-colors ${
+                              dimensionUnit === unit
+                                ? 'bg-red-600 text-white'
+                                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {unit}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Width & Height Inputs with Aspect Ratio Lock */}
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
+                          चौड़ाई (Width) [{dimensionUnit}]
+                        </label>
+                        <input
+                          type="number"
+                          step={dimensionUnit === 'px' ? '1' : '0.1'}
+                          value={customWidth}
+                          onChange={(e) => handleWidthChange(parseFloat(e.target.value) || 0)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
+                          ऊंचाई (Height) [{dimensionUnit}]
+                        </label>
+                        <input
+                          type="number"
+                          step={dimensionUnit === 'px' ? '1' : '0.1'}
+                          value={customHeight}
+                          onChange={(e) => handleHeightChange(parseFloat(e.target.value) || 0)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Aspect Ratio Lock Toggle & Defaults Preset */}
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setLockAspectRatio(!lockAspectRatio)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-red-600 cursor-pointer"
+                      >
+                        {lockAspectRatio ? (
+                          <>
+                            <Lock className="w-3 h-3 text-red-500" />
+                            <span>अनुपात लॉक है (3.5:4.5)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="w-3 h-3 text-slate-400" />
+                            <span>स्वतंत्र अनुपात (Unlocked)</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDimensionUnit('cm');
+                          setCustomWidth(3.5);
+                          setCustomHeight(4.5);
+                        }}
+                        className="text-[10px] font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                      >
+                        मानक 3.5×4.5 cm सेट करें
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CHECKBOX CONTROL 2: Target File Size (KB) Control */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <label
+                  onClick={() => setEnableCustomKb(!enableCustomKb)}
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  {enableCustomKb ? (
+                    <CheckSquare className="w-4 h-4 text-red-600 shrink-0" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                  <span className="text-xs font-black text-slate-900 dark:text-white">
+                    ☑ टारगेट फाइल साइज़ (KB) सेट करें
+                  </span>
+                </label>
+
+                {enableCustomKb && (
+                  <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-700 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
+                      <span>टारगेट साइज़ दर्ज करें:</span>
+                      <span className="text-red-600 dark:text-red-400 font-mono font-black">{targetKb} KB</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={10}
+                        max={300}
+                        value={targetKb}
+                        onChange={(e) => setTargetKb(Math.max(5, parseInt(e.target.value) || 0))}
+                        placeholder="KB में दर्ज करें"
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-900 font-mono"
+                      />
+                      <span className="text-xs font-bold text-slate-500">KB</span>
+                    </div>
+
+                    {/* Quick Selectable Preset Chips */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400">त्वरित प्रीसेट चिप्स:</span>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[20, 35, 50, 100].map((presetKb) => (
+                          <button
+                            key={presetKb}
+                            type="button"
+                            onClick={() => setTargetKb(presetKb)}
+                            className={`py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                              targetKb === presetKb
+                                ? 'bg-red-600 text-white shadow-2xs'
+                                : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {presetKb} KB
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* PRINT SHEET LAYOUT */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Grid className="w-3.5 h-3.5 text-indigo-500" />
                   <span>फोटो शीट लेआउट (Printable Sheet)</span>
                 </label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-3 gap-1">
                   {[
                     { id: 'single', label: '1 Photo (Online)' },
                     { id: '4x', label: '4 Photos (Wallet)' },
@@ -1371,7 +1731,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                       key={l.id}
                       type="button"
                       onClick={() => setPrintLayout(l.id as 'single' | '4x' | '6x' | '8x' | '12x')}
-                      className={`py-2 px-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer text-center ${
+                      className={`py-1.5 px-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer text-center ${
                         printLayout === l.id
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                           : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
@@ -1383,29 +1743,6 @@ export const SmartPassportMakerTool: React.FC = () => {
                 </div>
               </div>
 
-              {/* TARGET KB SLIDER (IF SINGLE PHOTO) */}
-              {printLayout === 'single' && (
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
-                    <span>टारगेट साइज़ (Target KB):</span>
-                    <span className="text-red-600 dark:text-red-400 font-mono font-black">{targetKb} KB</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={15}
-                    max={150}
-                    value={targetKb}
-                    onChange={(e) => setTargetKb(Number(e.target.value))}
-                    className="w-full accent-red-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                    <span>20 KB (SSC/MP)</span>
-                    <span>50 KB</span>
-                    <span>100 KB (UPSC)</span>
-                  </div>
-                </div>
-              )}
-
               {/* DOWNLOAD BUTTON */}
               <div className="space-y-2 pt-2">
                 <a
@@ -1414,7 +1751,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                   className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all active:scale-95"
                 >
                   <Download className="w-4 h-4" />
-                  <span>पासपोर्ट फोटो डाउनलोड करें ({finalFileSizeKb} KB)</span>
+                  <span>📥 पासपोर्ट फोटो डाउनलोड करें ({finalFileSizeKb} KB)</span>
                 </a>
 
                 <div className="flex items-center gap-2">
