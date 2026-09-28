@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Upload,
   Camera,
   Crop,
   Wand2,
@@ -15,14 +14,19 @@ import {
   FileCheck,
   Layers,
   Sparkles,
-  Info
+  Info,
+  FolderOpen,
+  RotateCw,
+  RotateCcw
 } from 'lucide-react';
 import {
   QuadCorners,
   autoDetectPhotoCorners,
   getCenteredDefaultCorners,
   warpPerspective,
-  clientInpaintObject
+  clientInpaintObject,
+  rotateCanvas,
+  aiDetectPhotoCorners
 } from '../../lib/perspectiveUtils';
 
 type ActiveStep = 'upload' | 'corners' | 'studio' | 'download';
@@ -122,26 +126,110 @@ export const SmartPassportMakerTool: React.FC = () => {
   const [finalFileSizeKb, setFinalFileSizeKb] = useState<number>(0);
   const [finalDataUrl, setFinalDataUrl] = useState<string>('');
 
-  // 1. File Upload Handler
+  // AI Corner Detection & Rotation State
+  const [isDetectingCorners, setIsDetectingCorners] = useState<boolean>(false);
+  const [aiDetectionStatus, setAiDetectionStatus] = useState<string>('');
+  const [rotationAngle, setRotationAngle] = useState<number>(0);
+
+  // Run AI Corner Detection & Auto-Rotation via Gemini 3.8 Flash
+  const runAiDetection = useCallback(async (dataUrl: string, width: number, height: number) => {
+    setIsDetectingCorners(true);
+    setAiDetectionStatus('✨ AI विज़न फोटो के 4 कोने और ओरिएंटेशन पहचान रहा है...');
+
+    try {
+      const result = await aiDetectPhotoCorners(dataUrl, width, height);
+      if (result.success && result.corners) {
+        setCorners(result.corners);
+        if (result.rotationNeeded && result.rotationNeeded !== 0) {
+          setRotationAngle(result.rotationNeeded);
+          setAiDetectionStatus(`✨ AI ने पासपोर्ट फोटो पहचान ली! (${result.rotationNeeded}° ऑटो-रोटेशन सेट किया गया)`);
+        } else {
+          setAiDetectionStatus('✨ AI ने पासपोर्ट फोटो के 4 कोने सफलतापूर्वक पहचान लिए!');
+        }
+      } else {
+        if (cornerCanvasRef.current) {
+          const detected = autoDetectPhotoCorners(width, height, cornerCanvasRef.current);
+          setCorners(detected);
+        }
+        setAiDetectionStatus('कोने सेट करें: लाल बिंदुओं को उंगली या माउस से खींचकर सही कोने पर रखें।');
+      }
+    } catch {
+      setAiDetectionStatus('कोने सेट करें: लाल बिंदुओं को फोटो के 4 कोनों पर रखें।');
+    } finally {
+      setIsDetectingCorners(false);
+    }
+  }, []);
+
+  // 1. File Upload Handler (Auto triggers AI Vision)
   const handleFileUpload = (file: File) => {
     if (!file || !file.type.startsWith('image/')) return;
     setFileName(file.name.replace(/\.[^/.]+$/, ''));
 
     const reader = new FileReader();
     reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
       const img = new Image();
       img.onload = () => {
         setOriginalImage(img);
+        setRotationAngle(0);
 
-        // Compute initial corners
+        // Immediate default corners while AI runs
         const initial = getCenteredDefaultCorners(img.width, img.height);
         setCorners(initial);
         setStep('corners');
-        setIsStraightened(false);
+
+        // Automatically run Gemini AI corner detection
+        runAiDetection(dataUrl, img.width, img.height);
       };
-      img.src = e.target?.result as string;
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
+  };
+
+  // Rotate original uploaded image canvas (90 deg CW or CCW)
+  const handleRotateOriginal = (dir: 'cw' | 'ccw') => {
+    if (!originalImage) return;
+    const deg = dir === 'cw' ? 90 : 270;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = originalImage.width;
+    tempCanvas.height = originalImage.height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(originalImage, 0, 0);
+
+    const rotated = rotateCanvas(tempCanvas, deg);
+    const dataUrl = rotated.toDataURL('image/jpeg', 0.95);
+    const newImg = new Image();
+    newImg.onload = () => {
+      setOriginalImage(newImg);
+      setCorners(getCenteredDefaultCorners(newImg.width, newImg.height));
+      runAiDetection(dataUrl, newImg.width, newImg.height);
+    };
+    newImg.src = dataUrl;
+  };
+
+  // Rotate studio canvas (90 deg CW or CCW)
+  const handleRotateStudio = (dir: 'cw' | 'ccw') => {
+    const studioCanvas = studioCanvasRef.current;
+    if (!studioCanvas) return;
+    const deg = dir === 'cw' ? 90 : 270;
+    const rotated = rotateCanvas(studioCanvas, deg);
+
+    studioCanvas.width = rotated.width;
+    studioCanvas.height = rotated.height;
+    const ctx = studioCanvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(rotated, 0, 0);
+    }
+
+    const maskCanvas = maskCanvasRef.current;
+    if (maskCanvas) {
+      const rotMask = rotateCanvas(maskCanvas, deg);
+      maskCanvas.width = rotMask.width;
+      maskCanvas.height = rotMask.height;
+      const mCtx = maskCanvas.getContext('2d');
+      if (mCtx) mCtx.drawImage(rotMask, 0, 0);
+    }
   };
 
   // Draw Corners Canvas with Interactive Handles
@@ -359,11 +447,17 @@ export const SmartPassportMakerTool: React.FC = () => {
     setMagnifierPos(null);
   };
 
-  // Quick Corner Buttons
+  // Quick Corner Buttons (AI Vision and Manual)
   const handleAutoDetect = () => {
     if (!originalImage) return;
-    const detected = autoDetectPhotoCorners(originalImage.width, originalImage.height, cornerCanvasRef.current);
-    setCorners(detected);
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = originalImage.width;
+    tempCanvas.height = originalImage.height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(originalImage, 0, 0);
+    const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.85);
+    runAiDetection(dataUrl, originalImage.width, originalImage.height);
   };
 
   const handleResetCenter = () => {
@@ -381,7 +475,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     });
   };
 
-  // Straighten & Warp Action
+  // Straighten & Warp Action with Auto-Rotation
   const handleStraightenAndCrop = () => {
     if (!corners || !originalImage) return;
 
@@ -394,13 +488,18 @@ export const SmartPassportMakerTool: React.FC = () => {
     tempCtx.drawImage(originalImage, 0, 0);
 
     // Standard 3.5 : 4.5 passport output canvas resolution (700 x 900 px for crisp 300 DPI)
-    const warpedCanvas = warpPerspective(tempSrc, corners, 700, 900);
+    let warpedCanvas = warpPerspective(tempSrc, corners, 700, 900);
+
+    // Apply auto-rotation if detected
+    if (rotationAngle !== 0) {
+      warpedCanvas = rotateCanvas(warpedCanvas, rotationAngle);
+    }
 
     // Initialize Studio Canvas
     const studioCanvas = studioCanvasRef.current;
     if (studioCanvas) {
-      studioCanvas.width = 700;
-      studioCanvas.height = 900;
+      studioCanvas.width = warpedCanvas.width;
+      studioCanvas.height = warpedCanvas.height;
       const sCtx = studioCanvas.getContext('2d');
       if (sCtx) {
         sCtx.drawImage(warpedCanvas, 0, 0);
@@ -410,15 +509,14 @@ export const SmartPassportMakerTool: React.FC = () => {
     // Initialize Mask Canvas
     const maskCanvas = maskCanvasRef.current;
     if (maskCanvas) {
-      maskCanvas.width = 700;
-      maskCanvas.height = 900;
+      maskCanvas.width = warpedCanvas.width;
+      maskCanvas.height = warpedCanvas.height;
       const mCtx = maskCanvas.getContext('2d');
       if (mCtx) {
-        mCtx.clearRect(0, 0, 700, 900);
+        mCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
       }
     }
 
-    setIsStraightened(true);
     setStep('studio');
   };
 
@@ -698,10 +796,26 @@ export const SmartPassportMakerTool: React.FC = () => {
             फोटो कैसी भी टेढ़ी-मेढ़ी (angled / skewed) हो, हमारा 4-Corner ट्रांसफ़ॉर्मर उसे ऑटोमैटिक सीधा (straight) व सपाट कर देगा।
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <label className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm cursor-pointer shadow-md active:scale-95 transition-all">
-              <Upload className="w-4 h-4" />
-              <span>फोटो चुनें (Select / Take Photo)</span>
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto">
+            {/* Gallery / Storage File Upload Button (NO capture attribute) */}
+            <label className="w-full sm:w-auto flex-1 inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm cursor-pointer shadow-md active:scale-95 transition-all">
+              <FolderOpen className="w-5 h-5 text-white" />
+              <span>गैलरी / स्टोरेज से चुनें (Files / Gallery)</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileUpload(f);
+                }}
+              />
+            </label>
+
+            {/* Mobile Camera Direct Button (with capture attribute) */}
+            <label className="w-full sm:w-auto flex-1 inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-black text-xs sm:text-sm cursor-pointer border border-slate-700 shadow-md active:scale-95 transition-all">
+              <Camera className="w-5 h-5 text-amber-400" />
+              <span>कैमरा से फोटो खींचें (Take Photo)</span>
               <input
                 type="file"
                 accept="image/*"
@@ -749,9 +863,27 @@ export const SmartPassportMakerTool: React.FC = () => {
 
       {/* STEP 2: 4-CORNER DETECTION & PERSPECTIVE WARP */}
       {step === 'corners' && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3.5">
+          {/* AI Vision Status Notice */}
+          <div className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5 flex-wrap">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300">
+              {isDetectingCorners ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-500 shrink-0" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              )}
+              <span>{aiDetectionStatus || 'AI विज़न फोटो के 4 कोनों को ऑटोमैटिक पहचान रहा है...'}</span>
+            </div>
+
+            {rotationAngle !== 0 && (
+              <span className="text-[11px] font-black bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-md">
+                ऑटो-रोटेशन: {rotationAngle}° सेट
+              </span>
+            )}
+          </div>
+
           {/* Controls Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <Crop className="w-4 h-4 text-red-500" />
@@ -762,15 +894,31 @@ export const SmartPassportMakerTool: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={handleAutoDetect}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-pointer flex items-center gap-1"
+                disabled={isDetectingCorners}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/40 cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>ऑटो कोने पहचानें (Auto Detect)</span>
+                {isDetectingCorners ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                )}
+                <span>{isDetectingCorners ? 'AI कोने खोज रहा है...' : 'AI ऑटो कोने पहचानें'}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleRotateOriginal('cw')}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                title="फोटो को 90 डिग्री घुमाएं (Rotate 90° Clockwise)"
+              >
+                <RotateCw className="w-3.5 h-3.5 text-indigo-500" />
+                <span>↻ 90° घुमाएं</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleResetCenter}
@@ -778,6 +926,7 @@ export const SmartPassportMakerTool: React.FC = () => {
               >
                 3.5×4.5 रीसेट
               </button>
+
               <button
                 type="button"
                 onClick={handleFullImageCorners}
@@ -807,17 +956,39 @@ export const SmartPassportMakerTool: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
             <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span>यदि फोटो टेढ़ी है, तो चारों कोने मिलाएँ। सीधा होने पर टेबल का अतिरिक्त हिस्सा स्वतः कट जाएगा।</span>
+              <span>यदि फोटो टेढ़ी है, तो चारों कोने मिलाएँ। सीधा होने पर टेबल व अतिरिक्त हिस्सा स्वतः कट जाएगा।</span>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setStep('upload')}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                अन्य फोटो चुनें
-              </button>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <label className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 cursor-pointer flex items-center gap-1.5 transition-all">
+                <FolderOpen className="w-3.5 h-3.5 text-blue-500" />
+                <span>गैलरी बदलें</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileUpload(f);
+                  }}
+                />
+              </label>
+
+              <label className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 cursor-pointer flex items-center gap-1.5 transition-all">
+                <Camera className="w-3.5 h-3.5 text-amber-500" />
+                <span>कैमरा</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileUpload(f);
+                  }}
+                />
+              </label>
+
               <button
                 type="button"
                 onClick={handleStraightenAndCrop}
@@ -837,12 +1008,33 @@ export const SmartPassportMakerTool: React.FC = () => {
           <div className="flex flex-col md:flex-row gap-5">
             {/* Left: Clean Canvas & Mask Layer */}
             <div className="flex-1 flex flex-col items-center">
-              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                 <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                   <span>समतल सीधी पासपोर्ट फोटो (Straightened Passport)</span>
                 </span>
-                <span className="text-[11px] font-bold text-slate-400">3.5 × 4.5 cm HD</span>
+                
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleRotateStudio('ccw')}
+                    className="px-2 py-1 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 cursor-pointer flex items-center gap-1 transition-all"
+                    title="फोटो 90° बाएँ घुमाएं"
+                  >
+                    <RotateCcw className="w-3 h-3 text-indigo-500" />
+                    <span>↺ बाएँ</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRotateStudio('cw')}
+                    className="px-2 py-1 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 cursor-pointer flex items-center gap-1 transition-all"
+                    title="फोटो 90° दाएँ घुमाएं"
+                  >
+                    <RotateCw className="w-3 h-3 text-indigo-500" />
+                    <span>↻ दाएँ</span>
+                  </button>
+                  <span className="text-[10px] font-bold text-slate-400 ml-1">3.5 × 4.5 cm HD</span>
+                </div>
               </div>
 
               {/* Stacked Canvas Container for inpainting */}

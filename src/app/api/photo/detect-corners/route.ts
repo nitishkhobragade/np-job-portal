@@ -1,0 +1,131 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenAI } from '@google/genai';
+
+export async function POST(req: NextRequest) {
+  try {
+    const { imageBase64, width, height } = await req.json();
+
+    if (!imageBase64) {
+      return NextResponse.json({ error: 'Image data is required' }, { status: 400 });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({
+        success: false,
+        fallback: true,
+        message: 'GEMINI_API_KEY is not configured on the server.'
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const cleanImg = imageBase64.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, '');
+
+    const prompt = `You are an expert AI computer vision assistant specializing in document scanning and passport photo extraction.
+Analyze this photo taken by a smartphone.
+In this scene, there is a physical printed passport-sized photo (or id photo) - it may be lying on a table, paper, bedsheet, placed inside a plastic sleeve, or held by human fingers/hands.
+
+YOUR MISSION:
+1. Detect the EXACT 4 corners of the printed passport photo (the physical rectangular photo itself, NOT the fingers holding it, NOT the plastic envelope, NOT the table/background).
+2. Determine if the photo is rotated and what clockwise rotation (0, 90, 180, or 270 degrees) is needed to make the person's face upright (head on top, chin on bottom, and any text like name/date at the bottom readable).
+3. Return the coordinates as normalized values from 0 to 1000 (where x=0 is left, x=1000 is right, y=0 is top, y=1000 is bottom).
+
+Return a JSON object in this exact schema:
+{
+  "found": true,
+  "confidence": 0.95,
+  "corners": {
+    "tl": { "x": 280, "y": 320 },
+    "tr": { "x": 620, "y": 360 },
+    "br": { "x": 560, "y": 740 },
+    "bl": { "x": 220, "y": 700 }
+  },
+  "boundingBox": {
+    "ymin": 320,
+    "xmin": 220,
+    "ymax": 740,
+    "xmax": 620
+  },
+  "rotationNeeded": 90,
+  "reasoning": "Brief explanation of the detected passport photo position and required rotation"
+}
+
+If no distinct physical photo is distinguishable, return:
+{ "found": false, "corners": null, "rotationNeeded": 0 }
+
+Respond ONLY with valid JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [
+        {
+          inlineData: {
+            data: cleanImg,
+            mimeType: 'image/jpeg'
+          }
+        },
+        {
+          text: prompt
+        }
+      ]
+    });
+
+    const responseText = response.text || '';
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new Error('Gemini did not return valid JSON');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    if (!parsed.found || !parsed.corners) {
+      return NextResponse.json({
+        success: false,
+        fallback: true,
+        message: 'Could not confidently isolate passport photo corners'
+      });
+    }
+
+    // Convert 0..1000 normalized coords to actual image dimensions if supplied
+    const w = Number(width) || 1000;
+    const h = Number(height) || 1000;
+
+    const corners = {
+      tl: {
+        x: Math.round((parsed.corners.tl.x / 1000) * w),
+        y: Math.round((parsed.corners.tl.y / 1000) * h)
+      },
+      tr: {
+        x: Math.round((parsed.corners.tr.x / 1000) * w),
+        y: Math.round((parsed.corners.tr.y / 1000) * h)
+      },
+      br: {
+        x: Math.round((parsed.corners.br.x / 1000) * w),
+        y: Math.round((parsed.corners.br.y / 1000) * h)
+      },
+      bl: {
+        x: Math.round((parsed.corners.bl.x / 1000) * w),
+        y: Math.round((parsed.corners.bl.y / 1000) * h)
+      }
+    };
+
+    const rotationNeeded = Number(parsed.rotationNeeded) || 0;
+
+    return NextResponse.json({
+      success: true,
+      corners,
+      normalizedCorners: parsed.corners,
+      rotationNeeded,
+      confidence: parsed.confidence || 0.9,
+      reasoning: parsed.reasoning || ''
+    });
+  } catch (error: unknown) {
+    console.error('Error detecting photo corners:', error);
+    const err = error as Error;
+    return NextResponse.json(
+      { error: err.message || 'Failed to detect photo corners', fallback: true },
+      { status: 500 }
+    );
+  }
+}

@@ -235,12 +235,12 @@ const HeaderInner: React.FC<HeaderProps> = ({
               href="/tools"
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black shadow-xs transition-all active:scale-95 ${
                 pathname.startsWith('/tools')
-                  ? 'bg-amber-400 text-slate-950 ring-1 ring-amber-300'
-                  : 'bg-gradient-to-r from-violet-600 to-indigo-700 text-white'
+                  ? 'bg-red-600 text-white ring-1 ring-red-500 shadow-sm'
+                  : 'bg-gradient-to-r from-violet-600 to-indigo-700 text-white hover:from-violet-700 hover:to-indigo-800'
               }`}
               aria-label="सरकारी फॉर्म टूल्स (Tools)"
             >
-              <Wrench className="w-3.5 h-3.5 text-amber-300" />
+              <Wrench className={`w-3.5 h-3.5 ${pathname.startsWith('/tools') ? 'text-white' : 'text-amber-300'}`} />
               <span>Tools</span>
             </Link>
 

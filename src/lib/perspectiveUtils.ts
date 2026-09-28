@@ -357,3 +357,97 @@ export function clientInpaintObject(
 
   ctx.putImageData(imgData, 0, 0);
 }
+
+/**
+ * Rotates any canvas by 90, 180, or 270 degrees cleanly
+ */
+export function rotateCanvas(canvas: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
+  const normDeg = ((degrees % 360) + 360) % 360;
+  if (normDeg === 0) return canvas;
+
+  const rotated = document.createElement('canvas');
+  const ctx = rotated.getContext('2d');
+  if (!ctx) return canvas;
+
+  if (normDeg === 90 || normDeg === 270) {
+    rotated.width = canvas.height;
+    rotated.height = canvas.width;
+  } else {
+    rotated.width = canvas.width;
+    rotated.height = canvas.height;
+  }
+
+  ctx.translate(rotated.width / 2, rotated.height / 2);
+  ctx.rotate((normDeg * Math.PI) / 180);
+  ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+
+  return rotated;
+}
+
+/**
+ * Calls server-side Gemini 3.8 Flash AI Vision to detect exact physical passport photo corners
+ * and required rotation angle from any angled mobile photo.
+ */
+export async function aiDetectPhotoCorners(
+  imageDataUrl: string,
+  width: number,
+  height: number
+): Promise<{
+  corners: QuadCorners | null;
+  rotationNeeded: number;
+  success: boolean;
+  confidence: number;
+  reasoning?: string;
+}> {
+  try {
+    let payload = imageDataUrl;
+    if (width > 1200 || height > 1200) {
+      const maxDim = 1024;
+      const scale = Math.min(maxDim / width, maxDim / height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const img = new Image();
+        img.src = imageDataUrl;
+        await new Promise<void>((res) => {
+          if (img.complete) res();
+          else img.onload = () => res();
+        });
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        payload = canvas.toDataURL('image/jpeg', 0.85);
+      }
+    }
+
+    const res = await fetch('/api/photo/detect-corners', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64: payload,
+        width,
+        height
+      })
+    });
+
+    const data = await res.json();
+    if (data.success && data.corners) {
+      return {
+        corners: data.corners,
+        rotationNeeded: Number(data.rotationNeeded) || 0,
+        success: true,
+        confidence: data.confidence || 0.9,
+        reasoning: data.reasoning
+      };
+    }
+  } catch (err) {
+    console.warn('AI corner detection error:', err);
+  }
+
+  return {
+    corners: null,
+    rotationNeeded: 0,
+    success: false,
+    confidence: 0
+  };
+}
