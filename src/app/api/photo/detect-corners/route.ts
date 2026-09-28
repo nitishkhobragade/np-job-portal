@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   try {
     const { imageBase64, width, height } = await req.json();
@@ -60,27 +62,48 @@ If no distinct physical photo print can be isolated, return:
 
 Respond ONLY with valid JSON.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: cleanImg,
-              mimeType: 'image/jpeg'
-            }
-          },
-          {
-            text: prompt
-          }
-        ]
-      },
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
+    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite'];
+    let responseText = '';
 
-    const responseText = response.text || '';
+    for (const modelName of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  data: cleanImg,
+                  mimeType: 'image/jpeg'
+                }
+              },
+              {
+                text: prompt
+              }
+            ]
+          },
+          config: {
+            responseMimeType: 'application/json'
+          }
+        });
+
+        if (response && response.text) {
+          responseText = response.text;
+          break;
+        }
+      } catch (mErr) {
+        console.warn(`Model ${modelName} corner detection attempt failed:`, mErr);
+      }
+    }
+
+    if (!responseText) {
+      return NextResponse.json({
+        success: false,
+        fallback: true,
+        message: 'Could not reach vision model'
+      });
+    }
+
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {

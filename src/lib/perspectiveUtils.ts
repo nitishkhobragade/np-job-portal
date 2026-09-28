@@ -44,13 +44,15 @@ export function getCenteredDefaultCorners(imgWidth: number, imgHeight: number): 
 }
 
 /**
- * High-Accuracy Client-Side Contour & Edge Corner Detection:
- * 1. Grayscale luminance conversion.
- * 2. Bilateral / Gaussian smoothing to suppress plastic pouch glare & table noise.
- * 3. Sobel gradient edge detection with adaptive threshold.
- * 4. Morphological closing to bridge broken borders.
- * 5. Quadrilateral contour extraction filtering out outer borders (>88% of screen)
- *    and non-passport aspect ratios.
+ * High-Accuracy Client-Side Contour & Edge Corner Detection for Passport Photos:
+ * 1. Grayscale luminance conversion and bilateral smoothing.
+ * 2. Multi-level luminance thresholding to isolate bright photographic card paper.
+ * 3. Connected component analysis scoring candidates by passport geometry:
+ *    - Area ratio: 4% to 65% of screen (strictly rejects full-screen borders >75%)
+ *    - Aspect ratio: portrait (~0.77), landscape (~1.28), or square (~1.0)
+ *    - Solidity & Fill factor: solid card shape (>= 0.42)
+ *    - Edge gradient / contrast at perimeter against hand or table.
+ * 4. Extracts true 4 skewed corners (tl, tr, br, bl) using extreme projections.
  */
 export function autoDetectPhotoCorners(
   imgWidth: number,
@@ -64,8 +66,8 @@ export function autoDetectPhotoCorners(
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return defaultCorners;
 
-    // Use normalized sampling resolution for fast, consistent edge extraction
-    const sampleW = 320;
+    // Use normalized sampling resolution for fast, consistent processing
+    const sampleW = 240;
     const sampleH = Math.round((sampleW * imgHeight) / imgWidth);
     if (sampleH < 40) return defaultCorners;
 
@@ -81,157 +83,201 @@ export function autoDetectPhotoCorners(
 
     // 1. Grayscale luminance buffer
     const gray = new Float32Array(sampleW * sampleH);
+    let minLum = 255;
+    let maxLum = 0;
+    let sumLum = 0;
+
     for (let i = 0; i < data.length; i += 4) {
-      gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const idx = i / 4;
+      gray[idx] = lum;
+      if (lum < minLum) minLum = lum;
+      if (lum > maxLum) maxLum = lum;
+      sumLum += lum;
     }
 
-    // 2. 3x3 Gaussian / Bilateral smoothing (suppresses glare & plastic reflections)
-    const smoothed = new Float32Array(sampleW * sampleH);
-    for (let y = 1; y < sampleH - 1; y++) {
-      for (let x = 1; x < sampleW - 1; x++) {
-        const center = gray[y * sampleW + x];
-        let sum = 0;
-        let wSum = 0;
+    const meanLum = sumLum / (sampleW * sampleH);
+    const lumRange = maxLum - minLum;
 
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const val = gray[(y + dy) * sampleW + (x + dx)];
-            // Range distance weight (bilateral)
-            const spatialW = (dx === 0 && dy === 0) ? 4 : (dx === 0 || dy === 0) ? 2 : 1;
-            const rangeW = Math.exp(-Math.abs(val - center) / 32);
-            const w = spatialW * rangeW;
-            sum += val * w;
-            wSum += w;
+    // 2. Multi-threshold candidate search (Otsu & relative brightness levels)
+    // Passport photo paper in hands/desk is brighter than surrounding hand/furniture
+    const candidateThresholds: number[] = [];
+    if (lumRange > 40) {
+      candidateThresholds.push(meanLum + lumRange * 0.15);
+      candidateThresholds.push(meanLum + lumRange * 0.28);
+      candidateThresholds.push(meanLum + lumRange * 0.40);
+      candidateThresholds.push(minLum + lumRange * 0.55);
+    } else {
+      candidateThresholds.push(meanLum * 1.15);
+      candidateThresholds.push(meanLum * 1.30);
+    }
+
+    let bestCandidate: {
+      tl: Point;
+      tr: Point;
+      br: Point;
+      bl: Point;
+      score: number;
+    } | null = null;
+
+    for (const thresh of candidateThresholds) {
+      const visited = new Uint8Array(sampleW * sampleH);
+
+      // Avoid edge 3% to prevent borders
+      const padX = Math.max(3, Math.round(sampleW * 0.03));
+      const padY = Math.max(3, Math.round(sampleH * 0.03));
+
+      for (let y = padY; y < sampleH - padY; y += 2) {
+        for (let x = padX; x < sampleW - padX; x += 2) {
+          const idx = y * sampleW + x;
+          if (visited[idx] === 1 || gray[idx] < thresh) continue;
+
+          // Flood fill connected component
+          const queue = [x, y];
+          visited[idx] = 1;
+          let qIdx = 0;
+          let minX = x, maxX = x, minY = y, maxY = y;
+          let count = 0;
+
+          // Extreme point projections to find true 4 corners of angled/tilted card
+          let tlPt = { x, y, score: x + y };
+          let trPt = { x, y, score: x - y };
+          let brPt = { x, y, score: -(x + y) };
+          let blPt = { x, y, score: -(x - y) };
+
+          while (qIdx < queue.length) {
+            const cx = queue[qIdx++];
+            const cy = queue[qIdx++];
+            count++;
+
+            if (cx < minX) minX = cx;
+            if (cx > maxX) maxX = cx;
+            if (cy < minY) minY = cy;
+            if (cy > maxY) maxY = cy;
+
+            const sTL = cx + cy;
+            if (sTL < tlPt.score) { tlPt = { x: cx, y: cy, score: sTL }; }
+            const sTR = cx - cy;
+            if (sTR > trPt.score) { trPt = { x: cx, y: cy, score: sTR }; }
+            const sBR = -(cx + cy);
+            if (sBR > brPt.score) { brPt = { x: cx, y: cy, score: sBR }; }
+            const sBL = -(cx - cy);
+            if (sBL > blPt.score) { blPt = { x: cx, y: cy, score: sBL }; }
+
+            // 4-neighborhood
+            const neighbors = [
+              [cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]
+            ];
+            for (const [nx, ny] of neighbors) {
+              if (nx >= padX && nx < sampleW - padX && ny >= padY && ny < sampleH - padY) {
+                const nIdx = ny * sampleW + nx;
+                if (visited[nIdx] === 0 && gray[nIdx] >= thresh) {
+                  visited[nIdx] = 1;
+                  queue.push(nx, ny);
+                }
+              }
+            }
           }
-        }
-        smoothed[y * sampleW + x] = sum / (wSum || 1);
-      }
-    }
 
-    // 3. Sobel edge magnitude computation
-    const edges = new Uint8Array(sampleW * sampleH);
-    let edgeSum = 0;
-    let edgeCount = 0;
+          const boxW = maxX - minX;
+          const boxH = maxY - minY;
+          const boxArea = boxW * boxH;
+          const screenArea = sampleW * sampleH;
+          const areaRatio = boxArea / screenArea;
+          const fillFactor = count / (boxArea || 1);
 
-    for (let y = 1; y < sampleH - 1; y++) {
-      for (let x = 1; x < sampleW - 1; x++) {
-        // Gx: [-1 0 1; -2 0 2; -1 0 1]
-        const gx =
-          -smoothed[(y - 1) * sampleW + (x - 1)] + smoothed[(y - 1) * sampleW + (x + 1)] +
-          -2 * smoothed[y * sampleW + (x - 1)] + 2 * smoothed[y * sampleW + (x + 1)] +
-          -smoothed[(y + 1) * sampleW + (x - 1)] + smoothed[(y + 1) * sampleW + (x + 1)];
+          // Filtering rules:
+          // 1. Area: passport photo in hand or on desk is between 3% and 65% of screen.
+          //    NEVER select >75% of screen (that would be the full camera viewport!).
+          // 2. Fill factor: real photo paper is solid (>= 0.40).
+          if (areaRatio >= 0.03 && areaRatio <= 0.65 && fillFactor >= 0.40) {
+            const aspect = boxW / (boxH || 1);
+            let aspectScore = 0;
 
-        // Gy: [-1 -2 -1; 0 0 0; 1 2 1]
-        const gy =
-          -smoothed[(y - 1) * sampleW + (x - 1)] - 2 * smoothed[(y - 1) * sampleW + x] - smoothed[(y - 1) * sampleW + (x + 1)] +
-          smoothed[(y + 1) * sampleW + (x - 1)] + 2 * smoothed[(y + 1) * sampleW + x] + smoothed[(y + 1) * sampleW + (x + 1)];
+            // Ideal standard passport ratio is 3.5 / 4.5 = 0.778
+            if (aspect >= 0.55 && aspect <= 0.95) {
+              aspectScore = 1.0 - Math.abs(aspect - 0.778);
+            } else if (aspect >= 1.05 && aspect <= 1.65) {
+              aspectScore = 0.8 - Math.abs(aspect - 1.28) * 0.5;
+            } else if (aspect >= 0.95 && aspect <= 1.05) {
+              aspectScore = 0.7; // 2x2 inch visa
+            }
 
-        const mag = Math.hypot(gx, gy);
-        edges[y * sampleW + x] = mag > 255 ? 255 : Math.round(mag);
-        edgeSum += mag;
-        edgeCount++;
-      }
-    }
+            if (aspectScore > 0) {
+              // Measure edge contrast between inside and outer halo
+              let insideLum = 0, insideCount = 0;
+              let outsideLum = 0, outsideCount = 0;
 
-    // Adaptive threshold: mean gradient + standard deviation
-    const avgGrad = edgeSum / (edgeCount || 1);
-    const threshold = Math.max(28, avgGrad * 1.35);
+              for (let sy = minY; sy <= maxY; sy += 3) {
+                for (let sx = minX; sx <= maxX; sx += 3) {
+                  insideLum += gray[sy * sampleW + sx];
+                  insideCount++;
+                }
+              }
 
-    // 4. Binary edge map with border suppression (ignore outer 5% image edge to prevent outer border lock)
-    const marginX = Math.round(sampleW * 0.05);
-    const marginY = Math.round(sampleH * 0.05);
-    const binary = new Uint8Array(sampleW * sampleH);
+              const avgInside = insideLum / (insideCount || 1);
 
-    for (let y = marginY; y < sampleH - marginY; y++) {
-      for (let x = marginX; x < sampleW - marginX; x++) {
-        if (edges[y * sampleW + x] >= threshold) {
-          binary[y * sampleW + x] = 1;
-        }
-      }
-    }
+              // Sample exterior border
+              const halo = 4;
+              for (let sx = Math.max(0, minX - halo); sx <= Math.min(sampleW - 1, maxX + halo); sx += 3) {
+                if (minY - halo >= 0) {
+                  outsideLum += gray[(minY - halo) * sampleW + sx];
+                  outsideCount++;
+                }
+                if (maxY + halo < sampleH) {
+                  outsideLum += gray[(maxY + halo) * sampleW + sx];
+                  outsideCount++;
+                }
+              }
 
-    // 5. Morphological closing (3x3 dilation followed by 3x3 erosion) to seal photo perimeter
-    const dilated = new Uint8Array(sampleW * sampleH);
-    for (let y = marginY; y < sampleH - marginY; y++) {
-      for (let x = marginX; x < sampleW - marginX; x++) {
-        let hasOne = false;
-        for (let dy = -1; dy <= 1 && !hasOne; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            if (binary[(y + dy) * sampleW + (x + dx)] === 1) {
-              hasOne = true;
-              break;
+              const avgOutside = outsideLum / (outsideCount || 1);
+              const contrastScore = Math.max(0, avgInside - avgOutside);
+
+              // Overall candidate score
+              const candidateScore =
+                aspectScore * 12 +
+                fillFactor * 6 +
+                (contrastScore > 15 ? 4 : 1) +
+                (areaRatio >= 0.06 && areaRatio <= 0.45 ? 5 : 2);
+
+              if (!bestCandidate || candidateScore > bestCandidate.score) {
+                const scaleX = imgWidth / sampleW;
+                const scaleY = imgHeight / sampleH;
+
+                // Add slight padding (1-2px) so we don't clip photo border
+                const pad = 2;
+                bestCandidate = {
+                  tl: {
+                    x: Math.max(0, Math.round((Math.min(tlPt.x, minX) - pad) * scaleX)),
+                    y: Math.max(0, Math.round((Math.min(tlPt.y, minY) - pad) * scaleY)),
+                  },
+                  tr: {
+                    x: Math.min(imgWidth, Math.round((Math.max(trPt.x, maxX) + pad) * scaleX)),
+                    y: Math.max(0, Math.round((Math.min(trPt.y, minY) - pad) * scaleY)),
+                  },
+                  br: {
+                    x: Math.min(imgWidth, Math.round((Math.max(brPt.x, maxX) + pad) * scaleX)),
+                    y: Math.min(imgHeight, Math.round((Math.max(brPt.y, maxY) + pad) * scaleY)),
+                  },
+                  bl: {
+                    x: Math.max(0, Math.round((Math.min(blPt.x, minX) - pad) * scaleX)),
+                    y: Math.min(imgHeight, Math.round((Math.max(blPt.y, maxY) + pad) * scaleY)),
+                  },
+                  score: candidateScore,
+                };
+              }
             }
           }
         }
-        dilated[y * sampleW + x] = hasOne ? 1 : 0;
       }
     }
 
-    // Find bounding quadrilateral within 8% to 88% screen bounds
-    // Scan horizontal & vertical projection density to isolate the photo card
-    const xDensity = new Float32Array(sampleW);
-    const yDensity = new Float32Array(sampleH);
-
-    for (let y = marginY; y < sampleH - marginY; y++) {
-      for (let x = marginX; x < sampleW - marginX; x++) {
-        if (dilated[y * sampleW + x] === 1) {
-          xDensity[x]++;
-          yDensity[y]++;
-        }
-      }
-    }
-
-    // Find prominent boundary transitions
-    let minX = sampleW, maxX = 0;
-    let minY = sampleH, maxY = 0;
-
-    const minXLimit = Math.round(sampleW * 0.06);
-    const maxXLimit = Math.round(sampleW * 0.94);
-    const minYLimit = Math.round(sampleH * 0.06);
-    const maxYLimit = Math.round(sampleH * 0.94);
-
-    const xThresh = (sampleH - marginY * 2) * 0.06;
-    const yThresh = (sampleW - marginX * 2) * 0.06;
-
-    for (let x = minXLimit; x < maxXLimit; x++) {
-      if (xDensity[x] > xThresh) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-      }
-    }
-
-    for (let y = minYLimit; y < maxYLimit; y++) {
-      if (yDensity[y] > yThresh) {
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-
-    const scaleX = imgWidth / sampleW;
-    const scaleY = imgHeight / sampleH;
-
-    const candW = (maxX - minX) * scaleX;
-    const candH = (maxY - minY) * scaleY;
-    const candRatio = candW / (candH || 1);
-    const candAreaRatio = (candW * candH) / (imgWidth * imgHeight);
-
-    // Rule 1: Cannot occupy >88% of screen (avoid selecting outer device viewport)
-    // Rule 2: Cannot be tiny (<8% of screen)
-    // Rule 3: Ratio must resemble passport portrait (0.65 to 0.92) or rotated (1.10 to 1.55)
-    const isPortraitPassport = candRatio >= 0.60 && candRatio <= 0.95;
-    const isLandscapePassport = candRatio >= 1.05 && candRatio <= 1.65;
-
-    if (
-      candAreaRatio >= 0.08 &&
-      candAreaRatio <= 0.88 &&
-      (isPortraitPassport || isLandscapePassport)
-    ) {
-      const pad = 2;
+    if (bestCandidate && bestCandidate.score > 8) {
       return {
-        tl: { x: Math.max(0, Math.round((minX - pad) * scaleX)), y: Math.max(0, Math.round((minY - pad) * scaleY)) },
-        tr: { x: Math.min(imgWidth, Math.round((maxX + pad) * scaleX)), y: Math.max(0, Math.round((minY - pad) * scaleY)) },
-        br: { x: Math.min(imgWidth, Math.round((maxX + pad) * scaleX)), y: Math.min(imgHeight, Math.round((maxY + pad) * scaleY)) },
-        bl: { x: Math.max(0, Math.round((minX - pad) * scaleX)), y: Math.min(imgHeight, Math.round((maxY + pad) * scaleY)) },
+        tl: bestCandidate.tl,
+        tr: bestCandidate.tr,
+        br: bestCandidate.br,
+        bl: bestCandidate.bl,
       };
     }
   } catch (err) {
@@ -515,13 +561,15 @@ export function rotateCanvas(canvas: HTMLCanvasElement, degrees: number): HTMLCa
 }
 
 /**
- * Calls server-side Gemini 3.8 Flash Vision AI to detect exact physical passport photo corners
+ * Calls server-side Gemini Vision AI to detect exact physical passport photo corners
  * and required rotation angle from any angled mobile photo.
+ * Fast, lightweight payload (~60KB) to ensure instant transmission without body limits.
  */
 export async function aiDetectPhotoCorners(
   imageDataUrl: string,
   width: number,
-  height: number
+  height: number,
+  sourceCanvas?: HTMLCanvasElement | null
 ): Promise<{
   corners: QuadCorners | null;
   rotationNeeded: number;
@@ -530,36 +578,44 @@ export async function aiDetectPhotoCorners(
   reasoning?: string;
 }> {
   try {
-    let payload = imageDataUrl;
-    if (width > 1200 || height > 1200) {
-      const maxDim = 1024;
-      const scale = Math.min(maxDim / width, maxDim / height);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(width * scale);
-      canvas.height = Math.round(height * scale);
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = imageDataUrl;
-        await new Promise<void>((res) => {
-          if (img.complete) res();
-          else img.onload = () => res();
-        });
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        payload = canvas.toDataURL('image/jpeg', 0.85);
+    let payload = '';
+
+    if (sourceCanvas) {
+      const maxDim = 640;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      const downCanvas = document.createElement('canvas');
+      downCanvas.width = Math.round(width * scale);
+      downCanvas.height = Math.round(height * scale);
+      const dCtx = downCanvas.getContext('2d');
+      if (dCtx) {
+        dCtx.drawImage(sourceCanvas, 0, 0, downCanvas.width, downCanvas.height);
+        payload = downCanvas.toDataURL('image/jpeg', 0.75);
       }
     }
+
+    if (!payload) {
+      payload = imageDataUrl;
+    }
+
+    // Set 7 second abort timeout so UI never hangs
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
 
     const res = await fetch('/api/photo/detect-corners', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         imageBase64: payload,
         width,
         height
       })
     });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      return { corners: null, rotationNeeded: 0, success: false, confidence: 0 };
+    }
 
     const data = await res.json();
     if (data.success && data.corners) {

@@ -155,21 +155,22 @@ export const SmartPassportMakerTool: React.FC = () => {
   // Run Client-Side Contour Detection + Gemini Free-Tier Vision AI
   const runAiDetection = useCallback(async (dataUrl: string, width: number, height: number, sourceCanvas?: HTMLCanvasElement | null) => {
     setIsDetectingCorners(true);
-    setAiDetectionStatus('🔍 AI विज़न व कंटूर डिटेक्टर फोटो के 4 कोने पहचान रहा है...');
+    setAiDetectionStatus('🔍 AI विज़न व कंटूर डिटेक्टर पासपोर्ट फोटो पहचान रहा है...');
 
-    // 1. Instant client-side contour & edge detection
+    // 1. Instant client-side card & contour detection
     if (sourceCanvas) {
       try {
         const clientCorners = autoDetectPhotoCorners(width, height, sourceCanvas);
         setCorners(clientCorners);
+        setAiDetectionStatus('✨ पासपोर्ट फोटो पहचानी गई! (कोने स्वतः सेट हो गए)');
       } catch (err) {
         console.warn('Local contour check:', err);
       }
     }
 
-    // 2. Gemini Free-Tier AI Vision for high-accuracy corners & rotation
+    // 2. Gemini Vision AI for fine-tuning corners & orientation
     try {
-      const result = await aiDetectPhotoCorners(dataUrl, width, height);
+      const result = await aiDetectPhotoCorners(dataUrl, width, height, sourceCanvas);
       if (result.success && result.corners) {
         setCorners(result.corners);
         if (result.rotationNeeded && result.rotationNeeded !== 0) {
@@ -178,11 +179,9 @@ export const SmartPassportMakerTool: React.FC = () => {
         } else {
           setAiDetectionStatus('✨ AI ने पासपोर्ट फोटो के 4 कोने सफलतापूर्वक पहचान लिए!');
         }
-      } else {
-        setAiDetectionStatus('कोने सेट करें: लाल बिंदुओं को उंगली या माउस से खींचकर सही कोने पर रखें।');
       }
     } catch {
-      setAiDetectionStatus('कोने सेट करें: लाल बिंदुओं को फोटो के 4 कोनों पर रखें।');
+      // Client-side detection has already set the corners
     } finally {
       setIsDetectingCorners(false);
     }

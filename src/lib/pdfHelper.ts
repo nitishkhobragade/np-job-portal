@@ -26,14 +26,14 @@ export async function loadPdfJs(): Promise<PdfJsModule | null> {
  */
 export async function getPdfPageCount(pdfBuffer: ArrayBuffer): Promise<number> {
   try {
-    const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+    const pdfDoc = await PDFDocument.load(pdfBuffer.slice(0), { ignoreEncryption: true });
     return pdfDoc.getPageCount();
   } catch (err) {
     console.warn('pdf-lib getPageCount failed, trying pdfjs:', err);
     try {
       const pdfjs = await loadPdfJs();
       if (!pdfjs) return 1;
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer) });
+      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer.slice(0)) });
       const pdfDoc = await loadingTask.promise;
       return pdfDoc.numPages;
     } catch {
@@ -43,8 +43,8 @@ export async function getPdfPageCount(pdfBuffer: ArrayBuffer): Promise<number> {
 }
 
 /**
- * Render a page from PDF ArrayBuffer to an HTMLCanvasElement
- * Uses high-resolution scale (2.5x - 3.0x) for crisp text rendering.
+ * Render a single page from PDF ArrayBuffer to an HTMLCanvasElement.
+ * Clones the buffer to prevent "Cannot perform Construct on a detached ArrayBuffer".
  */
 export async function renderPdfPageToCanvas(
   pdfBuffer: ArrayBuffer,
@@ -54,8 +54,10 @@ export async function renderPdfPageToCanvas(
   const pdfjs = await loadPdfJs();
   if (!pdfjs) throw new Error('PDF रेंडरिंग इंजन लोड नहीं हो सका।');
 
+  // ALWAYS slice(0) to create a copy of the ArrayBuffer so the caller's buffer is NEVER detached!
+  const bufferCopy = pdfBuffer.slice(0);
   const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(pdfBuffer),
+    data: new Uint8Array(bufferCopy),
     cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
     cMapPacked: true,
   });
@@ -83,4 +85,54 @@ export async function renderPdfPageToCanvas(
   // @ts-expect-error pdfjs typing nuance
   await page.render(renderContext).promise;
   return canvas;
+}
+
+/**
+ * Render ALL pages of a multi-page PDF into canvases in a single pass.
+ * Parses the document only once for maximum speed and zero memory detachment.
+ */
+export async function renderAllPdfPagesToCanvases(
+  pdfBuffer: ArrayBuffer,
+  scale: number = 0.8,
+  onProgress?: (current: number, total: number) => void
+): Promise<Array<{ pageNumber: number; canvas: HTMLCanvasElement }>> {
+  const pdfjs = await loadPdfJs();
+  if (!pdfjs) throw new Error('PDF रेंडरिंग इंजन लोड नहीं हो सका।');
+
+  const bufferCopy = pdfBuffer.slice(0);
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(bufferCopy),
+    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+    cMapPacked: true,
+  });
+
+  const pdfDoc = await loadingTask.promise;
+  const total = pdfDoc.numPages;
+  const results: Array<{ pageNumber: number; canvas: HTMLCanvasElement }> = [];
+
+  for (let i = 1; i <= total; i++) {
+    if (onProgress) {
+      onProgress(i, total);
+    }
+    const page = await pdfDoc.getPage(i);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const renderContext = {
+        canvasContext: ctx,
+        viewport,
+        intent: 'print',
+      };
+      // @ts-expect-error pdfjs typing nuance
+      await page.render(renderContext).promise;
+      results.push({ pageNumber: i, canvas });
+    }
+  }
+
+  return results;
 }
