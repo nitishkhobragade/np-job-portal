@@ -99,28 +99,39 @@ export function getQuadNaturalDimensions(corners: QuadCorners): { width: number;
  *    - Edge gradient / contrast at perimeter against hand or table.
  * 4. Extracts true 4 skewed corners (tl, tr, br, bl) using extreme projections.
  */
+/**
+ * High-Accuracy Client-Side Contour & Edge Corner Detection for Passport Photos:
+ * 1. Grayscale luminance conversion and bilateral smoothing.
+ * 2. Multi-level luminance thresholding to isolate photographic card paper.
+ * 3. Connected component analysis scoring candidates by passport geometry:
+ *    - Area ratio: 3% to 65% of screen (strictly rejects full-screen borders >75%)
+ *    - Aspect ratio: portrait (~0.77), landscape (~1.28), or square (~1.0)
+ *    - Solidity & Fill factor: solid card shape (>= 0.40)
+ *    - Edge gradient / contrast at perimeter against hand or table.
+ * 4. Extracts true 4 skewed corners (tl, tr, br, bl) without forcing upright axis-alignment.
+ */
 export function autoDetectPhotoCorners(
   imgWidth: number,
   imgHeight: number,
   canvas?: HTMLCanvasElement | null
-): QuadCorners {
+): { corners: QuadCorners; isRealDetection: boolean } {
   const defaultCorners = getCenteredDefaultCorners(imgWidth, imgHeight);
-  if (!canvas) return defaultCorners;
+  if (!canvas) return { corners: defaultCorners, isRealDetection: false };
 
   try {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return defaultCorners;
+    if (!ctx) return { corners: defaultCorners, isRealDetection: false };
 
     // Use normalized sampling resolution for fast, consistent processing
-    const sampleW = 240;
+    const sampleW = 280;
     const sampleH = Math.round((sampleW * imgHeight) / imgWidth);
-    if (sampleH < 40) return defaultCorners;
+    if (sampleH < 40) return { corners: defaultCorners, isRealDetection: false };
 
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = sampleW;
     tempCanvas.height = sampleH;
     const tctx = tempCanvas.getContext('2d', { willReadFrequently: true });
-    if (!tctx) return defaultCorners;
+    if (!tctx) return { corners: defaultCorners, isRealDetection: false };
 
     tctx.drawImage(canvas, 0, 0, sampleW, sampleH);
     const imgData = tctx.getImageData(0, 0, sampleW, sampleH);
@@ -146,11 +157,10 @@ export function autoDetectPhotoCorners(
 
     // 2. Multi-threshold candidate search (both bright-on-dark and dark-on-bright)
     const candidateThresholds: Array<{ val: number; mode: 'bright' | 'dark' }> = [];
-    if (lumRange > 30) {
+    if (lumRange > 25) {
       candidateThresholds.push({ val: meanLum + lumRange * 0.12, mode: 'bright' });
       candidateThresholds.push({ val: meanLum + lumRange * 0.25, mode: 'bright' });
       candidateThresholds.push({ val: meanLum + lumRange * 0.38, mode: 'bright' });
-      // Dark on bright (e.g. blue passport background on white desk or paper)
       candidateThresholds.push({ val: meanLum - lumRange * 0.12, mode: 'dark' });
       candidateThresholds.push({ val: meanLum - lumRange * 0.25, mode: 'dark' });
     } else {
@@ -171,7 +181,7 @@ export function autoDetectPhotoCorners(
       const isBright = threshItem.mode === 'bright';
       const visited = new Uint8Array(sampleW * sampleH);
 
-      // Avoid edge 3% to prevent outer frame borders
+      // Avoid edge 3% to prevent camera frame borders
       const padX = Math.max(3, Math.round(sampleW * 0.03));
       const padY = Math.max(3, Math.round(sampleH * 0.03));
 
@@ -188,11 +198,15 @@ export function autoDetectPhotoCorners(
           let minX = x, maxX = x, minY = y, maxY = y;
           let count = 0;
 
-          // Extreme point projections to find true 4 corners of angled/tilted card
+          // True extreme corner projections for tilted/skewed quadrilateral:
+          // Top-Left minimizes (x + y)
+          // Top-Right maximizes (x - y)
+          // Bottom-Right maximizes (x + y)
+          // Bottom-Left minimizes (x - y)
           let tlPt = { x, y, score: x + y };
           let trPt = { x, y, score: x - y };
-          let brPt = { x, y, score: -(x + y) };
-          let blPt = { x, y, score: -(x - y) };
+          let brPt = { x, y, score: x + y };
+          let blPt = { x, y, score: x - y };
 
           while (qIdx < queue.length) {
             const cx = queue[qIdx++];
@@ -208,10 +222,10 @@ export function autoDetectPhotoCorners(
             if (sTL < tlPt.score) { tlPt = { x: cx, y: cy, score: sTL }; }
             const sTR = cx - cy;
             if (sTR > trPt.score) { trPt = { x: cx, y: cy, score: sTR }; }
-            const sBR = -(cx + cy);
+            const sBR = cx + cy;
             if (sBR > brPt.score) { brPt = { x: cx, y: cy, score: sBR }; }
-            const sBL = -(cx - cy);
-            if (sBL > blPt.score) { blPt = { x: cx, y: cy, score: sBL }; }
+            const sBL = cx - cy;
+            if (sBL < blPt.score) { blPt = { x: cx, y: cy, score: sBL }; }
 
             // 4-neighborhood
             const neighbors = [
@@ -237,24 +251,24 @@ export function autoDetectPhotoCorners(
           const fillFactor = count / (boxArea || 1);
 
           // Filtering rules:
-          // 1. Area: passport photo in hand or on desk is between 3% and 65% of screen.
-          //    NEVER select >75% of screen (that would be the full camera viewport!).
-          // 2. Fill factor: real photo paper is solid (>= 0.40).
-          if (areaRatio >= 0.03 && areaRatio <= 0.65 && fillFactor >= 0.40) {
+          // 1. Area: passport photo in hand or on desk is between 4% and 65% of screen.
+          //    NEVER select full camera viewport (>75%).
+          // 2. Fill factor: real photo paper is solid (>= 0.38).
+          if (areaRatio >= 0.04 && areaRatio <= 0.65 && fillFactor >= 0.38) {
             const aspect = boxW / (boxH || 1);
             let aspectScore = 0;
 
-            // Ideal standard passport ratio is 3.5 / 4.5 = 0.778
-            if (aspect >= 0.55 && aspect <= 0.95) {
+            // Ideal standard passport ratio is 3.5 / 4.5 = ~0.778
+            if (aspect >= 0.52 && aspect <= 0.98) {
               aspectScore = 1.0 - Math.abs(aspect - 0.778);
-            } else if (aspect >= 1.05 && aspect <= 1.65) {
+            } else if (aspect >= 1.02 && aspect <= 1.68) {
               aspectScore = 0.8 - Math.abs(aspect - 1.28) * 0.5;
             } else if (aspect >= 0.95 && aspect <= 1.05) {
               aspectScore = 0.7; // 2x2 inch visa
             }
 
             if (aspectScore > 0) {
-              // Measure edge contrast between inside and outer halo
+              // Measure edge contrast
               let insideLum = 0, insideCount = 0;
               let outsideLum = 0, outsideCount = 0;
 
@@ -264,10 +278,8 @@ export function autoDetectPhotoCorners(
                   insideCount++;
                 }
               }
-
               const avgInside = insideLum / (insideCount || 1);
 
-              // Sample exterior border
               const halo = 4;
               for (let sx = Math.max(0, minX - halo); sx <= Math.min(sampleW - 1, maxX + halo); sx += 3) {
                 if (minY - halo >= 0) {
@@ -279,39 +291,36 @@ export function autoDetectPhotoCorners(
                   outsideCount++;
                 }
               }
-
               const avgOutside = outsideLum / (outsideCount || 1);
-              const contrastScore = Math.max(0, avgInside - avgOutside);
+              const contrastScore = Math.max(0, Math.abs(avgInside - avgOutside));
 
-              // Overall candidate score
               const candidateScore =
                 aspectScore * 12 +
                 fillFactor * 6 +
-                (contrastScore > 15 ? 4 : 1) +
-                (areaRatio >= 0.06 && areaRatio <= 0.45 ? 5 : 2);
+                (contrastScore > 12 ? 4 : 1) +
+                (areaRatio >= 0.06 && areaRatio <= 0.50 ? 5 : 2);
 
               if (!bestCandidate || candidateScore > bestCandidate.score) {
                 const scaleX = imgWidth / sampleW;
                 const scaleY = imgHeight / sampleH;
 
-                // Add slight padding (1-2px) so we don't clip photo border
-                const pad = 2;
+                // Map true rotated 4 points directly without clamping to axis-aligned box!
                 bestCandidate = {
                   tl: {
-                    x: Math.max(0, Math.round((Math.min(tlPt.x, minX) - pad) * scaleX)),
-                    y: Math.max(0, Math.round((Math.min(tlPt.y, minY) - pad) * scaleY)),
+                    x: Math.max(0, Math.min(imgWidth, Math.round(tlPt.x * scaleX))),
+                    y: Math.max(0, Math.min(imgHeight, Math.round(tlPt.y * scaleY))),
                   },
                   tr: {
-                    x: Math.min(imgWidth, Math.round((Math.max(trPt.x, maxX) + pad) * scaleX)),
-                    y: Math.max(0, Math.round((Math.min(trPt.y, minY) - pad) * scaleY)),
+                    x: Math.max(0, Math.min(imgWidth, Math.round(trPt.x * scaleX))),
+                    y: Math.max(0, Math.min(imgHeight, Math.round(trPt.y * scaleY))),
                   },
                   br: {
-                    x: Math.min(imgWidth, Math.round((Math.max(brPt.x, maxX) + pad) * scaleX)),
-                    y: Math.min(imgHeight, Math.round((Math.max(brPt.y, maxY) + pad) * scaleY)),
+                    x: Math.max(0, Math.min(imgWidth, Math.round(brPt.x * scaleX))),
+                    y: Math.max(0, Math.min(imgHeight, Math.round(brPt.y * scaleY))),
                   },
                   bl: {
-                    x: Math.max(0, Math.round((Math.min(blPt.x, minX) - pad) * scaleX)),
-                    y: Math.min(imgHeight, Math.round((Math.max(blPt.y, maxY) + pad) * scaleY)),
+                    x: Math.max(0, Math.min(imgWidth, Math.round(blPt.x * scaleX))),
+                    y: Math.max(0, Math.min(imgHeight, Math.round(blPt.y * scaleY))),
                   },
                   score: candidateScore,
                 };
@@ -322,19 +331,22 @@ export function autoDetectPhotoCorners(
       }
     }
 
-    if (bestCandidate && bestCandidate.score > 8) {
+    if (bestCandidate && bestCandidate.score > 7) {
       return {
-        tl: bestCandidate.tl,
-        tr: bestCandidate.tr,
-        br: bestCandidate.br,
-        bl: bestCandidate.bl,
+        corners: {
+          tl: bestCandidate.tl,
+          tr: bestCandidate.tr,
+          br: bestCandidate.br,
+          bl: bestCandidate.bl,
+        },
+        isRealDetection: true
       };
     }
   } catch (err) {
     console.warn('Contour auto-detection fallback:', err);
   }
 
-  return defaultCorners;
+  return { corners: defaultCorners, isRealDetection: false };
 }
 
 /**
@@ -766,9 +778,114 @@ export function rotateCanvas(canvas: HTMLCanvasElement, degrees: number): HTMLCa
 }
 
 /**
- * Calls server-side Gemini Vision AI to detect exact physical passport photo corners
- * and required rotation angle from any angled mobile photo.
- * Fast, lightweight payload (~60KB) to ensure instant transmission without body limits.
+ * Subtle contrast & unsharp sharpening filter for extracted passport photos.
+ * Enhances printed text (e.g. candidate name, date of photo) and facial details
+ * without noise or halos.
+ */
+export function enhancePassportSharpness(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = canvas.width;
+  const h = canvas.height;
+  const enhanced = document.createElement('canvas');
+  enhanced.width = w;
+  enhanced.height = h;
+  const ctx = enhanced.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return canvas;
+
+  ctx.drawImage(canvas, 0, 0);
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  const orig = new Uint8ClampedArray(data);
+
+  // 3x3 mild sharpening convolution kernel (strength k = 0.22)
+  const k = 0.22;
+  const centerWeight = 1 + 4 * k;
+
+  // Gentle contrast boost (+6%)
+  const contrastFactor = 1.06;
+  const intercept = 128 * (1 - contrastFactor);
+
+  for (let y = 1; y < h - 1; y++) {
+    const rowIdx = y * w;
+    const topRow = (y - 1) * w;
+    const botRow = (y + 1) * w;
+
+    for (let x = 1; x < w - 1; x++) {
+      const idx = (rowIdx + x) * 4;
+      const topIdx = (topRow + x) * 4;
+      const botIdx = (botRow + x) * 4;
+      const leftIdx = (rowIdx + x - 1) * 4;
+      const rightIdx = (rowIdx + x + 1) * 4;
+
+      for (let c = 0; c < 3; c++) {
+        const center = orig[idx + c];
+        const top = orig[topIdx + c];
+        const bot = orig[botIdx + c];
+        const left = orig[leftIdx + c];
+        const right = orig[rightIdx + c];
+
+        const sharpVal = center * centerWeight - k * (top + bot + left + right);
+        const finalVal = sharpVal * contrastFactor + intercept;
+
+        data[idx + c] = Math.max(0, Math.min(255, Math.round(finalVal)));
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  return enhanced;
+}
+
+/**
+ * Creates a lightweight downscaled JPEG payload (~60KB to 100KB)
+ * guaranteeing Vercel 4.5MB Serverless Function payload limit is NEVER exceeded.
+ */
+async function createOptimizedVisionPayload(
+  imageDataUrl: string,
+  width: number,
+  height: number,
+  sourceCanvas?: HTMLCanvasElement | null
+): Promise<string> {
+  const maxDim = 800;
+  const scale = Math.min(1, maxDim / Math.max(width, height, 1));
+  const targetW = Math.max(100, Math.round(width * scale));
+  const targetH = Math.max(100, Math.round(height * scale));
+
+  if (sourceCanvas) {
+    const downCanvas = document.createElement('canvas');
+    downCanvas.width = targetW;
+    downCanvas.height = targetH;
+    const dCtx = downCanvas.getContext('2d');
+    if (dCtx) {
+      dCtx.drawImage(sourceCanvas, 0, 0, targetW, targetH);
+      return downCanvas.toDataURL('image/jpeg', 0.80);
+    }
+  }
+
+  // If no source canvas, downscale via Image object
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const downCanvas = document.createElement('canvas');
+      downCanvas.width = targetW;
+      downCanvas.height = targetH;
+      const dCtx = downCanvas.getContext('2d');
+      if (dCtx) {
+        dCtx.drawImage(img, 0, 0, targetW, targetH);
+        resolve(downCanvas.toDataURL('image/jpeg', 0.80));
+      } else {
+        resolve(imageDataUrl);
+      }
+    };
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+}
+
+/**
+ * Calls server-side Gemini Vision API (/api/tools/extract-passport)
+ * to detect exact rotated 4 corners and required orientation.
+ * Fully compatible with Vercel and local environments.
  */
 export async function aiDetectPhotoCorners(
   imageDataUrl: string,
@@ -781,65 +898,65 @@ export async function aiDetectPhotoCorners(
   success: boolean;
   confidence: number;
   reasoning?: string;
+  errorMessage?: string;
 }> {
   try {
-    let payload = '';
+    const payload = await createOptimizedVisionPayload(imageDataUrl, width, height, sourceCanvas);
 
-    if (sourceCanvas) {
-      const maxDim = 640;
-      const scale = Math.min(1, maxDim / Math.max(width, height));
-      const downCanvas = document.createElement('canvas');
-      downCanvas.width = Math.round(width * scale);
-      downCanvas.height = Math.round(height * scale);
-      const dCtx = downCanvas.getContext('2d');
-      if (dCtx) {
-        dCtx.drawImage(sourceCanvas, 0, 0, downCanvas.width, downCanvas.height);
-        payload = downCanvas.toDataURL('image/jpeg', 0.75);
+    const endpoints = ['/api/tools/extract-passport', '/api/photo/detect-corners'];
+
+    for (const endpoint of endpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            imageBase64: payload,
+            width,
+            height
+          })
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        if (data.success && data.corners) {
+          return {
+            corners: data.corners,
+            rotationNeeded: Number(data.rotationNeeded) || 0,
+            success: true,
+            confidence: data.confidence || 0.95,
+            reasoning: data.reasoning
+          };
+        } else if (data.fallback && data.message) {
+          console.info(`${endpoint} returned info:`, data.message);
+          return {
+            corners: null,
+            rotationNeeded: 0,
+            success: false,
+            confidence: 0,
+            errorMessage: data.message || data.error
+          };
+        }
+      } catch (e) {
+        console.warn(`Attempt at ${endpoint} failed:`, e);
       }
     }
-
-    if (!payload) {
-      payload = imageDataUrl;
-    }
-
-    // Set 7 second abort timeout so UI never hangs
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-    const res = await fetch('/api/photo/detect-corners', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        imageBase64: payload,
-        width,
-        height
-      })
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      return { corners: null, rotationNeeded: 0, success: false, confidence: 0 };
-    }
-
-    const data = await res.json();
-    if (data.success && data.corners) {
-      return {
-        corners: data.corners,
-        rotationNeeded: Number(data.rotationNeeded) || 0,
-        success: true,
-        confidence: data.confidence || 0.9,
-        reasoning: data.reasoning
-      };
-    }
   } catch (err) {
-    console.warn('AI corner detection error:', err);
+    console.warn('AI corner extraction exception:', err);
   }
 
   return {
     corners: null,
     rotationNeeded: 0,
     success: false,
-    confidence: 0
+    confidence: 0,
+    errorMessage: 'Could not connect to Gemini Vision service'
   };
 }
+

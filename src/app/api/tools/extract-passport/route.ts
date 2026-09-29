@@ -4,8 +4,9 @@ import { GoogleGenAI } from '@google/genai';
 export const maxDuration = 30;
 
 /**
- * AI Photo Corner Detection Route
- * Re-uses the passport extraction engine for maximum accuracy.
+ * AI Passport Photo Extractor Vision API
+ * Detects the tilted/skewed 4 corners of a physical printed passport photo
+ * held in hand, lying on a surface, or inside a plastic sleeve.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!rawImage) {
       return NextResponse.json({
         success: false,
-        error: 'Image data is required'
+        error: 'Image data is required (imageBase64 or image field)'
       }, { status: 400 });
     }
 
@@ -25,8 +26,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: false,
         fallback: true,
-        error: 'GEMINI_API_KEY is not configured in environment variables.',
-        message: 'GEMINI_API_KEY is missing from environment. Please redeploy in Vercel.'
+        error: 'GEMINI_API_KEY is not configured in Vercel / server environment variables.',
+        message: 'Vercel Project Settings > Environment Variables me GEMINI_API_KEY jodein aur Redeploy karein.'
       }, { status: 200 });
     }
 
@@ -72,6 +73,7 @@ If no distinct physical photo print can be isolated, return:
 
 Respond ONLY with valid JSON.`;
 
+    // Candidate vision models in order of speed and free-tier support
     const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
     let responseText = '';
     let usedModel = '';
@@ -107,7 +109,7 @@ Respond ONLY with valid JSON.`;
       } catch (mErr: unknown) {
         const err = mErr as Error;
         lastErrorMsg = err.message || String(mErr);
-        console.warn(`Model ${modelName} corner detection attempt failed:`, lastErrorMsg);
+        console.warn(`Vision model ${modelName} corner detection attempt failed:`, lastErrorMsg);
       }
     }
 
@@ -115,20 +117,22 @@ Respond ONLY with valid JSON.`;
       return NextResponse.json({
         success: false,
         fallback: true,
-        error: lastErrorMsg || 'Could not reach vision model API.',
+        error: lastErrorMsg || 'Vision models did not return a response',
         message: lastErrorMsg.includes('API_KEY_INVALID') || lastErrorMsg.includes('API key not valid')
           ? 'Gemini API Key अमान्य (Invalid) है। कृपया aistudio.google.com से सही API key प्राप्त करें।'
           : lastErrorMsg || 'Could not reach vision model API.'
       }, { status: 200 });
     }
 
+    // Parse JSON safely
     const jsonMatch = responseText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     if (!jsonMatch) {
-      throw new Error('Gemini did not return valid JSON');
+      throw new Error('Gemini response did not contain JSON');
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
 
+    // Handle both { corners: [...] } and raw [...] array formats
     let rawCornersArray: Array<{ x: number; y: number }> | null = null;
     let rotationNeeded = 0;
     let confidence = 0.95;
@@ -157,10 +161,11 @@ Respond ONLY with valid JSON.`;
       return NextResponse.json({
         success: false,
         fallback: true,
-        message: 'Could not confidently isolate passport photo corners'
+        message: 'Could not isolate distinct physical passport photo corners.'
       }, { status: 200 });
     }
 
+    // Normalize coordinates: some models return [0..1], others [0..1000]
     let isZeroToOne = true;
     for (let i = 0; i < 4; i++) {
       if (rawCornersArray[i].x > 1.05 || rawCornersArray[i].y > 1.05) {
@@ -174,9 +179,11 @@ Respond ONLY with valid JSON.`;
       y: isZeroToOne ? Math.round(pt.y * 1000) : Math.round(pt.y),
     }));
 
+    // Target image dimensions
     const w = Number(width) || 1000;
     const h = Number(height) || 1000;
 
+    // Map 0..1000 normalized coordinates directly onto full image canvas
     const corners = {
       tl: {
         x: Math.max(0, Math.min(w, Math.round((normalizedPoints[0].x / 1000) * w))),
@@ -217,10 +224,14 @@ Respond ONLY with valid JSON.`;
       model: usedModel
     });
   } catch (error: unknown) {
-    console.error('Error detecting photo corners:', error);
+    console.error('Error in extract-passport vision API:', error);
     const err = error as Error;
     return NextResponse.json(
-      { error: err.message || 'Failed to detect photo corners', fallback: true },
+      {
+        success: false,
+        error: err.message || 'Failed to detect photo corners',
+        fallback: true
+      },
       { status: 500 }
     );
   }

@@ -33,7 +33,8 @@ import {
   clientInpaintObject,
   rotateCanvas,
   aiDetectPhotoCorners,
-  replacePassportBackground
+  replacePassportBackground,
+  enhancePassportSharpness
 } from '../../lib/perspectiveUtils';
 
 type ActiveStep = 'upload' | 'corners' | 'studio' | 'download';
@@ -178,36 +179,45 @@ export const SmartPassportMakerTool: React.FC = () => {
   // Run Client-Side Contour Detection + Gemini Free-Tier Vision AI
   const runAiDetection = useCallback(async (dataUrl: string, width: number, height: number, sourceCanvas?: HTMLCanvasElement | null) => {
     setIsDetectingCorners(true);
-    setAiDetectionStatus('🔍 AI विज़न व कंटूर डिटेक्टर पासपोर्ट फोटो पहचान रहा है...');
+    setAiDetectionStatus('🔍 Gemini AI विज़न फोटो के वास्तविक 4 कोनों की तलाश कर रहा है...');
 
-    // 1. Instant client-side card & contour detection
-    if (sourceCanvas) {
-      try {
-        const clientCorners = autoDetectPhotoCorners(width, height, sourceCanvas);
-        setCorners(clientCorners);
-        setAiDetectionStatus('✨ पासपोर्ट फोटो पहचानी गई! (कोने स्वतः सेट हो गए)');
-      } catch (err) {
-        console.warn('Local contour check:', err);
-      }
-    }
-
-    // 2. Gemini Vision AI for fine-tuning corners & orientation
+    // 1. Run Gemini Vision API (/api/tools/extract-passport)
     try {
       const result = await aiDetectPhotoCorners(dataUrl, width, height, sourceCanvas);
       if (result.success && result.corners) {
         setCorners(result.corners);
         if (result.rotationNeeded && result.rotationNeeded !== 0) {
           setRotationAngle(result.rotationNeeded);
-          setAiDetectionStatus(`✨ AI ने इनर पासपोर्ट फोटो पहचान ली! (${result.rotationNeeded}° ऑटो-रोटेशन सेट)`);
+          setAiDetectionStatus(`✨ AI विज़न ने पासपोर्ट फोटो पहचानी! (${result.rotationNeeded}° ऑटो-रोटेशन सेट)`);
         } else {
-          setAiDetectionStatus('✨ AI ने पासपोर्ट फोटो के 4 कोने सफलतापूर्वक पहचान लिए!');
+          setAiDetectionStatus('✨ AI विज़न ने पासपोर्ट फोटो के 4 वास्तविक कोने (Rotated Quad) सटीक पहचान लिए!');
         }
+        setIsDetectingCorners(false);
+        return;
+      } else if (result.errorMessage) {
+        console.info('Vision note:', result.errorMessage);
       }
-    } catch {
-      // Client-side detection has already set the corners
-    } finally {
-      setIsDetectingCorners(false);
+    } catch (err) {
+      console.warn('Vision detection attempt:', err);
     }
+
+    // 2. Client-side contour fallback if vision API did not return corners
+    if (sourceCanvas) {
+      try {
+        const clientResult = autoDetectPhotoCorners(width, height, sourceCanvas);
+        if (clientResult.isRealDetection && clientResult.corners) {
+          setCorners(clientResult.corners);
+          setAiDetectionStatus('✨ कंटूर डिटेक्शन ने फोटो के 4 कोने सफलतापूर्वक पहचान लिए!');
+          setIsDetectingCorners(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Local contour check:', err);
+      }
+    }
+
+    setAiDetectionStatus('ℹ️ कोनों को अपनी उंगली या माउस से खींचकर फोटो पर सेट करें, अथवा "⚡ 1-Click AI Auto Extract" दबाएं।');
+    setIsDetectingCorners(false);
   }, []);
 
   // 1. File Upload Handler (Auto triggers Client Contour + AI Vision)
@@ -542,6 +552,71 @@ export const SmartPassportMakerTool: React.FC = () => {
     });
   };
 
+  // ⚡ 1-Click AI Auto Extract & Straighten (Direct Pipeline)
+  const handleOneClickAutoExtract = async () => {
+    if (!originalImage) return;
+    setIsDetectingCorners(true);
+    setAiDetectionStatus('⚡ 1-Click AI: विज़न मॉडल फोटो के वास्तविक 4 कोने पहचानकर सीधा व शार्प कर रहा है...');
+
+    const tempSrc = document.createElement('canvas');
+    tempSrc.width = originalImage.width;
+    tempSrc.height = originalImage.height;
+    const tempCtx = tempSrc.getContext('2d');
+    if (!tempCtx) {
+      setIsDetectingCorners(false);
+      return;
+    }
+    tempCtx.drawImage(originalImage, 0, 0);
+    const dataUrl = tempSrc.toDataURL('image/jpeg', 0.85);
+
+    let detectedCorners: QuadCorners | null = null;
+    let detectedRotation = rotationAngle;
+
+    try {
+      const aiResult = await aiDetectPhotoCorners(dataUrl, originalImage.width, originalImage.height, tempSrc);
+      if (aiResult.success && aiResult.corners) {
+        detectedCorners = aiResult.corners;
+        if (aiResult.rotationNeeded) detectedRotation = aiResult.rotationNeeded;
+      }
+    } catch (e) {
+      console.warn('1-Click AI vision extract error:', e);
+    }
+
+    if (!detectedCorners) {
+      const contour = autoDetectPhotoCorners(originalImage.width, originalImage.height, tempSrc);
+      if (contour.isRealDetection && contour.corners) {
+        detectedCorners = contour.corners;
+      } else {
+        detectedCorners = corners || getInnerCardDefaultCorners(originalImage.width, originalImage.height);
+      }
+    }
+
+    setCorners(detectedCorners);
+    setRotationAngle(detectedRotation);
+
+    // Perform client-side perspective transform (2D projective homography)
+    const natural = getQuadNaturalDimensions(detectedCorners);
+    const targetH = 900;
+    const targetW = Math.max(100, Math.round(targetH * natural.aspect));
+
+    let warpedCanvas = warpPerspective(tempSrc, detectedCorners, targetW, targetH);
+    if (detectedRotation !== 0) {
+      warpedCanvas = rotateCanvas(warpedCanvas, detectedRotation);
+    }
+
+    // Apply subtle contrast & sharpness enhancement for text (e.g. Yash Sontake, Date) and face clarity
+    warpedCanvas = enhancePassportSharpness(warpedCanvas);
+
+    const resultDataUrl = warpedCanvas.toDataURL('image/jpeg', 0.95);
+    setStraightenedDataUrl(resultDataUrl);
+    setWorkingDataUrl(resultDataUrl);
+    setBgColor('original');
+    setStudioReady(false);
+    setIsDetectingCorners(false);
+    setAiDetectionStatus('⚡ 1-Click AI एक्सट्रैक्शन पूर्ण: फोटो सीधी, समतल व शार्प हो गई!');
+    setStep('studio');
+  };
+
   // Straighten & Warp Action (FIX FOR BLANK WHITE CANVAS & NATURAL RATIO)
   const handleStraightenAndCrop = () => {
     if (!corners || !originalImage) return;
@@ -565,6 +640,9 @@ export const SmartPassportMakerTool: React.FC = () => {
     if (rotationAngle !== 0) {
       warpedCanvas = rotateCanvas(warpedCanvas, rotationAngle);
     }
+
+    // Apply subtle contrast & sharpness enhancement for text and face clarity
+    warpedCanvas = enhancePassportSharpness(warpedCanvas);
 
     const dataUrl = warpedCanvas.toDataURL('image/jpeg', 0.95);
     setStraightenedDataUrl(dataUrl);
@@ -1094,67 +1172,104 @@ export const SmartPassportMakerTool: React.FC = () => {
           </div>
 
           {/* Controls Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div>
-              <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <Crop className="w-4 h-4 text-red-500" />
-                <span>फोटो के चारों कोने (4 Corners) सेट करें</span>
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                कोने को उंगली या माउस से खींचें। मैग्निफायर ग्लास (Magnifier Loupe) में ज़ूम देखकर कोने पर छोड़ें।
-              </p>
-            </div>
+          <div className="space-y-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            {/* ⚡ 1-Click AI Direct Auto Extract Banner Button */}
+            <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white shadow-md">
+              <div className="flex items-center gap-3 text-left">
+                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+                  <Sparkles className="w-5 h-5 text-yellow-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-black flex items-center gap-1.5">
+                    <span>⚡ 1-Click AI Auto Extract & Straighten</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-white text-red-700 font-black tracking-wide uppercase">
+                      Direct AI Pipeline
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-white/90 font-medium">
+                    AI विज़न 4 झुके कोने पहचानकर फोटो को सीधे समतल (Homography), रोटेट व टेक्स्ट शार्प कर देगा।
+                  </div>
+                </div>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
-                onClick={handleAutoDetect}
+                onClick={handleOneClickAutoExtract}
                 disabled={isDetectingCorners}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/40 cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black bg-white hover:bg-yellow-50 text-red-700 shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shrink-0"
               >
                 {isDetectingCorners ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                  <RefreshCw className="w-4 h-4 animate-spin text-red-600" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <Sparkles className="w-4 h-4 text-amber-500" />
                 )}
-                <span>{isDetectingCorners ? 'AI कोने खोज रहा है...' : 'AI ऑटो कोने पहचानें'}</span>
+                <span>{isDetectingCorners ? 'AI प्रोसेस कर रहा है...' : '⚡ 1-क्लिक ऑटो एक्सट्रैक्ट'}</span>
               </button>
+            </div>
 
-              <button
-                type="button"
-                onClick={handleInnerCardCorners}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-800 dark:text-indigo-300 border border-indigo-500/40 cursor-pointer flex items-center gap-1 transition-all"
-                title="हाथ या पाउच में पकड़ी छोटी फोटो को सेलेक्ट करें (50% Inner Card)"
-              >
-                <span>🔍 इनर कार्ड (50%)</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Crop className="w-4 h-4 text-red-500" />
+                  <span>फोटो के चारों कोने (Free-Form 4 Quad Handles)</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  चारों कोने पूरी तरह स्वतंत्र हैं। किसी भी कोने को उंगली या माउस से खींचकर मनचाही दिशा में सेट करें।
+                </p>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleRotateOriginal('cw')}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
-                title="फोटो को 90 डिग्री घुमाएं (Rotate 90° Clockwise)"
-              >
-                <RotateCw className="w-3.5 h-3.5 text-indigo-500" />
-                <span>घूमाएं (Rotate 90°)</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoDetect}
+                  disabled={isDetectingCorners}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/40 cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  title="Gemini Vision API से फोटो के वास्तविक 4 कोने पहचानें"
+                >
+                  {isDetectingCorners ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  )}
+                  <span>{isDetectingCorners ? 'AI खोज रहा है...' : 'AI ऑटो कोने पहचानें'}</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={handleResetCenter}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
-              >
-                <RefreshCw className="w-3 h-3 text-slate-500" />
-                <span>🔄 कोनों को पुनः सेट करें</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleInnerCardCorners}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-800 dark:text-indigo-300 border border-indigo-500/40 cursor-pointer flex items-center gap-1 transition-all"
+                  title="हाथ या पाउच में पकड़ी छोटी फोटो को सेलेक्ट करें (50% Inner Card)"
+                >
+                  <span>🔍 इनर कार्ड (50%)</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={handleFullImageCorners}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
-              >
-                पूरी फोटो
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleRotateOriginal('cw')}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                  title="फोटो को 90 डिग्री घुमाएं (Rotate 90° Clockwise)"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>घूमाएं (Rotate 90°)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetCenter}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3 text-slate-500" />
+                  <span>🔄 रीसेट</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFullImageCorners}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                >
+                  पूरी फोटो
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1564,6 +1679,47 @@ export const SmartPassportMakerTool: React.FC = () => {
                 <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                   {selectedPreset.name}
                 </span>
+              </div>
+
+              {/* Target Size (KB) & Dimensions Checkboxes directly on Result Preview Screen */}
+              <div className="mt-3 w-full max-w-sm p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800 space-y-2">
+                <div className="text-[11px] font-black text-amber-900 dark:text-amber-200 flex items-center justify-between">
+                  <span>⚙️ डाउनलोड से पहले चेकबॉक्स द्वारा कंट्रोल करें:</span>
+                  <span className="text-[10px] bg-amber-200/60 dark:bg-amber-800/60 px-1.5 py-0.5 rounded font-bold">1-Click</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <label
+                    onClick={() => {
+                      const next = !enableCustomDimensions;
+                      setEnableCustomDimensions(next);
+                      setTimeout(() => generateFinalPhoto(), 50);
+                    }}
+                    className={`p-2 rounded-lg border font-bold cursor-pointer transition-all flex items-center gap-1.5 select-none ${
+                      enableCustomDimensions
+                        ? 'bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 border-red-500 shadow-xs'
+                        : 'bg-white/60 dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    {enableCustomDimensions ? <CheckSquare className="w-4 h-4 text-red-600 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span className="leading-tight">☑ Dimensions सेट करें</span>
+                  </label>
+
+                  <label
+                    onClick={() => {
+                      const next = !enableCustomKb;
+                      setEnableCustomKb(next);
+                      setTimeout(() => generateFinalPhoto(), 50);
+                    }}
+                    className={`p-2 rounded-lg border font-bold cursor-pointer transition-all flex items-center gap-1.5 select-none ${
+                      enableCustomKb
+                        ? 'bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 border-red-500 shadow-xs'
+                        : 'bg-white/60 dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    {enableCustomKb ? <CheckSquare className="w-4 h-4 text-red-600 shrink-0" /> : <Square className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <span className="leading-tight">☑ Target KB सेट करें</span>
+                  </label>
+                </div>
               </div>
 
               {/* Step 4 Live Background Color Switcher */}
