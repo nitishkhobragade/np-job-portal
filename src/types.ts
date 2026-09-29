@@ -276,6 +276,21 @@ export interface PostRecord {
     male: string;
     female: string;
   }>;
+  categoryWisePosts?: Array<{
+    category: string;
+    ur: string;
+    obc: string;
+    ews: string;
+    sc: string;
+    st: string;
+    total: string;
+  }>;
+  correctionDate?: string;
+  syllabusUrl?: string;
+  officialWebsiteUrl?: string;
+  ageCalculationDate?: string;
+  isAiVerified?: boolean;
+  aiAuditPassed?: boolean;
   // Tech specific fields
   isTechJob?: boolean;
   companyName?: string;
