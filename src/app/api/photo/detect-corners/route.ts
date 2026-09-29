@@ -39,9 +39,21 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    let mimeType = 'image/jpeg';
+    const mimeMatch = rawImage.match(/^data:([^;]+);base64,/);
+    if (mimeMatch && mimeMatch[1]) {
+      mimeType = mimeMatch[1];
+    }
     const cleanImg = rawImage.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, '');
 
-    const prompt = `You are a computer vision bounding system. In this image, locate the small physical passport photo print (the inner card showing a human face and name/date, held in hand or on a surface).
+    const prompt = `You are an expert computer vision bounding system specialized in physical passport photos.
+
+CRITICAL TARGET INSTRUCTION - INNER PHOTO CARD VS OUTER PACKAGING:
+- The user has taken a mobile photo of a printed passport photo print (often held in fingers, on a desk, or INSIDE A TRANSPARENT OR TRANSLUCENT PLASTIC POUCH, SLEEVE, OR BAG).
+- DO NOT detect or bound the outer plastic pouch, polythene sleeve, plastic packaging margins, fingers, palm, or background!
+- LOOK INSIDE THE PACKET: Locate the ACTUAL INNER RECTANGULAR PAPER PHOTO PRINT CARD containing the human face, hair, shirt, and candidate name/date text (e.g. "YASH SONTAKE", date, etc.) on white/light paper with a distinct photo border.
+- The 4 corners MUST tightly and strictly enclose ONLY the 4 corners of that INNER PRINTED PHOTO PAPER CARD itself.
+
 Detect its exact 4 corner points in clockwise order starting from Top-Left:
 [
   {"x": normalized_x_TL, "y": normalized_y_TL},
@@ -49,7 +61,7 @@ Detect its exact 4 corner points in clockwise order starting from Top-Left:
   {"x": normalized_x_BR, "y": normalized_y_BR},
   {"x": normalized_x_BL, "y": normalized_y_BL}
 ]
-Note: The photo might be tilted/skewed. Return the actual rotated 4 corners of the photo paper itself, NOT an upright bounding box, and do NOT include surrounding fingers, plastic pouches, or background. Coordinates must be normalized (0 to 1000). Map the returned coordinates directly to the canvas overlay so the 4 corners align directly onto the tilted photo corners.
+Note: The photo might be tilted/skewed at an angle. Return the actual rotated 4 corners of the photo paper itself, NOT an upright bounding box, and do NOT include surrounding fingers, plastic pouches, or background. Coordinates must be normalized (0 to 1000). Map the returned coordinates directly to the canvas overlay so the 4 corners align directly onto the tilted photo corners.
 
 Also determine if the inner photo is rotated and what clockwise degrees (0, 90, 180, or 270) is needed to make the human face upright.
 
@@ -72,7 +84,12 @@ If no distinct physical photo print can be isolated, return:
 
 Respond ONLY with valid JSON.`;
 
-    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    const candidateModels = [
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
+      'gemini-3.1-pro-preview'
+    ];
     let responseText = '';
     let usedModel = '';
     let lastErrorMsg = '';
@@ -86,7 +103,7 @@ Respond ONLY with valid JSON.`;
               {
                 inlineData: {
                   data: cleanImg,
-                  mimeType: 'image/jpeg'
+                  mimeType: mimeType
                 }
               },
               {

@@ -69,6 +69,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
   const pathname = usePathname() || '/';
   const searchParams = useSearchParams();
   const categoryParam = (searchParams?.get('category') || '').toLowerCase();
+  const isToolsPage = pathname.startsWith('/tools');
 
   // Dynamic Navigation Highlight Calculation
   const getActiveTab = (): 'home' | 'latest-jobs' | 'admit-card' | 'results' | 'mp-special' | 'tech-jobs' | 'central-ssc' => {
@@ -471,30 +472,32 @@ const HeaderInner: React.FC<HeaderProps> = ({
         </div>
       </nav>
 
-      {/* Fast Category Badges Strip */}
-      <div className="w-full max-w-full bg-neutral-50 border-b border-neutral-200 px-2 sm:px-4 py-2 overflow-hidden box-border">
-        <div className="w-full max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
-          <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider shrink-0 mr-1">
-            श्रेणी:
-          </span>
-          {categories.map((cat) => {
-            const isActive = selectedCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => handleCategoryPillClick(cat)}
-                className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-red-700 text-white shadow-2xs'
-                    : 'bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-300'
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
+      {/* Fast Category Badges Strip - Hidden on /tools and all tool pages */}
+      {!isToolsPage && (
+        <div className="w-full max-w-full bg-neutral-50 border-b border-neutral-200 px-2 sm:px-4 py-2 overflow-hidden box-border">
+          <div className="w-full max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
+            <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider shrink-0 mr-1">
+              श्रेणी:
+            </span>
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => handleCategoryPillClick(cat)}
+                  className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-red-700 text-white shadow-2xs'
+                      : 'bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-300'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* MOBILE HAMBURGER SLIDE DRAWER (COMPACT VERTICAL SPACING) */}
       {mobileMenuOpen && (

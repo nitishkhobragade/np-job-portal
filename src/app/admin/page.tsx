@@ -1063,6 +1063,30 @@ export default function AdminPage() {
     showToast(`नया स्रोत सफलतापूर्वक जोड़ा गया: ${created.name}`);
   };
 
+  // Live SarkariResult & Official Portals Auto-Scraper (Vercel & Firebase Safe Limit)
+  const handleRunRealAutoScraper = async () => {
+    setIsScraping(true);
+    showToast('🚀 SarkariResult व आधिकारिक पोर्टल से लेटेस्ट जॉब्स फेच व AI विश्लेषण शुरू...');
+    try {
+      const res = await fetch('/api/admin/scrape-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scrapeSarkari: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || `सफलतापूर्वक ${data.count} नए जॉब ड्राफ्ट तैयार किए गए!`);
+        await refreshData();
+      } else {
+        showToast(data.error || 'स्क्रैपर निष्पादन में समस्या आई');
+      }
+    } catch {
+      showToast('सर्वर से कनेक्ट करने में त्रुटि हुई');
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
   // AI Scraper Triggers
   const handleRunAIScraper = async () => {
     setIsScraping(true);
@@ -3054,11 +3078,21 @@ export default function AdminPage() {
 
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  onClick={() => setShowAddSourceModal(true)}
+                  onClick={setShowAddSourceModal ? () => setShowAddSourceModal(true) : undefined}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs rounded-xl shadow transition-transform active:scale-95"
                 >
                   <Plus className="w-4 h-4 text-emerald-400" />
                   <span>+ नया स्रोत जोड़ें (+ Add Feed)</span>
+                </button>
+
+                <button
+                  onClick={handleRunRealAutoScraper}
+                  disabled={isScraping}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-500 hover:to-orange-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 cursor-pointer"
+                  title="SarkariResult और आधिकारिक पोर्टल से टॉप 3 नई भर्तियां फेच करें (Vercel & Firebase Safe Limit)"
+                >
+                  <Sparkles className="w-4 h-4 text-yellow-200" />
+                  <span>{isScraping ? 'लाइव स्कैन जारी है...' : '⚡ SarkariResult से टॉप 3 फेच करें'}</span>
                 </button>
 
                 <button
@@ -3149,6 +3183,9 @@ export default function AdminPage() {
               <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
                 <span className="text-slate-400 font-bold">त्वरित टेस्ट सैंपल्स:</span>
                 {[
+                  { label: '🔥 SarkariResult Latest Jobs (CM)', url: 'https://sarkariresult.com.cm/latest-jobs/' },
+                  { label: '🔥 SarkariResult Home (CM)', url: 'https://sarkariresult.com.cm/' },
+                  { label: '🔥 SarkariResult Official (.com)', url: 'https://www.sarkariresult.com/latestjob/' },
                   { label: '🏛️ MPESB व्यापम', url: 'https://esb.mp.gov.in/latest-rulebooks' },
                   { label: '📰 MP Vacancy', url: 'https://mpvacancy.in/category/latest-update/' },
                   { label: '📰 Vacancy Update MP', url: 'https://vacancyupdatemp.com/latest-jobs/' },

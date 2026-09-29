@@ -44,19 +44,23 @@ export function getCenteredDefaultCorners(imgWidth: number, imgHeight: number): 
 }
 
 /**
- * Returns centered inner corners covering ~50% of the frame,
- * ideal for photos where someone holds a printed passport card in fingers or pouch.
+ * Returns centered inner corners covering ~38% of the frame (standard passport 3.5:4.5 ratio),
+ * specifically sized to fit an inner physical passport card held in fingers, palm, or plastic pouch.
  */
-export function getInnerCardDefaultCorners(imgWidth: number, imgHeight: number): QuadCorners {
+export function getInnerCardDefaultCorners(
+  imgWidth: number,
+  imgHeight: number,
+  scaleRatio: number = 0.38
+): QuadCorners {
   const targetRatio = 3.5 / 4.5;
   const currentRatio = imgWidth / imgHeight;
 
   let boxW: number, boxH: number;
   if (currentRatio > targetRatio) {
-    boxH = Math.round(imgHeight * 0.50);
+    boxH = Math.round(imgHeight * scaleRatio);
     boxW = Math.round(boxH * targetRatio);
   } else {
-    boxW = Math.round(imgWidth * 0.50);
+    boxW = Math.round(imgWidth * scaleRatio);
     boxH = Math.round(boxW / targetRatio);
   }
 
@@ -908,7 +912,7 @@ export async function aiDetectPhotoCorners(
     for (const endpoint of endpoints) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
         const res = await fetch(endpoint, {
           method: 'POST',

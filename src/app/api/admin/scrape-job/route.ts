@@ -1,36 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../../lib/firebase';
 import { PostRecord } from '../../../../types';
 import { formatDateToDDMMYYYY } from '../../../../lib/postRouting';
+import { runSafeBatchAutoScraper } from '../../../../lib/sarkariScraper';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
-
-const DEFAULT_OFFICIAL_PORTALS = [
-  {
-    rawTitle: 'MP ESB Group 4 Assistant Grade 3 Steno Typist Recruitment 2026',
-    dept: 'Madhya Pradesh Employees Selection Board (MPESB)',
-    category: 'mp-special',
-    sourceUrl: 'https://esb.mp.gov.in',
-    sampleDetails: 'MP ESB official notice for Group 4, Assistant Grade 3, Steno Typist posts. Total 3047 posts. 12th pass with CPCT score card and Hindi typing. Age 18-40 years with MP domicile relaxation. Online apply on MP Online portal.'
-  },
-  {
-    rawTitle: 'SSC Multi Tasking Staff (MTS) & Havaldar Examination 2026',
-    dept: 'Staff Selection Commission (SSC)',
-    category: 'central',
-    sourceUrl: 'https://ssc.gov.in',
-    sampleDetails: 'Staff Selection Commission notice for Multi-Tasking (Non-Technical) Staff and Havaldar (CBIC/CBN) Examination 2026. 10th pass eligible. Age limit 18-25 and 18-27 years. Online application at ssc.gov.in.'
-  },
-  {
-    rawTitle: 'Railway Recruitment Cell Western Railway Apprentice 2026',
-    dept: 'Indian Railways - RRC Western Railway',
-    category: 'latest-jobs',
-    sourceUrl: 'https://rrc-wr.com',
-    sampleDetails: 'RRC Western Railway engagement of Act Apprentices under Apprentices Act 1961. Total 5050 slots. 10th pass with ITI certificate in relevant trade. Age 15-24 years.'
-  }
-];
 
 function generateCleanSlug(title: string): string {
   return title
@@ -39,24 +16,6 @@ function generateCleanSlug(title: string): string {
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-}
-
-async function isJobDuplicate(slug: string, title: string): Promise<boolean> {
-  try {
-    const postsRef = collection(db, 'posts');
-    const slugQuery = query(postsRef, where('slug', '==', slug));
-    const slugSnap = await getDocs(slugQuery);
-    if (!slugSnap.empty) return true;
-
-    const titleQuery = query(postsRef, where('title', '==', title));
-    const titleSnap = await getDocs(titleQuery);
-    if (!titleSnap.empty) return true;
-
-    return false;
-  } catch (err) {
-    console.warn('Deduplication check error:', err);
-    return false;
-  }
 }
 
 // Cleans raw HTML text into readable content
@@ -83,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { url, scanDefaults } = body;
+    const { url, scanDefaults, scrapeSarkari } = body;
 
     const apiKey = (process.env.GEMINI_API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
     const ai = apiKey
@@ -93,39 +52,22 @@ export async function POST(req: NextRequest) {
         })
       : null;
 
-    // SCENARIO 1: Quick Scan Pre-Configured Official Portals
-    if (scanDefaults) {
-      const scannedDrafts: PostRecord[] = [];
-      const skipped: string[] = [];
-
-      for (const item of DEFAULT_OFFICIAL_PORTALS.slice(0, 3)) {
-        const slug = generateCleanSlug(item.rawTitle);
-        const dup = await isJobDuplicate(slug, item.rawTitle);
-        if (dup) {
-          skipped.push(item.rawTitle);
-          continue;
-        }
-
-        const draft = await extractAndCreateDraft({
-          sourceTitle: item.rawTitle,
-          dept: item.dept,
-          category: item.category,
-          sourceUrl: item.sourceUrl,
-          rawContext: item.sampleDetails,
-          ai
-        });
-
-        if (draft) {
-          scannedDrafts.push(draft);
-        }
-      }
+    // SCENARIO 1: Quick Scan & Import from SarkariResult & Official Portals
+    if (scanDefaults || scrapeSarkari) {
+      const batchResult = await runSafeBatchAutoScraper(3);
 
       return NextResponse.json({
-        success: true,
-        message: `सफलतापूर्वक ${scannedDrafts.length} नए ड्राफ्ट तैयार किए गए (${skipped.length} डुप्लीकेट छोड़े गए)`,
-        count: scannedDrafts.length,
-        drafts: scannedDrafts,
-        skipped,
+        success: batchResult.success,
+        message: batchResult.message,
+        count: batchResult.imported.length,
+        drafts: batchResult.imported,
+        skipped: batchResult.skipped,
+        totalScanned: batchResult.totalScanned,
+        sources: [
+          'https://sarkariresult.com.cm/latest-jobs/',
+          'https://sarkariresult.com.cm/',
+          'https://www.sarkariresult.com/latestjob/'
+        ],
         durationMs: Date.now() - startTime
       }, { status: 200 });
     }
@@ -392,22 +334,30 @@ ${rawContext || 'Please use Google Search to verify the recruitment details of '
 
       contents.push({ text: prompt });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: {
-          parts: contents
-        },
-        config: {
-          responseMimeType: 'application/json',
-          tools: [{ googleSearch: {} }]
-        }
-      });
+      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+      for (const mName of candidateModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model: mName,
+            contents: {
+              parts: contents
+            },
+            config: {
+              responseMimeType: 'application/json',
+              tools: [{ googleSearch: {} }]
+            }
+          });
 
-      if (response && response.text) {
-        const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          extracted = { ...extracted, ...parsed };
+          if (response && response.text) {
+            const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              extracted = { ...extracted, ...parsed };
+              break;
+            }
+          }
+        } catch (mErr) {
+          console.warn(`Model ${mName} attempt in extractAndCreateDraft:`, mErr);
         }
       }
     } catch (aiErr) {
