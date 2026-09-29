@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Lock,
@@ -40,8 +40,12 @@ import {
   Bot,
   BookOpen,
   DollarSign,
-  ShieldCheck
+  ShieldCheck,
+  BellRing,
+  Send,
+  X
 } from 'lucide-react';
+import { computeJobLifecycle } from '../../lib/jobLifecycle';
 import { PostRecord, PopupAdSettings, ScrapedJobDraft, ScraperSource, ScraperBucket, TickerAlert, AdSenseConfig } from '../../types';
 import { getAdSenseConfig, saveAdSenseConfig } from '../../lib/adsenseConfig';
 import {
@@ -220,8 +224,8 @@ export default function AdminPage() {
     };
   }, [isAuthenticated, handleLogout]);
 
-  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup' | 'adsense'
-  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup' | 'adsense'>('posts');
+  // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'push' | 'popup' | 'ticker' | 'backup' | 'adsense'
+  const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'push' | 'popup' | 'ticker' | 'backup' | 'adsense'>('posts');
 
   // AdSense & 12-Hour Rewarded Web Ad Config
   const [adsenseConfig, setAdsenseConfig] = useState<AdSenseConfig>(getAdSenseConfig);
@@ -264,6 +268,12 @@ export default function AdminPage() {
   const [formPdfLink, setFormPdfLink] = useState<string>('');
   const [formSyllabusLink, setFormSyllabusLink] = useState<string>('');
   const [formOfficialSite, setFormOfficialSite] = useState<string>('');
+  // Dynamic Lifecycle URLs (Admit Card, Exam City, Result, Answer Key)
+  const [formAdmitCardUrl, setFormAdmitCardUrl] = useState<string>('');
+  const [formExamCityUrl, setFormExamCityUrl] = useState<string>('');
+  const [formResultUrl, setFormResultUrl] = useState<string>('');
+  const [formAnswerKeyUrl, setFormAnswerKeyUrl] = useState<string>('');
+
   const [formImportantLinks, setFormImportantLinks] = useState<Array<{ id: string; title: string; url: string }>>([]);
   const [formStatus, setFormStatus] = useState<'draft' | 'pending_approval' | 'published' | 'suspended'>('published');
   const [formYear, setFormYear] = useState<string>(() => String(new Date().getFullYear()));
@@ -274,6 +284,24 @@ export default function AdminPage() {
   const [formRoleOverview, setFormRoleOverview] = useState<string>('');
   const [isGeneratingAiDesc, setIsGeneratingAiDesc] = useState<boolean>(false);
   const [reviewedDraftId, setReviewedDraftId] = useState<string | null>(null);
+
+  // Row-Level Push Notification Modal state
+  const [pushAlertPost, setPushAlertPost] = useState<PostRecord | null>(null);
+  const [pushAlertTitle, setPushAlertTitle] = useState<string>('');
+  const [pushAlertBody, setPushAlertBody] = useState<string>('');
+  const [pushAlertUrl, setPushAlertUrl] = useState<string>('');
+  const [isSendingPush, setIsSendingPush] = useState<boolean>(false);
+  const [pushStats, setPushStats] = useState<{ totalActive: number; mobileCount: number; desktopCount: number; tabletCount?: number }>({
+    totalActive: 0,
+    mobileCount: 0,
+    desktopCount: 0
+  });
+
+  // Custom Standalone Push Broadcast state
+  const [customPushTitle, setCustomPushTitle] = useState<string>('');
+  const [customPushBody, setCustomPushBody] = useState<string>('');
+  const [customPushUrl, setCustomPushUrl] = useState<string>('https://npjobportal.com');
+  const [isSendingCustomPush, setIsSendingCustomPush] = useState<boolean>(false);
 
   // Custom Poster Engine state for Post form
   const [formUseCustomPoster, setFormUseCustomPoster] = useState<boolean>(false);
@@ -373,6 +401,24 @@ export default function AdminPage() {
   const [newTickerDate, setNewTickerDate] = useState<string>('');
   const [newTickerIsBreaking, setNewTickerIsBreaking] = useState<boolean>(false);
 
+  // Push Notification Subscribers Fetcher
+  const fetchPushStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/send-push');
+      const data = await res.json();
+      if (data.success) {
+        setPushStats({
+          totalActive: data.totalActive || 0,
+          mobileCount: data.mobileCount || 0,
+          desktopCount: data.desktopCount || 0,
+          tabletCount: data.tabletCount || 0
+        });
+      }
+    } catch (err) {
+      console.warn('Push stats fetch notice:', err);
+    }
+  }, []);
+
   const refreshData = async () => {
     setIsLoadingPosts(true);
     try {
@@ -391,6 +437,7 @@ export default function AdminPage() {
       if (!posterJob && fetchedPosts.length > 0) {
         setPosterJob(fetchedPosts[0]);
       }
+      fetchPushStats().catch(() => {});
     } catch (err) {
       console.error('Error loading admin data:', err);
     } finally {
@@ -426,13 +473,14 @@ export default function AdminPage() {
       if (drafts) setScrapedDrafts(drafts);
       if (sources) setScraperSources(sources);
       if (fetchedTickers) setTickersList(fetchedTickers);
+      fetchPushStats().catch(() => {});
     }).catch((err) => console.warn('Aux data fetch error:', err));
 
     return () => {
       unsubscribe();
       unsubTickers();
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchPushStats]);
 
   // Sync URL query params with admin tab and poster postId
   useEffect(() => {
@@ -647,6 +695,20 @@ export default function AdminPage() {
       return;
     }
 
+    // Compute dynamic lifecycle flags (hasActiveApplication, hasAdmitCard, hasResult)
+    const lifecycle = computeJobLifecycle({
+      title: formTitle,
+      applyLink: formApplyLink,
+      lastDate: formEndDate,
+      admitCardDate: formAdmitCardDate,
+      admitCardUrl: formAdmitCardUrl,
+      examCityUrl: formExamCityUrl,
+      resultUrl: formResultUrl,
+      answerKeyUrl: formAnswerKeyUrl,
+      importantLinks: formImportantLinks,
+      category: formCategories[0]
+    });
+
     const postData: Partial<PostRecord> = {
       title: formTitle,
       shortTitle: formShortTitle || formTitle.slice(0, 30),
@@ -689,12 +751,23 @@ export default function AdminPage() {
         syllabusPdf: formSyllabusLink,
         officialSite: formOfficialSite || 'https://esb.mp.gov.in'
       },
+      // Dynamic Multi-Stage Lifecycle URLs & Flags
+      admitCardUrl: formAdmitCardUrl.trim() || undefined,
+      examCityUrl: formExamCityUrl.trim() || undefined,
+      resultUrl: formResultUrl.trim() || undefined,
+      answerKeyUrl: formAnswerKeyUrl.trim() || undefined,
+      hasActiveApplication: lifecycle.hasActiveApplication,
+      hasAdmitCard: lifecycle.hasAdmitCard,
+      hasResult: lifecycle.hasResult,
+      lifecycleStage: lifecycle.lifecycleStage,
+
       importantLinks: formImportantLinks,
       status: formStatus,
       year: formYear || String(new Date().getFullYear()),
       month: formMonth || String(new Date().getMonth() + 1).padStart(2, '0'),
       blogNo: formBlogNo || getNextBlogNumber(posts, formYear, formMonth),
-      slug: formSlug.trim() || undefined,
+      // Keep existing slug unchanged for continuous SEO rank accumulation
+      slug: editingPostId ? (posts.find(p => p.id === editingPostId)?.slug || formSlug.trim() || undefined) : (formSlug.trim() || undefined),
       isTechJob: formIsTechJob || formCategories.includes('tech'),
       companyName: formCompanyName,
       role: formRole,
@@ -760,6 +833,10 @@ export default function AdminPage() {
     setFormPdfLink('');
     setFormSyllabusLink('');
     setFormOfficialSite('');
+    setFormAdmitCardUrl('');
+    setFormExamCityUrl('');
+    setFormResultUrl('');
+    setFormAnswerKeyUrl('');
     setFormImportantLinks([]);
     setFormStatus('published');
     setFormYear(curYear);
@@ -806,10 +883,14 @@ export default function AdminPage() {
     setFormAgeRelaxation(p.ageRelaxation || 'नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
     setFormShowReservation(p.showReservationSection !== false);
     setFormEligibility(p.eligibility || p.qualification || '');
-    setFormApplyLink(p.links?.apply || '');
-    setFormPdfLink(p.links?.notificationPdf || '');
-    setFormSyllabusLink(p.links?.syllabusPdf || '');
-    setFormOfficialSite(p.links?.officialSite || '');
+    setFormApplyLink(p.links?.apply || p.applyLink || '');
+    setFormPdfLink(p.links?.notificationPdf || p.notificationPdf || '');
+    setFormSyllabusLink(p.links?.syllabusPdf || p.syllabusUrl || '');
+    setFormOfficialSite(p.links?.officialSite || p.officialWebsiteUrl || '');
+    setFormAdmitCardUrl(p.admitCardUrl || '');
+    setFormExamCityUrl(p.examCityUrl || '');
+    setFormResultUrl(p.resultUrl || '');
+    setFormAnswerKeyUrl(p.answerKeyUrl || '');
     setFormImportantLinks(p.importantLinks || []);
     setFormStatus(p.status);
     setFormYear(p.year || '2026');
@@ -859,10 +940,14 @@ export default function AdminPage() {
     setFormAgeRelaxation(p.ageRelaxation || 'नियमानुसार SC/ST/OBC हेतु 5 वर्ष की छूट');
     setFormShowReservation(p.showReservationSection !== false);
     setFormEligibility(p.eligibility || p.qualification || '');
-    setFormApplyLink(p.links?.apply || '');
-    setFormPdfLink(p.links?.notificationPdf || '');
-    setFormSyllabusLink(p.links?.syllabusPdf || '');
-    setFormOfficialSite(p.links?.officialSite || '');
+    setFormApplyLink(p.links?.apply || p.applyLink || '');
+    setFormPdfLink(p.links?.notificationPdf || p.notificationPdf || '');
+    setFormSyllabusLink(p.links?.syllabusPdf || p.syllabusUrl || '');
+    setFormOfficialSite(p.links?.officialSite || p.officialWebsiteUrl || '');
+    setFormAdmitCardUrl(p.admitCardUrl || '');
+    setFormExamCityUrl(p.examCityUrl || '');
+    setFormResultUrl(p.resultUrl || '');
+    setFormAnswerKeyUrl(p.answerKeyUrl || '');
     setFormStatus('draft');
     setFormYear(curYear);
     setFormMonth(curMonth);
@@ -1213,6 +1298,93 @@ export default function AdminPage() {
       if (typeof window !== 'undefined') {
         window.scrollTo({ top: 300, behavior: 'smooth' });
       }
+    }
+  };
+
+  // Push Notification Functions
+  const handleOpenRowPushModal = (job: PostRecord) => {
+    const meta = getPostRoutingMeta(job);
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://npjobportal.com';
+    const fullUrl = `${origin}${meta.fullPath}`;
+
+    const isAdmit = Boolean(job.hasAdmitCard || job.admitCardUrl);
+    const isResult = Boolean(job.hasResult || job.resultUrl);
+
+    let stageBadge = 'ऑनलाइन आवेदन शुरू!';
+    if (isResult) {
+      stageBadge = 'रिजल्ट व उत्तर कुंजी Live!';
+    } else if (isAdmit) {
+      stageBadge = 'एडमिट कार्ड / परीक्षा तिथि Live!';
+    }
+
+    setPushAlertPost(job);
+    setPushAlertTitle(`${job.title}: ${stageBadge}`);
+    setPushAlertBody(`Click here to check dates and download notice. (अंतिम तिथि: ${job.dates?.end || job.lastDate || 'विज्ञप्ति अनुसार'})`);
+    setPushAlertUrl(fullUrl);
+  };
+
+  const handleConfirmSendRowPush = async () => {
+    if (!pushAlertTitle.trim() || !pushAlertBody.trim()) {
+      showToast('सूचना का शीर्षक एवं संदेश अनिवार्य हैं!');
+      return;
+    }
+    setIsSendingPush(true);
+    try {
+      const res = await fetch('/api/admin/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: pushAlertTitle.trim(),
+          body: pushAlertBody.trim(),
+          url: pushAlertUrl.trim() || 'https://npjobportal.com'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`📢 पुश अलर्ट सफलतापूर्वक भेजा गया! (${data.totalSubscribers || pushStats.totalActive} सक्रिय डिवाइस)`);
+        setPushAlertPost(null);
+        await fetchPushStats();
+      } else {
+        showToast(`त्रुटि: ${data.error || 'अलर्ट नहीं भेजा जा सका'}`);
+      }
+    } catch (err) {
+      console.error('Error broadcasting push alert:', err);
+      showToast('पुश अलर्ट भेजने में तकनीकी समस्या आई।');
+    } finally {
+      setIsSendingPush(false);
+    }
+  };
+
+  const handleSendCustomPush = async () => {
+    if (!customPushTitle.trim() || !customPushBody.trim()) {
+      showToast('कृपया Alert Title एवं Body Message भरें!');
+      return;
+    }
+    setIsSendingCustomPush(true);
+    try {
+      const res = await fetch('/api/admin/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: customPushTitle.trim(),
+          body: customPushBody.trim(),
+          url: customPushUrl.trim() || 'https://npjobportal.com'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🚀 कस्टम पुश नोटिफिकेशन प्रसारित! (${data.totalSubscribers || pushStats.totalActive} सक्रिय सब्सक्राइबर्स)`);
+        setCustomPushTitle('');
+        setCustomPushBody('');
+        await fetchPushStats();
+      } else {
+        showToast(`त्रुटि: ${data.error || 'कस्टम पुश नहीं भेजा जा सका'}`);
+      }
+    } catch (err) {
+      console.error('Error broadcasting custom push:', err);
+      showToast('कस्टम पुश भेजने में तकनीकी समस्या आई।');
+    } finally {
+      setIsSendingCustomPush(false);
     }
   };
 
@@ -1574,11 +1746,179 @@ export default function AdminPage() {
                   resetPostForm();
                   setShowAddForm(!showAddForm);
                 }}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg transition-transform active:scale-95"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg transition-transform active:scale-95 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>{showAddForm ? 'फॉर्म बंद करें' : 'नई भर्ती / नोटिफिकेशन जोड़ें'}</span>
               </button>
+            </div>
+
+            {/* 📢 WEB PUSH NOTIFICATION BROADCAST CARD */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-red-950/40 border-2 border-red-500/40 rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center font-bold shadow-md shrink-0">
+                    <BellRing className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-black text-white flex items-center gap-2">
+                        📢 Web Push Notification Broadcast (FCM Subscribers)
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-red-950 text-red-300 border border-red-700 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                        कुल एक्टिव सब्सक्राइबर्स: {pushStats.totalActive}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      📱 मोबाइल: <strong className="text-slate-200">{pushStats.mobileCount}</strong> • 💻 डेस्कटॉप: <strong className="text-slate-200">{pushStats.desktopCount}</strong> • 📱 टैबलेट: <strong className="text-slate-200">{pushStats.tabletCount || 0}</strong> • सीधे यूज़र्स के डिवाइस पर अलर्ट भेजें
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={fetchPushStats}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold border border-slate-700 transition-colors self-start md:self-auto cursor-pointer"
+                  title="सब्सक्राइबर संख्या रीफ्रेश करें"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>सब्सक्राइबर रीफ्रेश</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-4">
+                <div className="lg:col-span-2 space-y-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold text-xs mb-1">
+                      Alert Title (सूचना का शीर्षक):
+                    </label>
+                    <input
+                      type="text"
+                      value={customPushTitle}
+                      onChange={(e) => setCustomPushTitle(e.target.value)}
+                      placeholder="उदा: MP Police Constable Exam Admit Card 2026 Live Released!"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs sm:text-sm focus:outline-hidden focus:border-red-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold text-xs mb-1">
+                      Body Message (संदेश विवरण):
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={customPushBody}
+                      onChange={(e) => setCustomPushBody(e.target.value)}
+                      placeholder="उदा: तुरंत अपना एडमिट कार्ड डाउनलोड करें एवं परीक्षा केंद्र चेक करें। लिंक पर क्लिक करें।"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs sm:text-sm focus:outline-hidden focus:border-red-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold text-xs mb-1">
+                      Action Link (टारगेट वेबपेज / जॉब लिंक URL):
+                    </label>
+                    <input
+                      type="text"
+                      value={customPushUrl}
+                      onChange={(e) => setCustomPushUrl(e.target.value)}
+                      placeholder="उदा: https://npjobportal.com/jobs/mp-police-constable"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-hidden focus:border-red-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleSendCustomPush}
+                      disabled={isSendingCustomPush}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSendingCustomPush ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>प्रसारित हो रहा है...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          <span>🚀 Send Push Alert to All Users</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Quick Template Fillers */}
+                    <span className="text-[11px] text-slate-400 font-bold ml-1">क्विक टेम्पलेट:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomPushTitle('🚨 नई सरकारी भर्ती: MPESB & SSC बंपर पद जारी!');
+                        setCustomPushBody('10वीं, 12वीं एवं ग्रेजुएट पास उम्मीदवार आज ही आवेदन करें। अंतिम तिथि नजदीक है!');
+                        setCustomPushUrl('https://npjobportal.com');
+                      }}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      🆕 New Vacancy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomPushTitle('🎟️ Sarkari Admit Card Live: प्रवेश पत्र तुरंत डाउनलोड करें!');
+                        setCustomPushBody('परीक्षा शहर पर्ची व एडमिट कार्ड जारी हो चुका है। परीक्षा केंद्र की जानकारी देखें।');
+                        setCustomPushUrl('https://npjobportal.com/category/admit-card');
+                      }}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      🎟️ Admit Card
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomPushTitle('🏆 Sarkari Result & Answer Key Released!');
+                        setCustomPushBody('स्कोर कार्ड और मेरिट लिस्ट आधिकारिक पोर्टल पर जारी। अपना रिजल्ट तुरंत चेक करें।');
+                        setCustomPushUrl('https://npjobportal.com/category/results');
+                      }}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      🏆 Result Out
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Preview Box */}
+                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>यूज़र मोबाइल / PC स्क्रीन प्रीव्यू</span>
+                      <span className="text-red-400">Live Preview</span>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-md space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-amber-400 text-slate-950 flex items-center justify-center font-black text-[10px]">
+                          NP
+                        </div>
+                        <div className="leading-none">
+                          <span className="text-[10px] font-bold text-slate-300">NP JOB PORTAL</span>
+                          <span className="text-[9px] text-slate-500 ml-1.5">• अभी</span>
+                        </div>
+                      </div>
+                      <h4 className="text-xs font-black text-white line-clamp-1">
+                        {customPushTitle || 'अलर्ट का शीर्षक यहां दिखेगा...'}
+                      </h4>
+                      <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                        {customPushBody || 'नोटिफिकेशन का मुख्य संदेश यहां दिखेगा...'}
+                      </p>
+                      <div className="text-[10px] text-blue-400 truncate font-mono">
+                        {customPushUrl || 'https://npjobportal.com'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-500 pt-2 border-t border-slate-800/80 mt-3">
+                    * जब यूज़र नोटिफिकेशन पर क्लिक करेगा, तो सीधे उपरोक्त URL खुल जाएगा।
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* ADD / EDIT POST FORM */}
@@ -2407,6 +2747,72 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* Dynamic Multi-Stage Lifecycle URLs (Admit Card & Result Auto-Highlighting) */}
+                  <div className="bg-slate-950/80 border border-blue-500/30 rounded-xl p-4 space-y-3">
+                    <div>
+                      <h4 className="text-xs font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>⚡ डायनामिक लाइफसाइकिल लिंक्स (Admit Card & Result Auto-Highlighting)</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        एडमिट कार्ड या रिजल्ट लिंक दर्ज करते ही यह भर्ती स्वतः Admit Card या Result सेक्शन में न्यू (Pulsating) बैज के साथ लाइव हो जाएगी (SEO URL अपरिवर्तित रहेगा)।
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-slate-300 font-bold text-xs mb-1">
+                          एडमिट कार्ड डाउनलोड लिंक (Admit Card / Hall Ticket URL):
+                        </label>
+                        <input
+                          type="url"
+                          value={formAdmitCardUrl}
+                          onChange={(e) => setFormAdmitCardUrl(e.target.value)}
+                          placeholder="https://.../admit-card"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-xs mb-1">
+                          एग्जाम सिटी / डेट स्लिप लिंक (Exam City Slip URL):
+                        </label>
+                        <input
+                          type="url"
+                          value={formExamCityUrl}
+                          onChange={(e) => setFormExamCityUrl(e.target.value)}
+                          placeholder="https://.../city-slip"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-xs mb-1">
+                          परीक्षा परिणाम लिंक (Result / Scorecard URL):
+                        </label>
+                        <input
+                          type="url"
+                          value={formResultUrl}
+                          onChange={(e) => setFormResultUrl(e.target.value)}
+                          placeholder="https://.../result"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold text-xs mb-1">
+                          उत्तर कुंजी लिंक (Answer Key / Objection URL):
+                        </label>
+                        <input
+                          type="url"
+                          value={formAnswerKeyUrl}
+                          onChange={(e) => setFormAnswerKeyUrl(e.target.value)}
+                          placeholder="https://.../answer-key"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Dynamic Important Hyperlinks Repeater */}
                   <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -2946,6 +3352,15 @@ export default function AdminPage() {
                                   title="🤖 AI Audit / Re-verify (इंटरनेट फैक्ट-चेकिंग एवं ऑटो-फिक्स)"
                                 >
                                   <Bot className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* 📢 Web Push Alert Trigger (Row-Level) */}
+                                <button
+                                  onClick={() => handleOpenRowPushModal(job)}
+                                  className="p-1.5 rounded-lg bg-red-950/70 hover:bg-red-600 text-red-300 hover:text-white transition-colors cursor-pointer border border-red-800/60"
+                                  title="📢 पुश अलर्ट भेजें (Broadcast Push Alert to Subscribers)"
+                                >
+                                  <BellRing className="w-3.5 h-3.5" />
                                 </button>
 
                                 {/* Social Multi-Share Trigger */}
@@ -4974,6 +5389,103 @@ export default function AdminPage() {
         onRetry={() => singleAuditTargetJob && handleRunSingleAudit(singleAuditTargetJob)}
         errorMessage={singleAuditError}
       />
+
+      {/* 📢 ROW-LEVEL PUSH ALERT CONFIRMATION MODAL */}
+      {pushAlertPost && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border-2 border-red-500/80 rounded-2xl w-full max-w-lg p-5 shadow-2xl text-slate-100 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-md">
+                  <BellRing className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white">
+                    📢 भर्ती पुश अलर्ट भेजें (Push Notification Broadcast)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    सब्सक्राइबर्स: <strong className="text-amber-400 font-bold">{pushStats.totalActive} सक्रिय डिवाइस</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPushAlertPost(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-slate-300 font-bold text-xs mb-1">
+                  Notification Title (सूचना का शीर्षक):
+                </label>
+                <input
+                  type="text"
+                  value={pushAlertTitle}
+                  onChange={(e) => setPushAlertTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs sm:text-sm font-bold focus:outline-hidden focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold text-xs mb-1">
+                  Message Body (संदेश विवरण):
+                </label>
+                <textarea
+                  rows={3}
+                  value={pushAlertBody}
+                  onChange={(e) => setPushAlertBody(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs leading-relaxed focus:outline-hidden focus:border-red-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold text-xs mb-1">
+                  Target URL (क्लिक करने पर खुलने वाला पेज):
+                </label>
+                <input
+                  type="text"
+                  value={pushAlertUrl}
+                  onChange={(e) => setPushAlertUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-hidden focus:border-red-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setPushAlertPost(null)}
+                disabled={isSendingPush}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                रद्द करें (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSendRowPush}
+                disabled={isSendingPush}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {isSendingPush ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>भेजा जा रहा है...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>🚀 अभी पुश भेजें (Send Push Now)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* IN-APP POST DELETION CONFIRMATION MODAL */}
       {postToDelete && (

@@ -108,6 +108,7 @@ export interface JobItem {
 
 export interface AdmitCardItem {
   id: string;
+  slug?: string;
   title: string;
   department: string;
   examDate: string;
@@ -116,10 +117,15 @@ export interface AdmitCardItem {
   hallTicketStatus: 'Live Now' | 'Coming Soon' | 'Out';
   isNew?: boolean;
   downloadUrl?: string;
+  admitCardUrl?: string;
+  examCityUrl?: string;
+  hasAdmitCard?: boolean;
+  sourceJobId?: string;
 }
 
 export interface ResultItem {
   id: string;
+  slug?: string;
   title: string;
   department: string;
   declaredDate: string;
@@ -129,8 +135,22 @@ export interface ResultItem {
   isNew?: boolean;
   viewUrl?: string;
   resultUrl?: string;
+  answerKeyUrl?: string;
   scoreCardAvailable?: boolean;
   status?: string;
+  hasResult?: boolean;
+  sourceJobId?: string;
+}
+
+export interface PushSubscriber {
+  id: string;
+  token: string;
+  deviceType: 'mobile' | 'desktop' | 'tablet';
+  browser?: string;
+  userAgent?: string;
+  subscribedAt: string;
+  lastActiveAt?: string;
+  active: boolean;
 }
 
 export interface TrendingCard {
@@ -311,6 +331,16 @@ export interface PostRecord {
   seoDescription?: string;
   seoKeywords?: string[];
   jobPostingSchema?: Record<string, unknown>;
+
+  // Dynamic Multi-Stage Job Lifecycle Flags (Latest Jobs, Admit Card, Result)
+  hasActiveApplication?: boolean; // true when applyOnlineUrl is active and today <= lastDate
+  hasAdmitCard?: boolean; // true when admitCardUrl or examCityUrl is populated
+  hasResult?: boolean; // true when resultUrl or answerKeyUrl is populated
+  admitCardUrl?: string; // Direct link to download admit card / hall ticket
+  examCityUrl?: string; // Direct link to check exam city / date slip
+  resultUrl?: string; // Direct link to check score / result
+  answerKeyUrl?: string; // Direct link to check answer key / objections
+  lifecycleStage?: 'application' | 'admit_card' | 'result' | 'archived';
 }
 
 // Scraper Target Feeds & Sources

@@ -9,6 +9,7 @@ import { Footer } from '../../../components/Footer';
 import { FloatingMobileBar } from '../../../components/FloatingMobileBar';
 import { JobItem, AdmitCardItem, ResultItem, PostRecord } from '../../../types';
 import { subscribeToPosts, getStoredPosts } from '../../../lib/firebase';
+import { isAdmitCardPost, isResultPost, mapPostToLifecycleAdmitCard, mapPostToLifecycleResult } from '../../../lib/jobLifecycle';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 
 function mapPostToJob(p: PostRecord): JobItem {
@@ -47,32 +48,6 @@ function mapPostToJob(p: PostRecord): JobItem {
     experience: p.experience,
     location: p.location,
     batchEligibility: p.batchEligibility
-  };
-}
-
-function mapPostToAdmitCard(p: PostRecord): AdmitCardItem {
-  return {
-    id: p.id,
-    title: p.title,
-    department: p.dept,
-    examDate: p.dates?.exam || 'शीघ्र घोषित',
-    releaseDate: p.dates?.start || p.publishedAt || 'जारी',
-    hallTicketStatus: 'Live Now',
-    isNew: true,
-    downloadUrl: p.links?.apply || p.links?.notificationPdf
-  };
-}
-
-function mapPostToResult(p: PostRecord): ResultItem {
-  return {
-    id: p.id,
-    title: p.title,
-    department: p.dept,
-    resultDate: p.publishedAt || p.dates?.start || 'जारी',
-    type: p.title.toLowerCase().includes('answer key') ? 'Answer Key' : 'Final Result',
-    isNew: true,
-    status: 'Declared',
-    resultUrl: p.links?.apply || p.links?.notificationPdf
   };
 }
 
@@ -134,15 +109,11 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   );
 
   const [liveAdmitCards, setLiveAdmitCards] = useState<AdmitCardItem[]>(() =>
-    initialPosts
-      .filter((p) => p.category === 'admit-card' || p.categories?.includes('admit-card') || p.title.toLowerCase().includes('admit'))
-      .map(mapPostToAdmitCard)
+    initialPosts.filter(isAdmitCardPost).map(mapPostToLifecycleAdmitCard)
   );
 
   const [liveResults, setLiveResults] = useState<ResultItem[]>(() =>
-    initialPosts
-      .filter((p) => p.category === 'results' || p.categories?.includes('result') || p.title.toLowerCase().includes('result') || p.title.toLowerCase().includes('answer key'))
-      .map(mapPostToResult)
+    initialPosts.filter(isResultPost).map(mapPostToLifecycleResult)
   );
 
   // Detail Modal state
@@ -157,14 +128,10 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       const mapped = published.map(mapPostToJob);
       if (mapped.length > 0) setLiveJobs(mapped);
 
-      const admits = published
-        .filter((p) => p.category === 'admit-card' || p.categories?.includes('admit-card') || p.title.toLowerCase().includes('admit'))
-        .map(mapPostToAdmitCard);
+      const admits = published.filter(isAdmitCardPost).map(mapPostToLifecycleAdmitCard);
       if (admits.length > 0) setLiveAdmitCards(admits);
 
-      const results = published
-        .filter((p) => p.category === 'results' || p.categories?.includes('result') || p.title.toLowerCase().includes('result') || p.title.toLowerCase().includes('answer key'))
-        .map(mapPostToResult);
+      const results = published.filter(isResultPost).map(mapPostToLifecycleResult);
       if (results.length > 0) setLiveResults(results);
     }, 'all');
 

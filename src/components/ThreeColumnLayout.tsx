@@ -350,9 +350,16 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                         </p>
                       </div>
 
-                      <span className="shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded">
-                        {card.hallTicketStatus}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {card.isNew && (
+                          <span className="text-[10px] font-black uppercase text-white bg-blue-600 px-1.5 py-0.5 rounded shadow-2xs animate-pulse">
+                            NEW
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded">
+                          {card.hallTicketStatus}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Badges: Exam Date & Published Date Tag */}
@@ -370,13 +377,26 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
 
                     {/* Download & Service CTA */}
                     <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <button
-                        type="button"
-                        onClick={() => onSelectAdmitCard(card)}
-                        className="text-neutral-600 hover:text-neutral-900 font-medium text-[11px] flex items-center gap-1"
-                      >
-                        डाउनलोड लिंक <ChevronRight className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectAdmitCard(card)}
+                          className="text-neutral-600 hover:text-neutral-900 font-medium text-[11px] flex items-center gap-0.5"
+                        >
+                          क्विक लिंक
+                        </button>
+                        {card.slug && (
+                          <>
+                            <span className="text-neutral-300">|</span>
+                            <Link
+                              href={`/jobs/${card.slug}`}
+                              className="text-blue-700 hover:text-blue-800 font-bold text-[11px] flex items-center gap-0.5"
+                            >
+                              पेज देखें <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </>
+                        )}
+                      </div>
 
                       <a
                         href={printCardUrl}
@@ -453,15 +473,22 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
                         </p>
                       </div>
 
-                      <span
-                        className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                          res.type === 'Result'
-                            ? 'text-purple-800 bg-purple-50 border-purple-200'
-                            : 'text-amber-800 bg-amber-50 border-amber-200'
-                        }`}
-                      >
-                        {res.type}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {res.isNew && (
+                          <span className="text-[10px] font-black uppercase text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-2xs animate-pulse">
+                            NEW
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            res.type === 'Result'
+                              ? 'text-purple-800 bg-purple-50 border-purple-200'
+                              : 'text-amber-800 bg-amber-50 border-amber-200'
+                          }`}
+                        >
+                          {res.type}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Declaration Date & Scorecard status */}
@@ -485,13 +512,26 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
 
                     {/* View Result & Service CTA */}
                     <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <button
-                        type="button"
-                        onClick={() => onSelectResult(res)}
-                        className="text-neutral-600 hover:text-neutral-900 font-medium text-[11px] flex items-center gap-1"
-                      >
-                        परिणाम विवरण <ChevronRight className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectResult(res)}
+                          className="text-neutral-600 hover:text-neutral-900 font-medium text-[11px] flex items-center gap-0.5"
+                        >
+                          परिणाम विवरण
+                        </button>
+                        {res.slug && (
+                          <>
+                            <span className="text-neutral-300">|</span>
+                            <Link
+                              href={`/jobs/${res.slug}`}
+                              className="text-emerald-700 hover:text-emerald-800 font-bold text-[11px] flex items-center gap-0.5"
+                            >
+                              पेज देखें <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </>
+                        )}
+                      </div>
 
                       <a
                         href={checkResultUrl}

@@ -16,6 +16,7 @@ import { Footer } from '../components/Footer';
 import { PopupAdModal } from '../components/PopupAdModal';
 import { JobItem, AdmitCardItem, ResultItem, TrendingCard, PostRecord } from '../types';
 import { subscribeToPosts, getDeletedPostIds, syncTombstonesFromFirestore } from '../lib/firebase';
+import { isAdmitCardPost, isResultPost, mapPostToLifecycleAdmitCard, mapPostToLifecycleResult } from '../lib/jobLifecycle';
 
 // Helper to reliably compute publication timestamp for strict descending ordering
 function getPostTimestamp(p: PostRecord): number {
@@ -77,38 +78,6 @@ function mapPostToJob(p: PostRecord): JobItem {
   };
 }
 
-// Helper to convert PostRecord to AdmitCardItem
-function mapPostToAdmitCard(p: PostRecord): AdmitCardItem {
-  return {
-    id: p.id,
-    title: p.title,
-    department: p.dept,
-    examDate: p.examDate || p.dates?.exam || 'शीघ्र घोषित',
-    releaseDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
-    publishedDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
-    hallTicketStatus: 'Live Now',
-    isNew: true,
-    downloadUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf
-  };
-}
-
-// Helper to convert PostRecord to ResultItem
-function mapPostToResult(p: PostRecord): ResultItem {
-  return {
-    id: p.id,
-    title: p.title,
-    department: p.dept,
-    declaredDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
-    resultDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
-    publishedDate: p.publishedDate || (typeof p.publishedAt === 'string' ? p.publishedAt : '22/09/2026'),
-    type: p.title.toLowerCase().includes('answer key') ? 'Answer Key' : 'Final Result',
-    isNew: true,
-    status: 'Declared',
-    viewUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf,
-    resultUrl: p.applyLink || p.links?.apply || p.notificationPdf || p.links?.notificationPdf
-  };
-}
-
 export default function NPJobPortalPage() {
   const [currentLayout, setCurrentLayout] = useState<'A' | 'B'>('A');
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,7 +110,7 @@ export default function NPJobPortalPage() {
       validPosts.sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
       setRawPosts(validPosts);
 
-      // Separate into Jobs, Admit Cards, and Results
+      // Separate into Jobs, Admit Cards, and Results with Dynamic Lifecycle Auto-Highlighting
       const jobsList = validPosts
         .filter(
           (p) =>
@@ -150,31 +119,18 @@ export default function NPJobPortalPage() {
             p.category === 'tech-jobs' ||
             p.category === 'central' ||
             p.categories?.includes('vacancy') ||
+            p.hasActiveApplication ||
             (!p.categories?.includes('admit-card') && !p.categories?.includes('result'))
         )
         .map(mapPostToJob);
 
       const admitList = validPosts
-        .filter(
-          (p) =>
-            p.category === 'admit-card' ||
-            p.categories?.includes('admit-card') ||
-            p.categories?.includes('admit_card') ||
-            p.title.toLowerCase().includes('admit')
-        )
-        .map(mapPostToAdmitCard);
+        .filter(isAdmitCardPost)
+        .map(mapPostToLifecycleAdmitCard);
 
       const resultsList = validPosts
-        .filter(
-          (p) =>
-            p.category === 'results' ||
-            p.category === 'result' ||
-            p.categories?.includes('result') ||
-            p.categories?.includes('results') ||
-            p.title.toLowerCase().includes('result') ||
-            p.title.toLowerCase().includes('answer key')
-        )
-        .map(mapPostToResult);
+        .filter(isResultPost)
+        .map(mapPostToLifecycleResult);
 
       setLiveJobs(jobsList);
       setLiveAdmitCards(admitList);

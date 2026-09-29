@@ -4,6 +4,7 @@ import "./globals.css";
 import { ChannelJoinPopup } from "../components/ChannelJoinPopup";
 import { HashPurgeHandler } from "../components/HashPurgeHandler";
 import { RewardedAdGate } from "../components/RewardedAdGate";
+import { PushNotificationPrompt } from "../components/PushNotificationPrompt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -202,6 +203,7 @@ export default function RootLayout({
         <HashPurgeHandler />
         <ChannelJoinPopup />
         <RewardedAdGate />
+        <PushNotificationPrompt />
         {children}
       </body>
     </html>

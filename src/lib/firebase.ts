@@ -45,6 +45,9 @@ if (!getApps().length) {
   app = getApp();
 }
 
+// Export Firebase App instance
+export { app };
+
 // Export Firestore db instance
 export const db: Firestore = getFirestore(app);
 
