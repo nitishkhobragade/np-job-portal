@@ -11,7 +11,8 @@ export async function loadPdfJs(): Promise<PdfJsModule | null> {
   try {
     const pdfjs = await import('pdfjs-dist');
     if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version || '4.10.38'}/pdf.worker.min.mjs`;
+      const version = pdfjs.version || '4.10.38';
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
     }
     cachedPdfJs = pdfjs;
     return pdfjs;
@@ -114,23 +115,45 @@ export async function renderAllPdfPagesToCanvases(
     if (onProgress) {
       onProgress(i, total);
     }
-    const page = await pdfDoc.getPage(i);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (ctx) {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const renderContext = {
-        canvasContext: ctx,
-        viewport,
-        intent: 'print',
-      };
-      // @ts-expect-error pdfjs typing nuance
-      await page.render(renderContext).promise;
-      results.push({ pageNumber: i, canvas });
+    try {
+      const page = await pdfDoc.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const renderContext = {
+          canvasContext: ctx,
+          viewport,
+          intent: 'print',
+        };
+        // @ts-expect-error pdfjs typing nuance
+        await page.render(renderContext).promise;
+        results.push({ pageNumber: i, canvas });
+      }
+    } catch (pageErr) {
+      console.warn(`Error rendering page ${i}, generating placeholder canvas:`, pageErr);
+      const fallbackCanvas = document.createElement('canvas');
+      fallbackCanvas.width = 400;
+      fallbackCanvas.height = 560;
+      const fCtx = fallbackCanvas.getContext('2d');
+      if (fCtx) {
+        fCtx.fillStyle = '#f8fafc';
+        fCtx.fillRect(0, 0, 400, 560);
+        fCtx.strokeStyle = '#cbd5e1';
+        fCtx.lineWidth = 2;
+        fCtx.strokeRect(10, 10, 380, 540);
+        fCtx.fillStyle = '#64748b';
+        fCtx.font = 'bold 20px sans-serif';
+        fCtx.textAlign = 'center';
+        fCtx.fillText(`Page ${i}`, 200, 260);
+        fCtx.font = '14px sans-serif';
+        fCtx.fillText('PDF Document Page', 200, 290);
+      }
+      results.push({ pageNumber: i, canvas: fallbackCanvas });
     }
   }
 

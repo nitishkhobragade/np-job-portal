@@ -161,6 +161,65 @@ export default function AdminPage() {
     }
   }, []);
 
+  // Handle Logout
+  const handleLogout = React.useCallback(async () => {
+    inMemoryAdminAuth = false;
+    safeStorage.remove("np_portal_admin_session");
+    safeStorage.remove("np_admin_session");
+    safeStorage.remove("np_admin_auth");
+    safeStorage.remove("np_admin_user");
+    safeStorage.remove("np_admin_email");
+
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {}
+
+    setIsAuthenticated(false);
+    setAdminId("");
+    setPassword("");
+    setErrorMsg("");
+  }, []);
+
+  // 8-Minute Inactivity Auto-Logout Timer (Security Compliance)
+  const [idleSecondsRemaining, setIdleSecondsRemaining] = useState<number>(480);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let lastActivityTime = Date.now();
+    const IDLE_LIMIT_MS = 8 * 60 * 1000; // 8 minutes = 480 seconds
+
+    const handleUserActivity = () => {
+      lastActivityTime = Date.now();
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'mousedown', 'scroll', 'touchstart'];
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, handleUserActivity, { passive: true });
+    });
+
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - lastActivityTime;
+      const remaining = Math.max(0, Math.ceil((IDLE_LIMIT_MS - elapsed) / 1000));
+      setIdleSecondsRemaining(remaining);
+
+      if (elapsed >= IDLE_LIMIT_MS) {
+        clearInterval(timer);
+        handleLogout();
+        if (typeof window !== 'undefined') {
+          alert('🔒 सुरक्षा अलर्ट: एडमिन पैनल 8 मिनट तक निष्क्रिय (No Activity) रहने पर सुरक्षा कारणों से स्वतः लॉगआउट (Auto Logged Out) कर दिया गया है।');
+        }
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, handleUserActivity);
+      });
+    };
+  }, [isAuthenticated, handleLogout]);
+
   // Active Admin Tab: 'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup' | 'adsense'
   const [activeTab, setActiveTab] = useState<'posts' | 'poster' | 'scraper' | 'popup' | 'ticker' | 'backup' | 'adsense'>('posts');
 
@@ -522,25 +581,6 @@ export default function AdminPage() {
     setPendingStatusChanges({});
     await refreshData();
     showToast('असुरक्षित परिवर्तन रद्द कर दिए गए।');
-  };
-
-  // Handle Logout
-  const handleLogout = async () => {
-    inMemoryAdminAuth = false;
-    safeStorage.remove("np_portal_admin_session");
-    safeStorage.remove("np_admin_session");
-    safeStorage.remove("np_admin_auth");
-    safeStorage.remove("np_admin_user");
-    safeStorage.remove("np_admin_email");
-
-    try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } catch {}
-
-    setIsAuthenticated(false);
-    setAdminId("");
-    setPassword("");
-    setErrorMsg("");
   };
 
   // Delete Post Action - In-App Confirmation Handler
@@ -1367,6 +1407,19 @@ export default function AdminPage() {
               <RefreshCw className={`w-4 h-4 ${isLoadingPosts ? 'animate-spin' : ''}`} />
             </button>
 
+            {/* 8-Minute Auto Logout Security Indicator */}
+            <div
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors ${
+                idleSecondsRemaining < 60
+                  ? 'bg-red-950/80 text-red-300 border-red-500 animate-pulse'
+                  : 'bg-slate-800/80 text-amber-300 border-slate-700'
+              }`}
+              title="8 मिनट निष्क्रिय रहने पर सुरक्षा हेतु स्वतः लॉगआउट हो जाएगा"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>ऑटो-लॉगआउट: {Math.floor(idleSecondsRemaining / 60)}:{String(idleSecondsRemaining % 60).padStart(2, '0')}</span>
+            </div>
+
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-200 rounded-lg text-xs font-bold border border-rose-800/80 transition-colors"
@@ -2079,15 +2132,101 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-bold text-[11px] mb-1">
-                        भर्ती का विस्तृत विवरण (About Job & Work Profile):
-                      </label>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
+                        <label className="block text-slate-300 font-bold text-[11px]">
+                          भर्ती का विस्तृत विवरण (About Job & Work Profile):
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-bold">
+                          Markdown & Text Formatting Tools समर्थित
+                        </span>
+                      </div>
+
+                      {/* Text Formatting Toolbar (SarkariResult Style) */}
+                      <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-t-lg border border-b-0 border-slate-700 flex-wrap text-[11px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription((prev) => `${prev} **बोल्ड टेक्स्ट** `)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer"
+                          title="बोल्ड (Bold)"
+                        >
+                          <strong>B</strong>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription((prev) => `${prev} *इटैलिक टेक्स्ट* `)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer italic"
+                          title="इटैलिक (Italic)"
+                        >
+                          <em>I</em>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription((prev) => `${prev}\n### मुख्य शीर्षक (Heading)\n`)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer"
+                          title="हेडिंग 3"
+                        >
+                          H3
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription((prev) => `${prev}\n- बुलेट पॉइंट 1\n- बुलेट पॉइंट 2\n`)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer"
+                          title="बुलेट लिस्ट"
+                        >
+                          • लिस्ट
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription((prev) => `${prev}\n1. पहला चरण\n2. दूसरा चरण\n`)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer"
+                          title="नंबर लिस्ट"
+                        >
+                          1. 2. 3.
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription((prev) => `${prev}\n| पद का नाम | कुल पद | योग्यता |\n|---|---|---|\n| शिक्षक (1-5) | 25,000 | 12वीं + D.El.Ed + CTET |\n`)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer flex items-center gap-1"
+                          title="टेबल जोड़ें"
+                        >
+                          📊 टेबल टेम्पलेट
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription(`### Bihar BPSC School Teacher (TRE 4.0) Recruitment 2026 for 87,000+ Posts
+**Bihar Public Service Commission (BPSC)** has announced School Teacher TRE 4.0 Recruitment for **Primary, Middle, Secondary, and Higher Secondary** classes.
+
+#### Important Bullet Points:
+- **Primary Teacher (Class 1-5):** 12th Senior Secondary with 50% Marks and 2-Year D.El.Ed or 4-Year B.El.Ed + Qualified CTET / BTET Paper I.
+- **Middle School Teacher (Class 6-8):** Bachelor Degree with D.El.Ed / B.Ed + Qualified CTET / BTET Paper II.
+- **Secondary Teacher TGT (Class 9-10):** Bachelor / Master Degree in Related Subject + B.Ed + Bihar STET Paper I.
+- **Higher Secondary PGT (Class 11-12):** Master Degree in Related Subject + B.Ed + Bihar STET Paper II.
+
+#### How to Fill Online Form:
+1. Read the full official notification before applying.
+2. Prepare scanned copies of educational documents, live photo with white background, and signature.
+3. For hassle-free online form filling assistance from home, contact **Nitish Khobragade (8982324497)** on WhatsApp.`)}
+                          className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 cursor-pointer font-bold"
+                          title="SarkariResult BPSC TRE 4.0 टेम्पलेट लोड करें"
+                        >
+                          🎯 BPSC TRE 4.0 फॉर्मेट
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormDescription('')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-white border border-slate-700 cursor-pointer ml-auto"
+                          title="खाली करें"
+                        >
+                          Clear
+                        </button>
+                      </div>
+
                       <textarea
-                        rows={4}
+                        rows={5}
                         value={formDescription}
                         onChange={(e) => setFormDescription(e.target.value)}
                         placeholder="उदा: यह भर्ती क्या है? विभाग का परिचय, चयनित उम्मीदवार के कार्य, क्यों महत्वपूर्ण है..."
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white text-xs leading-relaxed focus:outline-hidden focus:border-amber-400"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-b-lg p-2.5 text-white text-xs leading-relaxed focus:outline-hidden focus:border-amber-400 font-mono"
                       />
                     </div>
 

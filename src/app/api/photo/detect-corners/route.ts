@@ -20,27 +20,34 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
     const cleanImg = imageBase64.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, '');
 
     const prompt = `You are a world-class AI computer vision assistant specializing in document scanning and passport photo extraction.
 Analyze this photo taken by a smartphone.
-In this scene, a physical printed passport-sized photo (or ID photo card) is visible. It might be held in human fingers/hands, placed inside a plastic sleeve/pouch, or lying on a paper/desk/bedsheet.
+In this scene, a physical printed passport-sized photo (or small ID photo card) is visible. It might be held in human fingers/hands, placed inside a transparent plastic sleeve/pouch, or lying on a paper, desk, or cloth.
 
 YOUR MISSION:
-1. Locate the physical passport photo print held in hand or on surface.
+1. Locate the physical passport photo print card held in hand or on surface.
 2. Return strictly the normalized coordinates bounding the inner photo paper print itself:
-   - NOT the fingers or hands holding it.
-   - NOT the plastic pouch or envelope border.
-   - NOT the desk, paper, or background.
-   - Strictly the 4 corners of the inner printed photo paper!
+   - EXCLUDE the fingers, fingernails, or hands holding it.
+   - EXCLUDE the plastic pouch, sleeve, transparent bag, or lamination border.
+   - EXCLUDE the desk, paper, or background.
+   - Strictly identify the 4 corners of the inner printed photo paper!
 3. Determine if the photo is rotated and what clockwise rotation (0, 90, 180, or 270 degrees) is needed to make the person's face upright (head at the top, chin at the bottom, upright posture).
 4. Return normalized coordinates from 0 to 1000 (where x=0 is left edge, x=1000 is right edge, y=0 is top edge, y=1000 is bottom edge).
 
 Return a JSON object in this exact schema:
 {
   "found": true,
-  "confidence": 0.96,
+  "confidence": 0.98,
   "corners": {
     "tl": { "x": 280, "y": 320 },
     "tr": { "x": 620, "y": 360 },
@@ -62,7 +69,7 @@ If no distinct physical photo print can be isolated, return:
 
 Respond ONLY with valid JSON.`;
 
-    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite'];
+    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
     let responseText = '';
 
     for (const modelName of candidateModels) {

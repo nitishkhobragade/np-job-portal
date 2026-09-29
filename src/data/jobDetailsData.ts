@@ -3,6 +3,83 @@ import { OWNER_INFO } from './portalData';
 
 export const DETAILED_JOBS_LIST: JobPostDetail[] = [
   {
+    slug: "bpsc-school-teacher-tre-4-0-2026",
+    id: "job-bpsc-tre4",
+    title: "Bihar BPSC School Teacher (TRE 4.0) Recruitment 2026 for 87,000+ Posts",
+    shortTitle: "BPSC School Teacher TRE 4.0",
+    department: "Bihar Public Service Commission (BPSC Patna)",
+    advtNo: "BPSC/TRE-4.0/2026",
+    totalPosts: "87,000+ Posts",
+    postDate: "February 2026",
+    startDate: "15/02/2026",
+    lastDate: "15/03/2026",
+    lastDateFee: "15/03/2026",
+    correctionDate: "20/03/2026",
+    examDate: "July / August 2026",
+    admitCardDate: "Exam se 10 Din Pehle",
+    feeGeneral: "₹750/- (General / OBC / Other State)",
+    feeReserved: "₹200/- (SC / ST / PH of Bihar)",
+    feePortal: "₹200/- (Female Candidates of Bihar)",
+    paymentMode: "Online Debit Card, Credit Card, Net Banking or UPI",
+    minAge: "18 Years (Primary) / 21 Years (TGT/PGT)",
+    maxAge: "37 Years (Male), 40 Years (Female / OBC)",
+    ageCalculationDate: "01/08/2026",
+    ageRelaxation: "Age Relaxation Extra as per Bihar Public Service Commission BPSC School Teacher TRE 4.0 Rules (BC/EBC 3 Yrs, SC/ST 5 Yrs).",
+    state: "Bihar",
+    category: "Teaching",
+    qualificationSummary: "Class 1-5: 12th + D.El.Ed + CTET/BTET Paper 1. Class 6-8: Degree + B.Ed/D.El.Ed + CTET/BTET Paper 2. Class 9-10: Degree in Subject + B.Ed + STET Paper 1. Class 11-12: PG in Subject + B.Ed + STET Paper 2.",
+    vacanciesBreakdown: [
+      {
+        postName: "Primary School Teacher (Class 1 to 5)",
+        total: "Approx 25,000 Posts",
+        eligibility: "12th (Senior Secondary) with 50% Marks and 2-Year D.El.Ed OR 4-Year B.El.Ed + Qualified CTET Paper I or BTET Paper I."
+      },
+      {
+        postName: "Middle School Teacher (Class 6 to 8)",
+        total: "Approx 20,000 Posts",
+        eligibility: "Bachelor Degree and 2-Year D.El.Ed OR Bachelor Degree with 50% Marks and B.Ed + Qualified CTET Paper II or BTET Paper II."
+      },
+      {
+        postName: "Secondary School Teacher TGT (Class 9 to 10)",
+        total: "Approx 22,000 Posts",
+        eligibility: "Bachelor / Master Degree in Related Subject with minimum 50% Marks and B.Ed Degree + Qualified Bihar STET Paper I."
+      },
+      {
+        postName: "Higher Secondary Teacher PGT (Class 11 to 12)",
+        total: "Approx 20,000 Posts",
+        eligibility: "Master Degree in Related Subject with minimum 50% Marks and B.Ed Degree + Qualified Bihar STET Paper II."
+      }
+    ],
+    categoryWisePosts: [
+      { category: "Primary Teacher (1-5)", ur: "9,500", obc: "6,000", ews: "2,500", sc: "4,000", st: "3,000", total: "25,000" },
+      { category: "Middle Teacher (6-8)", ur: "7,600", obc: "4,800", ews: "2,000", sc: "3,200", st: "2,400", total: "20,000" },
+      { category: "Secondary TGT (9-10)", ur: "8,360", obc: "5,280", ews: "2,200", sc: "3,520", st: "2,640", total: "22,000" },
+      { category: "Higher Secondary PGT (11-12)", ur: "7,600", obc: "4,800", ews: "2,000", sc: "3,200", st: "2,400", total: "20,000" }
+    ],
+    howToApplySteps: [
+      "Step 1: Bihar Public Service Commission (BPSC) released School Teacher TRE 4.0 Recruitment for Class 1 to 12. Candidate can apply online between 15/02/2026 to 15/03/2026.",
+      "Step 2: Candidate must read the official notification PDF carefully before applying the recruitment application form in BPSC Teacher Vacancy 2026.",
+      "Step 3: Kindly check and collect all required documents: Eligibility, ID Proof, Address Details, Basic Details, CTET/BTET/STET Marksheet, D.El.Ed / B.Ed Certificate.",
+      "Step 4: Kindly keep ready scan documents related to recruitment form: Photo (webcam live capture / white background), Signature, ID Proof, Certificates.",
+      "Step 5: Contact Nitish Khobragade (8982324497) on WhatsApp for fast, 100% accurate online form filling assistance from home.",
+      "Step 6: Before submit the application form must check the preview and all column carefully. Pay required application fee and take a printout of final submitted form."
+    ],
+    requiredDocuments: [
+      "Aadhar Card (Mobile Number Linked)",
+      "Educational Qualification Marksheets & Degree (10th, 12th, Graduation, PG)",
+      "B.Ed / D.El.Ed / B.El.Ed Marksheet & Passing Certificate",
+      "CTET / BTET / Bihar STET Certificate & Scorecard",
+      "Bihar Domicile & Caste Certificate (if applicable)",
+      "Live Webcam Photo & White Background Passport Photo",
+      "English & Hindi Signatures"
+    ],
+    applyUrl: "https://onlinebpsc.bihar.gov.in",
+    notificationPdfUrl: "https://www.bpsc.bih.nic.in",
+    syllabusUrl: "https://www.bpsc.bih.nic.in",
+    officialWebsiteUrl: "https://www.bpsc.bih.nic.in",
+    serviceTagline: "घर बैठे 100% सुरक्षित फॉर्म भरने के लिए संपर्क करें: Nitish Khobragade - 8982324497"
+  },
+  {
     slug: "mp-police-constable-2026",
     id: "job-1",
     title: "MP Police Constable (GD & Radio Operator) Recruitment 2026",

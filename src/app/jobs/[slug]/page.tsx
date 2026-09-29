@@ -21,7 +21,8 @@ import {
   Sparkles,
   ArrowLeft,
   FileCheck2,
-  Home
+  Home,
+  Globe
 } from 'lucide-react';
 import { getJobDetailBySlug } from '../../../data/jobDetailsData';
 import { OWNER_INFO } from '../../../data/portalData';
@@ -114,6 +115,24 @@ export default function JobDetailPage() {
   const richDesc = getRichJobDescription(job);
 
   const [copiedLink, setCopiedLink] = useState(false);
+  const [pageLang, setPageLang] = useState<'en' | 'hi'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('portal_preferred_lang');
+        if (saved === 'hi' || saved === 'en') return saved;
+      } catch {}
+    }
+    return 'en';
+  });
+
+  const toggleLanguage = (lang: 'en' | 'hi') => {
+    setPageLang(lang);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('portal_preferred_lang', lang);
+      } catch {}
+    }
+  };
 
   const handleSharePage = async () => {
     try {
@@ -164,11 +183,39 @@ export default function JobDetailPage() {
             </Link>
           </div>
 
-          {/* Direct WhatsApp Callout for Nitish */}
+          {/* Direct WhatsApp Callout & Language Toggle */}
           <div className="flex items-center gap-2">
+            {/* Language Switcher (SarkariResult English / Hindi) */}
+            <div className="flex items-center rounded-lg border border-neutral-300 bg-neutral-100 p-0.5 text-xs font-bold shadow-2xs">
+              <button
+                type="button"
+                onClick={() => toggleLanguage('en')}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  pageLang === 'en'
+                    ? 'bg-red-700 text-white shadow-xs font-black'
+                    : 'text-neutral-700 hover:text-neutral-900'
+                }`}
+                title="View original English format (SarkariResult Style)"
+              >
+                English
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleLanguage('hi')}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  pageLang === 'hi'
+                    ? 'bg-red-700 text-white shadow-xs font-black'
+                    : 'text-neutral-700 hover:text-neutral-900'
+                }`}
+                title="हिन्दी अनुवाद में देखें"
+              >
+                हिन्दी
+              </button>
+            </div>
+
             <button
               onClick={handleSharePage}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg transition-colors cursor-pointer"
               title="Share Vacancy"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -377,34 +424,46 @@ export default function JobDetailPage() {
             <div className="p-4 sm:p-5">
               <h3 className="text-base sm:text-lg font-black text-red-700 border-b-2 border-red-200 pb-2 mb-3 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-red-600" />
-                महत्वपूर्ण तिथियां (Important Dates)
+                <span>{pageLang === 'en' ? 'Important Dates' : 'महत्वपूर्ण तिथियां (Important Dates)'}</span>
               </h3>
               <ul className="space-y-2.5 text-xs sm:text-sm">
                 <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                  <span className="text-neutral-600 font-medium">आवेदन प्रारंभ तिथि:</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'Application Begin:' : 'आवेदन प्रारंभ तिथि:'}
+                  </span>
                   <span className="font-bold text-neutral-900">{job.startDate}</span>
                 </li>
                 <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                  <span className="text-neutral-600 font-medium">ऑनलाइन आवेदन की अंतिम तिथि:</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'Last Date for Apply Online:' : 'ऑनलाइन आवेदन की अंतिम तिथि:'}
+                  </span>
                   <span className="font-black text-red-600 bg-red-50 px-2 py-0.5 rounded">{job.lastDate}</span>
                 </li>
                 <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                  <span className="text-neutral-600 font-medium">परीक्षा शुल्क भुगतान अंतिम तिथि:</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'Pay Exam Fee Last Date:' : 'परीक्षा शुल्क भुगतान अंतिम तिथि:'}
+                  </span>
                   <span className="font-bold text-neutral-900">{job.lastDateFee}</span>
                 </li>
                 {job.correctionDate && (
                   <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                    <span className="text-neutral-600 font-medium">फॉर्म संशोधन (Correction) तिथि:</span>
+                    <span className="text-neutral-600 font-medium">
+                      {pageLang === 'en' ? 'Correction Date:' : 'फॉर्म संशोधन (Correction) तिथि:'}
+                    </span>
                     <span className="font-bold text-amber-700">{job.correctionDate}</span>
                   </li>
                 )}
                 <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                  <span className="text-neutral-600 font-medium">परीक्षा प्रारंभ तिथि (Exam Date):</span>
-                  <span className="font-bold text-blue-700">{job.examDate || 'शीघ्र अधिसूचित होगी'}</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'Exam Date:' : 'परीक्षा प्रारंभ तिथि (Exam Date):'}
+                  </span>
+                  <span className="font-bold text-blue-700">{job.examDate || (pageLang === 'en' ? 'As per Schedule' : 'शीघ्र अधिसूचित होगी')}</span>
                 </li>
                 <li className="flex justify-between items-center py-1">
-                  <span className="text-neutral-600 font-medium">प्रवेश पत्र (Admit Card):</span>
-                  <span className="font-bold text-emerald-700">{job.admitCardDate || 'परीक्षा से पहले'}</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'Admit Card Available:' : 'प्रवेश पत्र (Admit Card):'}
+                  </span>
+                  <span className="font-bold text-emerald-700">{job.admitCardDate || (pageLang === 'en' ? 'Before Exam' : 'परीक्षा से पहले')}</span>
                 </li>
               </ul>
             </div>
@@ -413,27 +472,37 @@ export default function JobDetailPage() {
             <div className="p-4 sm:p-5">
               <h3 className="text-base sm:text-lg font-black text-emerald-700 border-b-2 border-emerald-200 pb-2 mb-3 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-emerald-600" />
-                आवेदन शुल्क (Application Fee)
+                <span>{pageLang === 'en' ? 'Application Fee' : 'आवेदन शुल्क (Application Fee)'}</span>
               </h3>
               <ul className="space-y-2.5 text-xs sm:text-sm">
                 <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                  <span className="text-neutral-600 font-medium">सामान्य / अन्य राज्य (General/Other):</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'General / OBC / Other State:' : 'सामान्य / अन्य राज्य (General/Other):'}
+                  </span>
                   <span className="font-black text-neutral-900">{job.feeGeneral}</span>
                 </li>
                 <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                  <span className="text-neutral-600 font-medium">SC / ST / OBC / महिला:</span>
+                  <span className="text-neutral-600 font-medium">
+                    {pageLang === 'en' ? 'SC / ST / Reserved / Female:' : 'SC / ST / OBC / महिला:'}
+                  </span>
                   <span className="font-bold text-emerald-700">{job.feeReserved}</span>
                 </li>
                 {job.feePortal && (
                   <li className="flex justify-between items-center py-1 border-b border-neutral-100">
-                    <span className="text-neutral-600 font-medium">पोर्टल शुल्क (Portal Fee):</span>
+                    <span className="text-neutral-600 font-medium">
+                      {pageLang === 'en' ? 'Portal Charges:' : 'पोर्टल शुल्क (Portal Fee):'}
+                    </span>
                     <span className="font-bold text-neutral-700">{job.feePortal}</span>
                   </li>
                 )}
                 <li className="py-2">
-                  <span className="text-neutral-600 font-medium block mb-1">भुगतान का माध्यम (Payment Mode):</span>
+                  <span className="text-neutral-600 font-medium block mb-1">
+                    {pageLang === 'en' ? 'Payment Mode:' : 'भुगतान का माध्यम (Payment Mode):'}
+                  </span>
                   <span className="text-xs text-neutral-700 bg-neutral-100 p-2 rounded-lg block font-medium">
-                    {job.paymentMode}
+                    {pageLang === 'en'
+                      ? `Pay the Examination Fee Through Online Net Banking, Debit Card, Credit Card, or UPI.`
+                      : job.paymentMode}
                   </span>
                 </li>
               </ul>
@@ -444,25 +513,28 @@ export default function JobDetailPage() {
           <div className="p-4 sm:p-5 bg-neutral-50 border-b-2 border-neutral-200">
             <h3 className="text-base sm:text-lg font-black text-blue-900 border-b border-blue-200 pb-2 mb-3 flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-700" />
-              आयु सीमा (Age Limit Criteria)
-              {job.ageCalculationDate && (
-                <span className="text-xs font-bold text-neutral-600 ml-auto">
-                  (गणना तिथि: {job.ageCalculationDate})
-                </span>
-              )}
+              <span>
+                {pageLang === 'en'
+                  ? `Age Limit as on ${job.ageCalculationDate || '01/01/2026'}`
+                  : `आयु सीमा (Age Limit Criteria) ${job.ageCalculationDate ? `(गणना तिथि: ${job.ageCalculationDate})` : ''}`}
+              </span>
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
               <div className="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-2xs">
-                <div className="text-neutral-500 font-medium">न्यूनतम आयु (Minimum Age):</div>
+                <div className="text-neutral-500 font-medium">
+                  {pageLang === 'en' ? 'Minimum Age:' : 'न्यूनतम आयु (Minimum Age):'}
+                </div>
                 <div className="text-xl font-black text-neutral-900 mt-0.5">{job.minAge}</div>
               </div>
               <div className="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-2xs">
-                <div className="text-neutral-500 font-medium">अधिकतम आयु (Maximum Age):</div>
+                <div className="text-neutral-500 font-medium">
+                  {pageLang === 'en' ? 'Maximum Age:' : 'अधिकतम आयु (Maximum Age):'}
+                </div>
                 <div className="text-xl font-black text-neutral-900 mt-0.5">{job.maxAge}</div>
               </div>
             </div>
             <p className="text-xs text-neutral-600 mt-3 italic">
-              <strong>आयु में छूट (Age Relaxation):</strong> {job.ageRelaxation}
+              <strong>{pageLang === 'en' ? 'Age Relaxation Extra as per Rules:' : 'आयु में छूट (Age Relaxation):'}</strong> {job.ageRelaxation}
             </p>
           </div>
 
@@ -470,16 +542,26 @@ export default function JobDetailPage() {
           <div className="p-4 sm:p-5 border-b-2 border-neutral-200">
             <h3 className="text-base sm:text-lg font-black text-neutral-900 border-b-2 border-neutral-200 pb-2 mb-3 flex items-center gap-2">
               <GraduationCap className="w-5 h-5 text-neutral-700" />
-              पद का विवरण एवं शैक्षणिक योग्यता (Vacancy Details & Eligibility)
+              <span>
+                {pageLang === 'en'
+                  ? `Vacancy Details Total : ${job.totalPosts} Post`
+                  : `पद का विवरण एवं शैक्षणिक योग्यता (Vacancy Details & Eligibility)`}
+              </span>
             </h3>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-neutral-800 text-white font-bold">
-                    <th className="p-3 border border-neutral-700">पद का नाम (Post Name)</th>
-                    <th className="p-3 border border-neutral-700 text-center">कुल पद (Total)</th>
-                    <th className="p-3 border border-neutral-700">पात्रता / शैक्षणिक योग्यता (Eligibility Criteria)</th>
+                    <th className="p-3 border border-neutral-700">
+                      {pageLang === 'en' ? 'Post Name' : 'पद का नाम (Post Name)'}
+                    </th>
+                    <th className="p-3 border border-neutral-700 text-center">
+                      {pageLang === 'en' ? 'Total Post' : 'कुल पद (Total)'}
+                    </th>
+                    <th className="p-3 border border-neutral-700">
+                      {pageLang === 'en' ? 'Eligibility Criteria' : 'पात्रता / शैक्षणिक योग्यता (Eligibility Criteria)'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
@@ -595,7 +677,11 @@ export default function JobDetailPage() {
           <div className="p-4 sm:p-5 border-b-2 border-neutral-200 bg-white">
             <h3 className="text-base sm:text-lg font-black text-neutral-900 border-b-2 border-neutral-200 pb-2 mb-3 flex items-center gap-2">
               <FileText className="w-5 h-5 text-neutral-700" />
-              ऑनलाइन फॉर्म कैसे भरें (How to Apply Step-by-Step Guidelines)
+              <span>
+                {pageLang === 'en'
+                  ? `How to Fill ${job.shortTitle} Online Form 2026`
+                  : `ऑनलाइन फॉर्म कैसे भरें (How to Apply Step-by-Step Guidelines)`}
+              </span>
             </h3>
             <ol className="space-y-2 text-xs sm:text-sm text-neutral-700 font-medium">
               {job.howToApplySteps.map((step, i) => (
@@ -616,10 +702,12 @@ export default function JobDetailPage() {
                 Direct Links Section
               </span>
               <h3 className="text-lg sm:text-xl font-black text-neutral-900 mt-1">
-                महत्वपूर्ण उपयोगी लिंक (Important Action Links)
+                {pageLang === 'en' ? 'Important Links' : 'महत्वपूर्ण उपयोगी लिंक (Important Action Links)'}
               </h3>
               <p className="text-xs text-neutral-600">
-                ऑफिशियल पोर्टल पर जाएं अथवा व्हाट्सएप पर पोस्टर डाउनलोड कर शेयर करें
+                {pageLang === 'en'
+                  ? 'Interested Candidates Can Read the Full Notification Before Apply Online'
+                  : 'ऑफिशियल पोर्टल पर जाएं अथवा व्हाट्सएप पर पोस्टर डाउनलोड कर शेयर करें'}
               </p>
             </div>
 
@@ -630,7 +718,7 @@ export default function JobDetailPage() {
                   <tr className="hover:bg-red-50/40 transition-colors">
                     <td className="p-3.5 sm:p-4 font-black text-neutral-900 flex items-center gap-2">
                       <ExternalLink className="w-4 h-4 text-red-700" />
-                      <span>Apply Online (ऑनलाइन आवेदन करें)</span>
+                      <span>{pageLang === 'en' ? 'Apply Online' : 'Apply Online (ऑनलाइन आवेदन करें)'}</span>
                     </td>
                     <td className="p-3.5 sm:p-4 text-right">
                       <a
@@ -639,7 +727,7 @@ export default function JobDetailPage() {
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-700 hover:bg-red-800 text-white font-black text-xs sm:text-sm rounded-lg shadow-xs transition-colors"
                       >
-                        <span>Click Here (लिंक एक्टिव)</span>
+                        <span>{pageLang === 'en' ? 'Click Here' : 'Click Here (लिंक एक्टिव)'}</span>
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </td>
@@ -649,7 +737,7 @@ export default function JobDetailPage() {
                   <tr className="hover:bg-red-50/40 transition-colors">
                     <td className="p-3.5 sm:p-4 font-black text-neutral-900 flex items-center gap-2">
                       <Download className="w-4 h-4 text-blue-700" />
-                      <span>Download Notification (विस्तृत नोटिफिकेशन PDF)</span>
+                      <span>{pageLang === 'en' ? 'Download Notification' : 'Download Notification (विस्तृत नोटिफिकेशन PDF)'}</span>
                     </td>
                     <td className="p-3.5 sm:p-4 text-right">
                       <a
@@ -660,6 +748,25 @@ export default function JobDetailPage() {
                       >
                         <span>Download PDF</span>
                         <Download className="w-3.5 h-3.5" />
+                      </a>
+                    </td>
+                  </tr>
+
+                  {/* Official Website */}
+                  <tr className="hover:bg-red-50/40 transition-colors">
+                    <td className="p-3.5 sm:p-4 font-black text-neutral-900 flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-slate-700" />
+                      <span>{pageLang === 'en' ? 'Official Website' : 'Official Website (आधिकारिक वेबसाइट)'}</span>
+                    </td>
+                    <td className="p-3.5 sm:p-4 text-right">
+                      <a
+                        href={job.officialWebsiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs sm:text-sm rounded-lg shadow-xs transition-colors"
+                      >
+                        <span>Click Here</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </td>
                   </tr>

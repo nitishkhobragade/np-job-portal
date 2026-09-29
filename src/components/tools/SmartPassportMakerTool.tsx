@@ -27,10 +27,13 @@ import {
   QuadCorners,
   autoDetectPhotoCorners,
   getCenteredDefaultCorners,
+  getInnerCardDefaultCorners,
+  getQuadNaturalDimensions,
   warpPerspective,
   clientInpaintObject,
   rotateCanvas,
-  aiDetectPhotoCorners
+  aiDetectPhotoCorners,
+  replacePassportBackground
 } from '../../lib/perspectiveUtils';
 
 type ActiveStep = 'upload' | 'corners' | 'studio' | 'download';
@@ -48,6 +51,16 @@ interface ExamPreset {
 
 const EXAM_PRESETS: ExamPreset[] = [
   {
+    id: 'original-crop',
+    name: 'मूल क्रॉप्ड फोटो (Original Aspect / Size)',
+    label: 'क्रॉप की गई मूल फ़ोटो का प्राकृतिक अनुपात व स्पष्टता',
+    widthCm: 3.5,
+    heightCm: 4.5,
+    minKb: 20,
+    maxKb: 300,
+    popular: true,
+  },
+  {
     id: 'ssc-mpesb',
     name: 'SSC / MP Online / MPESB',
     label: '3.5 × 4.5 cm (20-50 KB)',
@@ -55,7 +68,6 @@ const EXAM_PRESETS: ExamPreset[] = [
     heightCm: 4.5,
     minKb: 20,
     maxKb: 50,
-    popular: true,
   },
   {
     id: 'upsc',
@@ -92,6 +104,15 @@ const EXAM_PRESETS: ExamPreset[] = [
     heightCm: 3.0,
     minKb: 10,
     maxKb: 30,
+  },
+  {
+    id: 'custom-sheet',
+    name: 'कस्टम / प्रिंटेबल शीट (Ultra HD Print)',
+    label: 'रंगीन प्रिंटर / फोटो पेपर हेतु अल्ट्रा एचडी क्लैरिटी',
+    widthCm: 3.5,
+    heightCm: 4.5,
+    minKb: 100,
+    maxKb: 2000,
   }
 ];
 
@@ -112,6 +133,7 @@ export const SmartPassportMakerTool: React.FC = () => {
 
   // Step 3: Straightened Data & Studio State (Guarantees NO blank white canvas!)
   const [straightenedDataUrl, setStraightenedDataUrl] = useState<string>('');
+  const [workingDataUrl, setWorkingDataUrl] = useState<string>('');
   const [studioReady, setStudioReady] = useState<boolean>(false);
 
   // Studio & Inpainting (Realme/Samsung Object Eraser)
@@ -130,6 +152,7 @@ export const SmartPassportMakerTool: React.FC = () => {
   // Step 4: Exam Preset & Output Sheet
   const [selectedPreset, setSelectedPreset] = useState<ExamPreset>(EXAM_PRESETS[0]);
   const [printLayout, setPrintLayout] = useState<'single' | '4x' | '6x' | '8x' | '12x'>('single');
+  const [sheetResolution, setSheetResolution] = useState<'300dpi' | '450dpi' | '600dpi' | 'a4_300'>('300dpi');
 
   // CHECKBOX CONTROL 1: Custom Dimensions
   const [enableCustomDimensions, setEnableCustomDimensions] = useState<boolean>(false);
@@ -499,6 +522,11 @@ export const SmartPassportMakerTool: React.FC = () => {
     runAiDetection(dataUrl, originalImage.width, originalImage.height, tempCanvas);
   };
 
+  const handleInnerCardCorners = () => {
+    if (!originalImage) return;
+    setCorners(getInnerCardDefaultCorners(originalImage.width, originalImage.height));
+  };
+
   const handleResetCenter = () => {
     if (!originalImage) return;
     setCorners(getCenteredDefaultCorners(originalImage.width, originalImage.height));
@@ -514,7 +542,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     });
   };
 
-  // Straighten & Warp Action (FIX FOR BLANK WHITE CANVAS)
+  // Straighten & Warp Action (FIX FOR BLANK WHITE CANVAS & NATURAL RATIO)
   const handleStraightenAndCrop = () => {
     if (!corners || !originalImage) return;
 
@@ -526,8 +554,12 @@ export const SmartPassportMakerTool: React.FC = () => {
     if (!tempCtx) return;
     tempCtx.drawImage(originalImage, 0, 0);
 
-    // Standard 3.5 : 4.5 passport output canvas resolution (700 x 900 px for crisp 300 DPI)
-    let warpedCanvas = warpPerspective(tempSrc, corners, 700, 900);
+    // Keep natural aspect ratio of the user-selected cropped quadrilateral
+    const natural = getQuadNaturalDimensions(corners);
+    const targetH = 900;
+    const targetW = Math.max(100, Math.round(targetH * natural.aspect));
+
+    let warpedCanvas = warpPerspective(tempSrc, corners, targetW, targetH);
 
     // Apply auto-rotation if detected
     if (rotationAngle !== 0) {
@@ -536,10 +568,56 @@ export const SmartPassportMakerTool: React.FC = () => {
 
     const dataUrl = warpedCanvas.toDataURL('image/jpeg', 0.95);
     setStraightenedDataUrl(dataUrl);
+    setWorkingDataUrl(dataUrl);
+    setBgColor('original');
     setStudioReady(false);
 
     // Move to Studio step
     setStep('studio');
+  };
+
+  // Live Background Color Replacement
+  const handleSelectBgColor = (color: 'original' | 'white' | 'blue' | 'grey') => {
+    setBgColor(color);
+    const source = straightenedDataUrl || workingDataUrl;
+    if (!source) return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      const tCtx = tempCanvas.getContext('2d');
+      if (!tCtx) return;
+      tCtx.drawImage(img, 0, 0);
+
+      const resultCanvas = replacePassportBackground(tempCanvas, color);
+      const newUrl = resultCanvas.toDataURL('image/jpeg', 0.95);
+      setWorkingDataUrl(newUrl);
+
+      const studioCanvas = studioCanvasRef.current;
+      if (studioCanvas) {
+        studioCanvas.width = resultCanvas.width;
+        studioCanvas.height = resultCanvas.height;
+        const sCtx = studioCanvas.getContext('2d');
+        if (sCtx) {
+          sCtx.drawImage(resultCanvas, 0, 0);
+        }
+      }
+      setAiSuccessMessage(color === 'original' ? 'मूल बैकग्राउंड बहाल किया गया' : `बैकग्राउंड रंग ${color === 'white' ? 'सफ़ेद' : color === 'blue' ? 'आसमानी नीला' : 'हल्का ग्रे'} सेट किया गया`);
+    };
+    img.src = source;
+  };
+
+  // Switch layout and auto-set Custom Sheet Preset
+  const handleLayoutChange = (layout: 'single' | '4x' | '6x' | '8x' | '12x') => {
+    setPrintLayout(layout);
+    if (layout !== 'single') {
+      const customSheet = EXAM_PRESETS.find((p) => p.id === 'custom-sheet') || EXAM_PRESETS[0];
+      setSelectedPreset(customSheet);
+      setEnableCustomKb(false);
+    }
   };
 
   // Initialize and Synchronize Studio Canvas when entering Step 3
@@ -688,6 +766,16 @@ export const SmartPassportMakerTool: React.FC = () => {
 
   // Dimension helpers: converts cm/mm/px to pixel width & height at 300 DPI
   const getTargetPixelDimensions = useCallback((): { width: number; height: number } => {
+    if (selectedPreset.id === 'original-crop') {
+      if (corners) {
+        const nat = getQuadNaturalDimensions(corners);
+        const h = 531;
+        const w = Math.round(h * nat.aspect);
+        return { width: Math.max(50, w), height: Math.max(50, h) };
+      }
+      return { width: 413, height: 531 };
+    }
+
     if (!enableCustomDimensions) {
       // Pre-filled standard: 3.5 x 4.5 cm (413 x 531 px at 300 DPI)
       const w = Math.round((selectedPreset.widthCm * 300) / 2.54);
@@ -706,7 +794,7 @@ export const SmartPassportMakerTool: React.FC = () => {
     } else {
       return { width: Math.max(50, Math.round(customWidth)), height: Math.max(50, Math.round(customHeight)) };
     }
-  }, [enableCustomDimensions, dimensionUnit, customWidth, customHeight, selectedPreset]);
+  }, [enableCustomDimensions, dimensionUnit, customWidth, customHeight, selectedPreset, corners]);
 
   // Handle custom width change with aspect ratio locking
   const handleWidthChange = (val: number) => {
@@ -728,127 +816,131 @@ export const SmartPassportMakerTool: React.FC = () => {
 
   // Generate Final Exam Output & Printable Sheet with Iterative Compression
   const generateFinalPhoto = useCallback(() => {
-    const studio = studioCanvasRef.current;
-    if (!studio) return;
+    const sourceUrl = workingDataUrl || straightenedDataUrl;
+    if (!sourceUrl) return;
 
-    // Apply color filters
-    const filteredCanvas = document.createElement('canvas');
-    filteredCanvas.width = studio.width;
-    filteredCanvas.height = studio.height;
-    const fCtx = filteredCanvas.getContext('2d');
-    if (!fCtx) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const studio = document.createElement('canvas');
+      studio.width = img.width;
+      studio.height = img.height;
+      const sCtx = studio.getContext('2d');
+      if (!sCtx) return;
+      sCtx.drawImage(img, 0, 0);
 
-    fCtx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
-    fCtx.drawImage(studio, 0, 0);
+      // Apply color filters
+      const filteredCanvas = document.createElement('canvas');
+      filteredCanvas.width = studio.width;
+      filteredCanvas.height = studio.height;
+      const fCtx = filteredCanvas.getContext('2d');
+      if (!fCtx) return;
 
-    // Replace background if selected
-    if (bgColor !== 'original') {
-      const imgData = fCtx.getImageData(0, 0, filteredCanvas.width, filteredCanvas.height);
-      const data = imgData.data;
+      fCtx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+      fCtx.drawImage(studio, 0, 0);
 
-      // Sample corners to identify background pixels
-      const cornerR = (data[0] + data[(filteredCanvas.width - 1) * 4]) / 2;
-      const cornerG = (data[1] + data[(filteredCanvas.width - 1) * 4 + 1]) / 2;
-      const cornerB = (data[2] + data[(filteredCanvas.width - 1) * 4 + 2]) / 2;
+      const { width: targetW, height: targetH } = getTargetPixelDimensions();
+      setFinalDimensions({ width: targetW, height: targetH });
 
-      let fillR = 255, fillG = 255, fillB = 255;
-      if (bgColor === 'blue') { fillR = 191; fillG = 219; fillB = 254; } // Light sky blue
-      else if (bgColor === 'grey') { fillR = 241; fillG = 245; fillB = 249; } // Neutral grey
+      // Construct target layout (single or multi-photo printable sheet)
+      const exportCanvas = document.createElement('canvas');
+      const pCtx = exportCanvas.getContext('2d');
+      if (!pCtx) return;
 
-      for (let i = 0; i < data.length; i += 4) {
-        const diff = Math.hypot(data[i] - cornerR, data[i + 1] - cornerG, data[i + 2] - cornerB);
-        if (diff < 40 && (data[i] + data[i + 1] + data[i + 2]) > 400) {
-          data[i] = fillR;
-          data[i + 1] = fillG;
-          data[i + 2] = fillB;
+      if (printLayout === 'single') {
+        exportCanvas.width = targetW;
+        exportCanvas.height = targetH;
+        pCtx.fillStyle = '#ffffff';
+        pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        pCtx.drawImage(filteredCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
+      } else {
+        // Multi-photo Printable Sheet (4x6 or A4 at selected DPI)
+        let sheetW = 1200;
+        let sheetH = 1800; // 4x6 at 300 DPI
+
+        if (sheetResolution === '450dpi') {
+          sheetW = 1800;
+          sheetH = 2700;
+        } else if (sheetResolution === '600dpi') {
+          sheetW = 2400;
+          sheetH = 3600; // 4x6 Studio Master
+        } else if (sheetResolution === 'a4_300') {
+          sheetW = 2480;
+          sheetH = 3508; // A4 Sheet 300 DPI
+        }
+
+        exportCanvas.width = sheetW;
+        exportCanvas.height = sheetH;
+        pCtx.fillStyle = '#ffffff';
+        pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+        const count = printLayout === '4x' ? 4 : printLayout === '6x' ? 6 : printLayout === '8x' ? 8 : 12;
+        const cols = count <= 4 ? 2 : count <= 8 ? 2 : 3;
+        const rows = Math.ceil(count / cols);
+
+        const pw = Math.round((sheetW / (cols + 0.4)) * 0.88);
+        const ph = Math.round(pw * (targetH / targetW));
+        const gapX = (sheetW - cols * pw) / (cols + 1);
+        const gapY = (sheetH - rows * ph) / (rows + 1);
+
+        let drawn = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (drawn >= count) break;
+            const px = Math.round(gapX + c * (pw + gapX));
+            const py = Math.round(gapY + r * (ph + gapY));
+
+            // Draw photo
+            pCtx.drawImage(filteredCanvas, px, py, pw, ph);
+
+            // Draw clean cutting border guide line
+            pCtx.strokeStyle = '#94a3b8';
+            pCtx.setLineDash([4, 4]);
+            pCtx.lineWidth = 1;
+            pCtx.strokeRect(px - 1, py - 1, pw + 2, ph + 2);
+            pCtx.setLineDash([]);
+
+            drawn++;
+          }
         }
       }
-      fCtx.putImageData(imgData, 0, 0);
-    }
 
-    const { width: targetW, height: targetH } = getTargetPixelDimensions();
-    setFinalDimensions({ width: targetW, height: targetH });
+      // Compression
+      let dataUrl = exportCanvas.toDataURL('image/jpeg', printLayout === 'single' ? 0.92 : 0.98);
+      let sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
 
-    // Construct target layout (single or multi-photo printable sheet)
-    const exportCanvas = document.createElement('canvas');
-    const pCtx = exportCanvas.getContext('2d');
-    if (!pCtx) return;
+      if (printLayout === 'single' && enableCustomKb && targetKb > 0) {
+        let minQ = 0.05;
+        let maxQ = 0.98;
+        for (let iter = 0; iter < 8; iter++) {
+          const midQ = (minQ + maxQ) / 2;
+          const testUrl = exportCanvas.toDataURL('image/jpeg', midQ);
+          const testSize = Math.round((testUrl.length * 3) / 4 / 1024);
 
-    if (printLayout === 'single') {
-      exportCanvas.width = targetW;
-      exportCanvas.height = targetH;
-      pCtx.fillStyle = '#ffffff';
-      pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-      pCtx.drawImage(filteredCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
-    } else {
-      // 4x6 inch paper (1200 x 1800 px at 300 DPI)
-      exportCanvas.width = 1200;
-      exportCanvas.height = 1800;
-      pCtx.fillStyle = '#ffffff';
-      pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+          dataUrl = testUrl;
+          sizeKb = testSize;
 
-      const count = printLayout === '4x' ? 4 : printLayout === '6x' ? 6 : printLayout === '8x' ? 8 : 12;
-      const cols = count <= 6 ? 2 : count <= 8 ? 2 : 3;
-      const rows = Math.ceil(count / cols);
-
-      const pw = Math.round(targetW * (count >= 12 ? 0.6 : 0.85));
-      const ph = Math.round(targetH * (count >= 12 ? 0.6 : 0.85));
-      const gapX = (exportCanvas.width - cols * pw) / (cols + 1);
-      const gapY = (exportCanvas.height - rows * ph) / (rows + 1);
-
-      let drawn = 0;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (drawn >= count) break;
-          const px = Math.round(gapX + c * (pw + gapX));
-          const py = Math.round(gapY + r * (ph + gapY));
-
-          // Draw photo
-          pCtx.drawImage(filteredCanvas, px, py, pw, ph);
-
-          // Draw thin cutting border line
-          pCtx.strokeStyle = '#cbd5e1';
-          pCtx.lineWidth = 1;
-          pCtx.strokeRect(px, py, pw, ph);
-
-          drawn++;
+          if (Math.abs(testSize - targetKb) <= 2) break;
+          if (testSize > targetKb) {
+            maxQ = midQ;
+          } else {
+            minQ = midQ;
+          }
         }
       }
-    }
 
-    // Client-Side Iterative Canvas JPEG Compression to match Target KB precisely
-    let dataUrl = exportCanvas.toDataURL('image/jpeg', 0.92);
-    let sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
-
-    if (enableCustomKb && targetKb > 0) {
-      // Binary search over quality to match targetKb precisely
-      let minQ = 0.05;
-      let maxQ = 0.98;
-      for (let iter = 0; iter < 8; iter++) {
-        const midQ = (minQ + maxQ) / 2;
-        const testUrl = exportCanvas.toDataURL('image/jpeg', midQ);
-        const testSize = Math.round((testUrl.length * 3) / 4 / 1024);
-
-        dataUrl = testUrl;
-        sizeKb = testSize;
-
-        if (Math.abs(testSize - targetKb) <= 2) break;
-        if (testSize > targetKb) {
-          maxQ = midQ;
-        } else {
-          minQ = midQ;
-        }
-      }
-    }
-
-    setFinalDataUrl(dataUrl);
-    setFinalFileSizeKb(sizeKb);
+      setFinalDataUrl(dataUrl);
+      setFinalFileSizeKb(sizeKb);
+    };
+    img.src = sourceUrl;
   }, [
+    workingDataUrl,
+    straightenedDataUrl,
     brightness,
     contrast,
     saturation,
-    bgColor,
     printLayout,
+    sheetResolution,
     enableCustomKb,
     targetKb,
     getTargetPixelDimensions
@@ -1026,6 +1118,15 @@ export const SmartPassportMakerTool: React.FC = () => {
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 )}
                 <span>{isDetectingCorners ? 'AI कोने खोज रहा है...' : 'AI ऑटो कोने पहचानें'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleInnerCardCorners}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-800 dark:text-indigo-300 border border-indigo-500/40 cursor-pointer flex items-center gap-1 transition-all"
+                title="हाथ या पाउच में पकड़ी छोटी फोटो को सेलेक्ट करें (50% Inner Card)"
+              >
+                <span>🔍 इनर कार्ड (50%)</span>
               </button>
 
               <button
@@ -1315,7 +1416,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                 <div className="grid grid-cols-4 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setBgColor('original')}
+                    onClick={() => handleSelectBgColor('original')}
                     className={`py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       bgColor === 'original'
                         ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900'
@@ -1326,7 +1427,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBgColor('white')}
+                    onClick={() => handleSelectBgColor('white')}
                     className={`py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       bgColor === 'white'
                         ? 'ring-2 ring-red-500 bg-white text-slate-900 border-slate-300 font-black'
@@ -1337,7 +1438,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBgColor('blue')}
+                    onClick={() => handleSelectBgColor('blue')}
                     className={`py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       bgColor === 'blue'
                         ? 'ring-2 ring-blue-600 bg-blue-100 text-blue-900 border-blue-400 font-black'
@@ -1348,7 +1449,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBgColor('grey')}
+                    onClick={() => handleSelectBgColor('grey')}
                     className={`py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       bgColor === 'grey'
                         ? 'ring-2 ring-slate-600 bg-slate-200 text-slate-900 border-slate-400 font-black'
@@ -1439,11 +1540,11 @@ export const SmartPassportMakerTool: React.FC = () => {
                 </span>
               </div>
 
-              {finalDataUrl ? (
+              {finalDataUrl || workingDataUrl || straightenedDataUrl ? (
                 <div className="p-2 bg-white rounded-xl shadow-lg border border-slate-300">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={finalDataUrl}
+                    src={finalDataUrl || workingDataUrl || straightenedDataUrl}
                     alt="Final Passport Photo"
                     className="max-h-[340px] w-auto object-contain rounded"
                   />
@@ -1455,7 +1556,7 @@ export const SmartPassportMakerTool: React.FC = () => {
               {/* Real-Time Stats Badges */}
               <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs font-bold">
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  📊 फाइल साइज़: {finalFileSizeKb} KB
+                  📊 फाइल साइज़: {finalFileSizeKb > 0 ? finalFileSizeKb : Math.max(12, Math.round(((finalDataUrl || workingDataUrl || straightenedDataUrl || '').length * 3) / 4 / 1024))} KB
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                   📐 {finalDimensions.width} × {finalDimensions.height} px (300 DPI)
@@ -1463,6 +1564,75 @@ export const SmartPassportMakerTool: React.FC = () => {
                 <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                   {selectedPreset.name}
                 </span>
+              </div>
+
+              {/* Step 4 Live Background Color Switcher */}
+              <div className="mt-3 w-full max-w-sm p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-blue-500" />
+                    <span>बैकग्राउंड रंग (Background Color):</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">1-क्लिक चेंज</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectBgColor('original');
+                      setTimeout(() => generateFinalPhoto(), 100);
+                    }}
+                    className={`py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                      bgColor === 'original'
+                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    मूल (Original)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectBgColor('white');
+                      setTimeout(() => generateFinalPhoto(), 100);
+                    }}
+                    className={`py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                      bgColor === 'white'
+                        ? 'ring-2 ring-red-500 bg-white text-slate-900 border-slate-400 font-black'
+                        : 'bg-white text-slate-800 border-slate-200'
+                    }`}
+                  >
+                    सफ़ेद (White)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectBgColor('blue');
+                      setTimeout(() => generateFinalPhoto(), 100);
+                    }}
+                    className={`py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                      bgColor === 'blue'
+                        ? 'ring-2 ring-blue-600 bg-blue-100 text-blue-900 border-blue-400 font-black'
+                        : 'bg-blue-50 text-blue-800 border-blue-200'
+                    }`}
+                  >
+                    आसमानी नीला
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSelectBgColor('grey');
+                      setTimeout(() => generateFinalPhoto(), 100);
+                    }}
+                    className={`py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                      bgColor === 'grey'
+                        ? 'ring-2 ring-slate-600 bg-slate-200 text-slate-900 border-slate-400 font-black'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    हल्का ग्रे
+                  </button>
+                </div>
               </div>
 
               {/* Quick Actions in Preview Footer */}
@@ -1508,6 +1678,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                             setCustomWidth(p.widthCm);
                             setCustomHeight(p.heightCm);
                           }
+                          setTimeout(() => generateFinalPhoto(), 50);
                         }}
                         className={`w-full text-left p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
@@ -1729,7 +1900,7 @@ export const SmartPassportMakerTool: React.FC = () => {
                     <button
                       key={l.id}
                       type="button"
-                      onClick={() => setPrintLayout(l.id as 'single' | '4x' | '6x' | '8x' | '12x')}
+                      onClick={() => handleLayoutChange(l.id as 'single' | '4x' | '6x' | '8x' | '12x')}
                       className={`py-1.5 px-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer text-center ${
                         printLayout === l.id
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
@@ -1740,6 +1911,72 @@ export const SmartPassportMakerTool: React.FC = () => {
                     </button>
                   ))}
                 </div>
+
+                {/* Ultra HD Print Resolution Selector when Sheet Layout is Selected */}
+                {printLayout !== 'single' && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-indigo-950 dark:text-indigo-200">
+                      <span>🖨️ प्रिंटर HD रिज़ॉल्यूशन (Color Print Quality):</span>
+                      <span className="text-[10px] bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.5 rounded font-black">
+                        {sheetResolution === '600dpi' ? '600 DPI Studio 4K' : sheetResolution === '450dpi' ? '450 DPI Ultra HD' : sheetResolution === 'a4_300' ? 'A4 300 DPI' : '300 DPI Standard HD'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setSheetResolution('300dpi')}
+                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                          sheetResolution === '300dpi'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <div>300 DPI (Standard HD)</div>
+                        <div className="text-[9px] opacity-80">1200 × 1800 px (4×6)</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSheetResolution('450dpi')}
+                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                          sheetResolution === '450dpi'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <div>450 DPI (Ultra HD)</div>
+                        <div className="text-[9px] opacity-80">1800 × 2700 px (4×6)</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSheetResolution('600dpi')}
+                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                          sheetResolution === '600dpi'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <div>600 DPI (Studio Master 4K)</div>
+                        <div className="text-[9px] opacity-80">2400 × 3600 px (Photo Paper)</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSheetResolution('a4_300')}
+                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                          sheetResolution === 'a4_300'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <div>A4 Sheet HD (300 DPI)</div>
+                        <div className="text-[9px] opacity-80">2480 × 3508 px</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* DOWNLOAD BUTTON */}

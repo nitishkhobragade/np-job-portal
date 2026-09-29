@@ -25,10 +25,10 @@ export function getCenteredDefaultCorners(imgWidth: number, imgHeight: number): 
 
   let boxW: number, boxH: number;
   if (currentRatio > targetRatio) {
-    boxH = Math.round(imgHeight * 0.75);
+    boxH = Math.round(imgHeight * 0.70);
     boxW = Math.round(boxH * targetRatio);
   } else {
-    boxW = Math.round(imgWidth * 0.75);
+    boxW = Math.round(imgWidth * 0.70);
     boxH = Math.round(boxW / targetRatio);
   }
 
@@ -41,6 +41,51 @@ export function getCenteredDefaultCorners(imgWidth: number, imgHeight: number): 
     br: { x: startX + boxW, y: startY + boxH },
     bl: { x: startX, y: startY + boxH },
   };
+}
+
+/**
+ * Returns centered inner corners covering ~50% of the frame,
+ * ideal for photos where someone holds a printed passport card in fingers or pouch.
+ */
+export function getInnerCardDefaultCorners(imgWidth: number, imgHeight: number): QuadCorners {
+  const targetRatio = 3.5 / 4.5;
+  const currentRatio = imgWidth / imgHeight;
+
+  let boxW: number, boxH: number;
+  if (currentRatio > targetRatio) {
+    boxH = Math.round(imgHeight * 0.50);
+    boxW = Math.round(boxH * targetRatio);
+  } else {
+    boxW = Math.round(imgWidth * 0.50);
+    boxH = Math.round(boxW / targetRatio);
+  }
+
+  const startX = Math.round((imgWidth - boxW) / 2);
+  const startY = Math.round((imgHeight - boxH) / 2);
+
+  return {
+    tl: { x: startX, y: startY },
+    tr: { x: startX + boxW, y: startY },
+    br: { x: startX + boxW, y: startY + boxH },
+    bl: { x: startX, y: startY + boxH },
+  };
+}
+
+/**
+ * Computes natural width, height, and aspect ratio of a 4-corner quadrilateral.
+ */
+export function getQuadNaturalDimensions(corners: QuadCorners): { width: number; height: number; aspect: number } {
+  const topW = Math.hypot(corners.tr.x - corners.tl.x, corners.tr.y - corners.tl.y);
+  const botW = Math.hypot(corners.br.x - corners.bl.x, corners.br.y - corners.bl.y);
+  const avgW = (topW + botW) / 2;
+
+  const leftH = Math.hypot(corners.bl.x - corners.tl.x, corners.bl.y - corners.tl.y);
+  const rightH = Math.hypot(corners.br.x - corners.tr.x, corners.br.y - corners.tr.y);
+  const avgH = (leftH + rightH) / 2;
+
+  const width = Math.max(50, Math.round(avgW));
+  const height = Math.max(50, Math.round(avgH));
+  return { width, height, aspect: width / height };
 }
 
 /**
@@ -99,17 +144,18 @@ export function autoDetectPhotoCorners(
     const meanLum = sumLum / (sampleW * sampleH);
     const lumRange = maxLum - minLum;
 
-    // 2. Multi-threshold candidate search (Otsu & relative brightness levels)
-    // Passport photo paper in hands/desk is brighter than surrounding hand/furniture
-    const candidateThresholds: number[] = [];
-    if (lumRange > 40) {
-      candidateThresholds.push(meanLum + lumRange * 0.15);
-      candidateThresholds.push(meanLum + lumRange * 0.28);
-      candidateThresholds.push(meanLum + lumRange * 0.40);
-      candidateThresholds.push(minLum + lumRange * 0.55);
+    // 2. Multi-threshold candidate search (both bright-on-dark and dark-on-bright)
+    const candidateThresholds: Array<{ val: number; mode: 'bright' | 'dark' }> = [];
+    if (lumRange > 30) {
+      candidateThresholds.push({ val: meanLum + lumRange * 0.12, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum + lumRange * 0.25, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum + lumRange * 0.38, mode: 'bright' });
+      // Dark on bright (e.g. blue passport background on white desk or paper)
+      candidateThresholds.push({ val: meanLum - lumRange * 0.12, mode: 'dark' });
+      candidateThresholds.push({ val: meanLum - lumRange * 0.25, mode: 'dark' });
     } else {
-      candidateThresholds.push(meanLum * 1.15);
-      candidateThresholds.push(meanLum * 1.30);
+      candidateThresholds.push({ val: meanLum * 1.10, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum * 0.90, mode: 'dark' });
     }
 
     let bestCandidate: {
@@ -120,17 +166,20 @@ export function autoDetectPhotoCorners(
       score: number;
     } | null = null;
 
-    for (const thresh of candidateThresholds) {
+    for (const threshItem of candidateThresholds) {
+      const thresh = threshItem.val;
+      const isBright = threshItem.mode === 'bright';
       const visited = new Uint8Array(sampleW * sampleH);
 
-      // Avoid edge 3% to prevent borders
+      // Avoid edge 3% to prevent outer frame borders
       const padX = Math.max(3, Math.round(sampleW * 0.03));
       const padY = Math.max(3, Math.round(sampleH * 0.03));
 
       for (let y = padY; y < sampleH - padY; y += 2) {
         for (let x = padX; x < sampleW - padX; x += 2) {
           const idx = y * sampleW + x;
-          if (visited[idx] === 1 || gray[idx] < thresh) continue;
+          const match = isBright ? gray[idx] >= thresh : gray[idx] <= thresh;
+          if (visited[idx] === 1 || !match) continue;
 
           // Flood fill connected component
           const queue = [x, y];
@@ -171,7 +220,8 @@ export function autoDetectPhotoCorners(
             for (const [nx, ny] of neighbors) {
               if (nx >= padX && nx < sampleW - padX && ny >= padY && ny < sampleH - padY) {
                 const nIdx = ny * sampleW + nx;
-                if (visited[nIdx] === 0 && gray[nIdx] >= thresh) {
+                const nMatch = isBright ? gray[nIdx] >= thresh : gray[nIdx] <= thresh;
+                if (visited[nIdx] === 0 && nMatch) {
                   visited[nIdx] = 1;
                   queue.push(nx, ny);
                 }
@@ -380,12 +430,22 @@ function getNormalizedPerspectiveTransform(
 export function warpPerspective(
   sourceCanvas: HTMLCanvasElement,
   corners: QuadCorners,
-  targetWidth: number = 700,
-  targetHeight: number = 900
+  targetWidth?: number,
+  targetHeight?: number
 ): HTMLCanvasElement {
+  let finalW = targetWidth || 0;
+  let finalH = targetHeight || 0;
+
+  if (finalW <= 0 || finalH <= 0) {
+    const natural = getQuadNaturalDimensions(corners);
+    const aspect = natural.aspect;
+    finalH = 900;
+    finalW = Math.max(100, Math.round(finalH * aspect));
+  }
+
   const outputCanvas = document.createElement('canvas');
-  outputCanvas.width = targetWidth;
-  outputCanvas.height = targetHeight;
+  outputCanvas.width = finalW;
+  outputCanvas.height = finalH;
 
   const outCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
   const srcCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
@@ -396,18 +456,18 @@ export function warpPerspective(
   const srcData = srcCtx.getImageData(0, 0, srcW, srcH);
   const srcPixels = srcData.data;
 
-  const outData = outCtx.createImageData(targetWidth, targetHeight);
+  const outData = outCtx.createImageData(finalW, finalH);
   const outPixels = outData.data;
 
   // Normalized homography mapping [0, 1] dest -> [0, 1] source
   const H = getNormalizedPerspectiveTransform(corners, srcW, srcH);
 
   // Backward pixel mapping with bilinear interpolation & boundary clamping
-  for (let dy = 0; dy < targetHeight; dy++) {
-    const normDy = dy / targetHeight;
+  for (let dy = 0; dy < finalH; dy++) {
+    const normDy = dy / finalH;
 
-    for (let dx = 0; dx < targetWidth; dx++) {
-      const normDx = dx / targetWidth;
+    for (let dx = 0; dx < finalW; dx++) {
+      const normDx = dx / finalW;
 
       const z = H[6] * normDx + H[7] * normDy + H[8];
       const invZ = 1.0 / (Math.abs(z) > 1e-9 ? z : 1e-9);
@@ -418,7 +478,7 @@ export function warpPerspective(
       const sx = normSx * srcW;
       const sy = normSy * srcH;
 
-      const outIndex = (dy * targetWidth + dx) * 4;
+      const outIndex = (dy * finalW + dx) * 4;
 
       // Clamp coordinates to natural image bounds (never yields blank white!)
       const clx = Math.max(0, Math.min(srcW - 1.001, sx));
@@ -451,6 +511,151 @@ export function warpPerspective(
 
   outCtx.putImageData(outData, 0, 0);
   return outputCanvas;
+}
+
+/**
+ * Intelligent Passport Background Replacer:
+ * Detects background in the top and sides, then applies chosen tint (White, Blue, Grey).
+ */
+export function replacePassportBackground(
+  sourceCanvas: HTMLCanvasElement,
+  color: 'original' | 'white' | 'blue' | 'grey'
+): HTMLCanvasElement {
+  if (color === 'original') return sourceCanvas;
+
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = w;
+  outCanvas.height = h;
+  const outCtx = outCanvas.getContext('2d');
+  if (!outCtx) return sourceCanvas;
+
+  outCtx.drawImage(sourceCanvas, 0, 0);
+  const imgData = outCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+
+  // 1. Sample background color profile STRICTLY from top-left and top-right corners
+  // Avoid central top region (w * 0.28 to w * 0.72) where hair and head are located!
+  let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+  const cornerW = Math.max(10, Math.floor(w * 0.25));
+  const cornerH = Math.max(10, Math.floor(h * 0.25));
+
+  for (let y = 0; y < cornerH; y += 2) {
+    // Top-left corner
+    for (let x = 0; x < cornerW; x += 2) {
+      const idx = (y * w + x) * 4;
+      bgR += data[idx];
+      bgG += data[idx + 1];
+      bgB += data[idx + 2];
+      bgCount++;
+    }
+    // Top-right corner
+    for (let x = w - cornerW; x < w; x += 2) {
+      const idx = (y * w + x) * 4;
+      bgR += data[idx];
+      bgG += data[idx + 1];
+      bgB += data[idx + 2];
+      bgCount++;
+    }
+  }
+
+  const meanR = bgR / (bgCount || 1);
+  const meanG = bgG / (bgCount || 1);
+  const meanB = bgB / (bgCount || 1);
+
+  // Target fill colors
+  let fillR = 255, fillG = 255, fillB = 255;
+  if (color === 'blue') {
+    fillR = 59; fillG = 130; fillB = 246; // Official passport sky/studio blue (#3b82f6)
+  } else if (color === 'grey') {
+    fillR = 226; fillG = 232; fillB = 240; // Neutral studio light grey (#e2e8f0)
+  }
+
+  // 2. Flood fill segmentation starting ONLY from top-left and top-right corner seeds
+  const isBg = new Uint8Array(w * h);
+  const queue: number[] = [];
+  const tolerance = 48;
+
+  const checkAndEnqueue = (x: number, y: number) => {
+    const idx = y * w + x;
+    if (isBg[idx] === 1) return;
+    const p = idx * 4;
+    const dist = Math.hypot(data[p] - meanR, data[p + 1] - meanG, data[p + 2] - meanB);
+    if (dist < tolerance) {
+      isBg[idx] = 1;
+      queue.push(x, y);
+    }
+  };
+
+  // Seed top-left and top-right edges
+  for (let x = 0; x < cornerW; x++) {
+    checkAndEnqueue(x, 0);
+  }
+  for (let x = w - cornerW; x < w; x++) {
+    checkAndEnqueue(x, 0);
+  }
+  // Seed upper side edges (top 50% only)
+  for (let y = 1; y < Math.floor(h * 0.50); y++) {
+    checkAndEnqueue(0, y);
+    checkAndEnqueue(w - 1, y);
+  }
+
+  let head = 0;
+  while (head < queue.length) {
+    const cx = queue[head++];
+    const cy = queue[head++];
+
+    const neighbors = [
+      [cx + 1, cy],
+      [cx - 1, cy],
+      [cx, cy + 1],
+      [cx, cy - 1]
+    ];
+
+    for (const [nx, ny] of neighbors) {
+      if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+        const nIdx = ny * w + nx;
+        if (isBg[nIdx] === 0) {
+          const pIdx = nIdx * 4;
+          const r = data[pIdx];
+          const g = data[pIdx + 1];
+          const b = data[pIdx + 2];
+
+          // Face / hair detection guard: dark hair (lum < 60) or warm skin tone should NOT be treated as background
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          const isHair = lum < 55 && (meanR > 90 || meanG > 90 || meanB > 90);
+          if (isHair) continue;
+
+          const dist = Math.hypot(r - meanR, g - meanG, b - meanB);
+          // Height penalty: be stricter in lower half to protect shoulders/clothes
+          const heightPenalty = ny > h * 0.4 ? ((ny - h * 0.4) / (h * 0.6)) * 28 : 0;
+
+          if (dist < tolerance - heightPenalty) {
+            isBg[nIdx] = 1;
+            queue.push(nx, ny);
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Smooth blend replaced background onto canvas
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (isBg[idx] === 1) {
+        const pIdx = idx * 4;
+        data[pIdx] = fillR;
+        data[pIdx + 1] = fillG;
+        data[pIdx + 2] = fillB;
+      }
+    }
+  }
+
+  outCtx.putImageData(imgData, 0, 0);
+  return outCanvas;
 }
 
 /**
