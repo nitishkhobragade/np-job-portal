@@ -5,7 +5,7 @@ import { Download, RefreshCw, ShieldCheck, ArrowUpRight, CheckCircle2 } from 'lu
 import { ToolUploadBox } from './ToolUploadBox';
 import { ToolErrorBanner } from './ToolErrorBanner';
 import { formatFileSize, getRealFileBytes } from '../../lib/fileHelper';
-import { compressCanvasStrictlyUnderTarget } from '../../lib/imageCompressionHelper';
+import { compressCanvasStrictlyUnderTarget, padJpegBytes } from '../../lib/imageCompressionHelper';
 
 export const ImageSizeIncreaserTool: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -58,48 +58,6 @@ export const ImageSizeIncreaserTool: React.FC = () => {
     setProcessedImageUrl(null);
     setProcessedSizeBytes(0);
     setErrorMessage(null);
-  };
-
-  // Safe JPEG padding function that inserts a valid COM (0xFF 0xFE) marker segment
-  const padJpegBytes = (jpegBuffer: ArrayBuffer, desiredTotalBytes: number): Uint8Array => {
-    const originalBytes = new Uint8Array(jpegBuffer);
-    if (originalBytes.length >= desiredTotalBytes) {
-      return originalBytes;
-    }
-
-    const neededExtra = desiredTotalBytes - originalBytes.length;
-    // JPEG COM segment header is 4 bytes (0xFF, 0xFE, lengthHigh, lengthLow)
-    // We can insert after SOI (0xFF 0xD8 at index 2)
-    const result = new Uint8Array(originalBytes.length + neededExtra);
-
-    // Copy SOI (first 2 bytes)
-    result[0] = originalBytes[0];
-    result[1] = originalBytes[1];
-
-    let writeIndex = 2;
-    let remainingToPad = neededExtra;
-
-    while (remainingToPad > 0) {
-      // Max payload in a single JPEG segment is 65533 bytes (since length field is 16-bit)
-      const segmentTotal = Math.min(remainingToPad, 65535);
-      const payloadSize = Math.max(0, segmentTotal - 4);
-
-      result[writeIndex] = 0xff;
-      result[writeIndex + 1] = 0xfe; // COM marker
-      const segLength = payloadSize + 2;
-      result[writeIndex + 2] = (segLength >> 8) & 0xff;
-      result[writeIndex + 3] = segLength & 0xff;
-
-      // Fill harmless whitespace/padding
-      result.fill(0x20, writeIndex + 4, writeIndex + 4 + payloadSize);
-
-      writeIndex += 4 + payloadSize;
-      remainingToPad -= (4 + payloadSize);
-    }
-
-    // Copy rest of the original JPEG
-    result.set(originalBytes.subarray(2), writeIndex);
-    return result;
   };
 
   const handleIncreaseSize = async () => {

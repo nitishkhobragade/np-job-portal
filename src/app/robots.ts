@@ -19,7 +19,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/admin/', '/api/'],
       },
     ],
-    sitemap: 'https://npjobportal.com/sitemap.xml',
-    host: 'https://npjobportal.com',
+    sitemap: 'https://npjobportal.in/sitemap.xml',
+    host: 'https://npjobportal.in',
   };
 }

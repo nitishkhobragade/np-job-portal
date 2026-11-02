@@ -4,13 +4,125 @@
  * (i.e. size in bytes <= targetKb * 1024).
  * If necessary, it creates a file 1-2 KB below the target ceiling, which is safe
  * for government examination portals (SSC, UPSC, State PSC, Police, Railway, etc.).
+ *
+ * It also supports automatic target padding (via valid JPEG COM markers) so that
+ * when user requests a specific target KB (e.g. 25 KB or 50 KB for a 140x60 signature),
+ * the output file size comfortably reaches that target size and is NOT stuck at 2-3 KB.
  */
 
 export interface CompressOptions {
   targetKb: number;
   mimeType?: 'image/jpeg' | 'image/webp' | 'image/png';
-  /** Margin in bytes below target to ensure safety against rounding (default 512 bytes) */
+  /** Margin in bytes below target to ensure safety against rounding (default 400 bytes) */
   safetyMarginBytes?: number;
+  /**
+   * When true (default: true for JPEG), if the image compresses naturally smaller than
+   * targetKb (e.g. small dimensions like 140x60 signatures), safe JPEG COM segments are
+   * added so the file size reaches the user's requested target KB to satisfy government portal
+   * minimum file size rules (e.g., minimum 20 KB - 50 KB).
+   */
+  padToTarget?: boolean;
+}
+
+/**
+ * Inserts valid JPEG COM (0xFF 0xFE) marker segments after the SOI marker (0xFF 0xD8).
+ * This safely increases JPEG file size to exact desired byte count without touching image pixels.
+ * Completely compliant with ISO/IEC 10918-1 JPEG standard.
+ */
+export function padJpegBytes(jpegBuffer: ArrayBuffer, desiredTotalBytes: number): Uint8Array {
+  const originalBytes = new Uint8Array(jpegBuffer);
+  if (originalBytes.length >= desiredTotalBytes) {
+    return originalBytes;
+  }
+
+  // Ensure it is a valid JPEG starting with SOI (0xFF 0xD8)
+  if (originalBytes.length < 4 || originalBytes[0] !== 0xff || originalBytes[1] !== 0xd8) {
+    return originalBytes;
+  }
+
+  let neededExtra = desiredTotalBytes - originalBytes.length;
+  if (neededExtra < 4) {
+    return originalBytes;
+  }
+
+  // Build list of COM segments (max 65535 total bytes each)
+  const segments: number[] = [];
+  while (neededExtra > 0) {
+    if (neededExtra < 4) {
+      if (segments.length > 0 && segments[segments.length - 1] + neededExtra <= 65535) {
+        segments[segments.length - 1] += neededExtra;
+      }
+      break;
+    }
+    const segSize = Math.min(neededExtra, 65500);
+    if (neededExtra - segSize > 0 && neededExtra - segSize < 4 && segSize + (neededExtra - segSize) <= 65535) {
+      segments.push(neededExtra);
+      neededExtra = 0;
+      break;
+    }
+    segments.push(segSize);
+    neededExtra -= segSize;
+  }
+
+  const totalExtra = segments.reduce((a, b) => a + b, 0);
+  const result = new Uint8Array(originalBytes.length + totalExtra);
+
+  // Copy SOI (first 2 bytes)
+  result[0] = 0xff;
+  result[1] = 0xd8;
+
+  let writeIndex = 2;
+  for (const segTotal of segments) {
+    const payloadSize = segTotal - 4;
+    result[writeIndex] = 0xff;
+    result[writeIndex + 1] = 0xfe; // COM marker
+    const segLength = payloadSize + 2;
+    result[writeIndex + 2] = (segLength >> 8) & 0xff;
+    result[writeIndex + 3] = segLength & 0xff;
+    // Fill with harmless whitespace bytes (ASCII space 0x20)
+    result.fill(0x20, writeIndex + 4, writeIndex + 4 + payloadSize);
+    writeIndex += segTotal;
+  }
+
+  // Copy remaining original JPEG bytes
+  result.set(originalBytes.subarray(2), writeIndex);
+  return result;
+}
+
+/**
+ * Safely pads a JPEG Data URL to reach the desired byte count.
+ */
+export function padJpegDataUrl(dataUrl: string, desiredTotalBytes: number): string {
+  if (!dataUrl.startsWith('data:image/jpeg') && !dataUrl.startsWith('data:image/jpg')) {
+    return dataUrl;
+  }
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx === -1) return dataUrl;
+
+  try {
+    const base64Str = dataUrl.slice(commaIdx + 1);
+    const binaryStr = atob(base64Str);
+    const len = binaryStr.length;
+    if (len >= desiredTotalBytes) return dataUrl;
+
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    const paddedBytes = padJpegBytes(bytes.buffer, desiredTotalBytes);
+
+    let binary = '';
+    const paddedLen = paddedBytes.byteLength;
+    const chunk = 8192;
+    for (let i = 0; i < paddedLen; i += chunk) {
+      const sub = paddedBytes.subarray(i, Math.min(i + chunk, paddedLen));
+      binary += String.fromCharCode.apply(null, Array.from(sub));
+    }
+    return `data:image/jpeg;base64,${btoa(binary)}`;
+  } catch {
+    return dataUrl;
+  }
 }
 
 export async function compressCanvasStrictlyUnderTarget(
@@ -20,7 +132,8 @@ export async function compressCanvasStrictlyUnderTarget(
   const {
     targetKb,
     mimeType = 'image/jpeg',
-    safetyMarginBytes = 512,
+    safetyMarginBytes = 400,
+    padToTarget = true,
   } = options;
 
   if (targetKb <= 0) {
@@ -29,7 +142,7 @@ export async function compressCanvasStrictlyUnderTarget(
 
   // Hard ceiling in bytes: MUST NOT EXCEED THIS UNDER ANY CIRCUMSTANCES
   const hardCeilingBytes = Math.floor(targetKb * 1024);
-  // Target safety ceiling: e.g. targetKb * 1024 - 512 bytes
+  // Target safety ceiling: e.g. targetKb * 1024 - 400 bytes
   const safeTargetBytes = Math.max(1024, hardCeilingBytes - safetyMarginBytes);
 
   let currentCanvas = sourceCanvas;
@@ -38,12 +151,12 @@ export async function compressCanvasStrictlyUnderTarget(
 
   let bestValidBlob: Blob | null = null;
 
-  // We allow up to 8 scale steps to handle huge megapixel photos compressed down to tiny KB (e.g. 10KB-20KB)
+  // We allow up to 8 scale steps to handle huge megapixel photos compressed down to tiny KB
   for (let scaleAttempt = 0; scaleAttempt < 8; scaleAttempt++) {
     let lowQ = 0.04;
-    let highQ = 0.96;
+    let highQ = 0.98;
 
-    // Check if highQ already fits
+    // Check if high quality already fits within hard ceiling
     const highBlob: Blob | null = await new Promise((res) =>
       currentCanvas.toBlob(res, mimeType, highQ)
     );
@@ -52,9 +165,9 @@ export async function compressCanvasStrictlyUnderTarget(
       if (!bestValidBlob || highBlob.size > bestValidBlob.size) {
         bestValidBlob = highBlob;
       }
-      // If high quality fits within ceiling, we found an excellent result
-      if (highBlob.size >= safeTargetBytes * 0.85 || scaleAttempt > 0) {
-        return bestValidBlob;
+      // If high quality fits within ceiling and is close to target, or after scaling, we can break search
+      if (highBlob.size >= safeTargetBytes * 0.9 || scaleAttempt > 0) {
+        break;
       }
     }
 
@@ -90,15 +203,14 @@ export async function compressCanvasStrictlyUnderTarget(
       }
     }
 
-    // If we have a valid blob that is <= hardCeilingBytes, we can return it
+    // If we have a valid blob that is <= hardCeilingBytes, we can break
     if (bestValidBlob && bestValidBlob.size <= hardCeilingBytes) {
-      // If it is reasonably close or we've scaled down enough, return
       if (bestValidBlob.size >= safeTargetBytes * 0.5 || scaleAttempt >= 2) {
-        return bestValidBlob;
+        break;
       }
     }
 
-    // If even lowest quality is still > hardCeilingBytes, we MUST downscale resolution
+    // If even lowest quality is still > hardCeilingBytes, downscale resolution
     const lastTestedSize = lowestBlob ? lowestBlob.size : hardCeilingBytes * 1.5;
     const ratio = Math.sqrt(safeTargetBytes / Math.max(lastTestedSize, hardCeilingBytes));
     const factor = Math.min(0.85, Math.max(0.4, ratio * 0.95));
@@ -124,7 +236,6 @@ export async function compressCanvasStrictlyUnderTarget(
 
   // Final emergency fallback if needed
   if (!bestValidBlob || bestValidBlob.size > hardCeilingBytes) {
-    // Aggressive scale down to ensure strict compliance
     const emergencyCanvas = document.createElement('canvas');
     emergencyCanvas.width = Math.min(250, currentWidth);
     emergencyCanvas.height = Math.min(300, currentHeight);
@@ -137,28 +248,44 @@ export async function compressCanvasStrictlyUnderTarget(
         emergencyCanvas.toBlob(res, 'image/jpeg', 0.2)
       );
       if (eBlob && eBlob.size <= hardCeilingBytes) {
-        return eBlob;
+        bestValidBlob = eBlob;
       }
     }
   }
 
-  if (bestValidBlob && bestValidBlob.size <= hardCeilingBytes) {
-    return bestValidBlob;
+  let finalBlob = bestValidBlob;
+  if (!finalBlob || finalBlob.size > hardCeilingBytes) {
+    const fallbackCanvas = document.createElement('canvas');
+    fallbackCanvas.width = 150;
+    fallbackCanvas.height = 150;
+    const fCtx = fallbackCanvas.getContext('2d');
+    if (fCtx) {
+      fCtx.fillStyle = '#ffffff';
+      fCtx.fillRect(0, 0, 150, 150);
+      fCtx.drawImage(sourceCanvas, 0, 0, 150, 150);
+    }
+    const fallbackBlob: Blob | null = await new Promise((res) =>
+      fallbackCanvas.toBlob(res, 'image/jpeg', 0.1)
+    );
+    finalBlob = fallbackBlob || new Blob([], { type: mimeType });
   }
 
-  // Extreme fallback - guarantee <= hardCeilingBytes
-  const fallbackCanvas = document.createElement('canvas');
-  fallbackCanvas.width = 150;
-  fallbackCanvas.height = 150;
-  const fCtx = fallbackCanvas.getContext('2d');
-  if (fCtx) {
-    fCtx.fillStyle = '#ffffff';
-    fCtx.fillRect(0, 0, 150, 150);
-    fCtx.drawImage(sourceCanvas, 0, 0, 150, 150);
+  // Automatic target padding for JPEG:
+  // If the resulting blob is smaller than safeTargetBytes, and padToTarget is enabled,
+  // we pad the JPEG so it hits the user's requested target size.
+  // This removes the issue where an image cannot reach the target KB when resized small!
+  if (padToTarget && (mimeType === 'image/jpeg' || finalBlob.type === 'image/jpeg')) {
+    if (finalBlob.size < safeTargetBytes) {
+      try {
+        const buffer = await finalBlob.arrayBuffer();
+        const paddedBytes = padJpegBytes(buffer, safeTargetBytes);
+        finalBlob = new Blob([paddedBytes.buffer], { type: 'image/jpeg' });
+      } catch (err) {
+        console.warn('JPEG padding fallback to unpadded blob:', err);
+      }
+    }
   }
-  const fallbackBlob: Blob | null = await new Promise((res) =>
-    fallbackCanvas.toBlob(res, 'image/jpeg', 0.1)
-  );
 
-  return fallbackBlob || (new Blob([], { type: mimeType }));
+  return finalBlob;
 }
+

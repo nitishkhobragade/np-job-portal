@@ -118,39 +118,50 @@ export function autoDetectPhotoCorners(
   imgWidth: number,
   imgHeight: number,
   canvas?: HTMLCanvasElement | null
-): { corners: QuadCorners; isRealDetection: boolean } {
-  const defaultCorners = getCenteredDefaultCorners(imgWidth, imgHeight);
-  if (!canvas) return { corners: defaultCorners, isRealDetection: false };
+): { corners: QuadCorners | null; isRealDetection: boolean } {
+  if (!canvas) return { corners: null, isRealDetection: false };
 
   try {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return { corners: defaultCorners, isRealDetection: false };
+    if (!ctx) return { corners: null, isRealDetection: false };
 
     // Use normalized sampling resolution for fast, consistent processing
-    const sampleW = 280;
+    const sampleW = 320;
     const sampleH = Math.round((sampleW * imgHeight) / imgWidth);
-    if (sampleH < 40) return { corners: defaultCorners, isRealDetection: false };
+    if (sampleH < 40) return { corners: null, isRealDetection: false };
 
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = sampleW;
     tempCanvas.height = sampleH;
     const tctx = tempCanvas.getContext('2d', { willReadFrequently: true });
-    if (!tctx) return { corners: defaultCorners, isRealDetection: false };
+    if (!tctx) return { corners: null, isRealDetection: false };
 
     tctx.drawImage(canvas, 0, 0, sampleW, sampleH);
     const imgData = tctx.getImageData(0, 0, sampleW, sampleH);
     const data = imgData.data;
 
-    // 1. Grayscale luminance buffer
+    // 1. Grayscale luminance buffer with Glare and Skin exclusion
     const gray = new Float32Array(sampleW * sampleH);
+    const isSkinOrGlare = new Uint8Array(sampleW * sampleH);
     let minLum = 255;
     let maxLum = 0;
     let sumLum = 0;
 
     for (let i = 0; i < data.length; i += 4) {
-      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
       const idx = i / 4;
       gray[idx] = lum;
+
+      // Detect specular reflections and fingers/skin to ignore them
+      const isGlare = lum > 242 && Math.abs(r - g) < 16 && Math.abs(r - b) < 16;
+      const isSkin = r > 95 && g > 40 && b > 20 && r > g && r > b && (r - g) > 15;
+      if (isGlare || isSkin) {
+        isSkinOrGlare[idx] = 1;
+      }
+
       if (lum < minLum) minLum = lum;
       if (lum > maxLum) maxLum = lum;
       sumLum += lum;
@@ -159,17 +170,27 @@ export function autoDetectPhotoCorners(
     const meanLum = sumLum / (sampleW * sampleH);
     const lumRange = maxLum - minLum;
 
-    // 2. Multi-threshold candidate search (both bright-on-dark and dark-on-bright)
+    // 2. Glare bridging infill
+    for (let y = 1; y < sampleH - 1; y++) {
+      for (let x = 1; x < sampleW - 1; x++) {
+        const idx = y * sampleW + x;
+        if (isSkinOrGlare[idx] === 1 && gray[idx] > 240) {
+          gray[idx] = (gray[idx - 1] + gray[idx + 1] + gray[idx - sampleW] + gray[idx + sampleW]) * 0.25;
+        }
+      }
+    }
+
+    // 3. Multi-threshold candidate search
     const candidateThresholds: Array<{ val: number; mode: 'bright' | 'dark' }> = [];
     if (lumRange > 25) {
-      candidateThresholds.push({ val: meanLum + lumRange * 0.12, mode: 'bright' });
-      candidateThresholds.push({ val: meanLum + lumRange * 0.25, mode: 'bright' });
-      candidateThresholds.push({ val: meanLum + lumRange * 0.38, mode: 'bright' });
-      candidateThresholds.push({ val: meanLum - lumRange * 0.12, mode: 'dark' });
-      candidateThresholds.push({ val: meanLum - lumRange * 0.25, mode: 'dark' });
+      candidateThresholds.push({ val: meanLum + lumRange * 0.15, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum + lumRange * 0.28, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum + lumRange * 0.42, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum - lumRange * 0.15, mode: 'dark' });
+      candidateThresholds.push({ val: meanLum - lumRange * 0.30, mode: 'dark' });
     } else {
-      candidateThresholds.push({ val: meanLum * 1.10, mode: 'bright' });
-      candidateThresholds.push({ val: meanLum * 0.90, mode: 'dark' });
+      candidateThresholds.push({ val: meanLum * 1.12, mode: 'bright' });
+      candidateThresholds.push({ val: meanLum * 0.88, mode: 'dark' });
     }
 
     let bestCandidate: {
@@ -185,15 +206,14 @@ export function autoDetectPhotoCorners(
       const isBright = threshItem.mode === 'bright';
       const visited = new Uint8Array(sampleW * sampleH);
 
-      // Avoid edge 3% to prevent camera frame borders
       const padX = Math.max(3, Math.round(sampleW * 0.03));
       const padY = Math.max(3, Math.round(sampleH * 0.03));
 
-      for (let y = padY; y < sampleH - padY; y += 2) {
-        for (let x = padX; x < sampleW - padX; x += 2) {
+      for (let y = padY; y < sampleH - padY; y += 3) {
+        for (let x = padX; x < sampleW - padX; x += 3) {
           const idx = y * sampleW + x;
           const match = isBright ? gray[idx] >= thresh : gray[idx] <= thresh;
-          if (visited[idx] === 1 || !match) continue;
+          if (visited[idx] === 1 || !match || isSkinOrGlare[idx] === 1) continue;
 
           // Flood fill connected component
           const queue = [x, y];
@@ -202,11 +222,6 @@ export function autoDetectPhotoCorners(
           let minX = x, maxX = x, minY = y, maxY = y;
           let count = 0;
 
-          // True extreme corner projections for tilted/skewed quadrilateral:
-          // Top-Left minimizes (x + y)
-          // Top-Right maximizes (x - y)
-          // Bottom-Right maximizes (x + y)
-          // Bottom-Left minimizes (x - y)
           let tlPt = { x, y, score: x + y };
           let trPt = { x, y, score: x - y };
           let brPt = { x, y, score: x + y };
@@ -254,61 +269,25 @@ export function autoDetectPhotoCorners(
           const areaRatio = boxArea / screenArea;
           const fillFactor = count / (boxArea || 1);
 
-          // Filtering rules:
-          // 1. Area: passport photo in hand or on desk is between 4% and 65% of screen.
-          //    NEVER select full camera viewport (>75%).
-          // 2. Fill factor: real photo paper is solid (>= 0.38).
-          if (areaRatio >= 0.04 && areaRatio <= 0.65 && fillFactor >= 0.38) {
+          if (areaRatio >= 0.04 && areaRatio <= 0.75 && fillFactor >= 0.38 && boxW > 25 && boxH > 35) {
             const aspect = boxW / (boxH || 1);
             let aspectScore = 0;
 
-            // Ideal standard passport ratio is 3.5 / 4.5 = ~0.778
             if (aspect >= 0.52 && aspect <= 0.98) {
               aspectScore = 1.0 - Math.abs(aspect - 0.778);
             } else if (aspect >= 1.02 && aspect <= 1.68) {
               aspectScore = 0.8 - Math.abs(aspect - 1.28) * 0.5;
             } else if (aspect >= 0.95 && aspect <= 1.05) {
-              aspectScore = 0.7; // 2x2 inch visa
+              aspectScore = 0.7;
             }
 
             if (aspectScore > 0) {
-              // Measure edge contrast
-              let insideLum = 0, insideCount = 0;
-              let outsideLum = 0, outsideCount = 0;
-
-              for (let sy = minY; sy <= maxY; sy += 3) {
-                for (let sx = minX; sx <= maxX; sx += 3) {
-                  insideLum += gray[sy * sampleW + sx];
-                  insideCount++;
-                }
-              }
-              const avgInside = insideLum / (insideCount || 1);
-
-              const halo = 4;
-              for (let sx = Math.max(0, minX - halo); sx <= Math.min(sampleW - 1, maxX + halo); sx += 3) {
-                if (minY - halo >= 0) {
-                  outsideLum += gray[(minY - halo) * sampleW + sx];
-                  outsideCount++;
-                }
-                if (maxY + halo < sampleH) {
-                  outsideLum += gray[(maxY + halo) * sampleW + sx];
-                  outsideCount++;
-                }
-              }
-              const avgOutside = outsideLum / (outsideCount || 1);
-              const contrastScore = Math.max(0, Math.abs(avgInside - avgOutside));
-
-              const candidateScore =
-                aspectScore * 12 +
-                fillFactor * 6 +
-                (contrastScore > 12 ? 4 : 1) +
-                (areaRatio >= 0.06 && areaRatio <= 0.50 ? 5 : 2);
+              const candidateScore = aspectScore * 12 + fillFactor * 6 + (areaRatio >= 0.05 && areaRatio <= 0.65 ? 5 : 2);
 
               if (!bestCandidate || candidateScore > bestCandidate.score) {
                 const scaleX = imgWidth / sampleW;
                 const scaleY = imgHeight / sampleH;
 
-                // Map true rotated 4 points directly without clamping to axis-aligned box!
                 bestCandidate = {
                   tl: {
                     x: Math.max(0, Math.min(imgWidth, Math.round(tlPt.x * scaleX))),
@@ -335,7 +314,7 @@ export function autoDetectPhotoCorners(
       }
     }
 
-    if (bestCandidate && bestCandidate.score > 7) {
+    if (bestCandidate && bestCandidate.score > 8) {
       return {
         corners: {
           tl: bestCandidate.tl,
@@ -350,7 +329,8 @@ export function autoDetectPhotoCorners(
     console.warn('Contour auto-detection fallback:', err);
   }
 
-  return { corners: defaultCorners, isRealDetection: false };
+  // Remove hardcoded uniform rectangle fallback box completely
+  return { corners: null, isRealDetection: false };
 }
 
 /**
@@ -358,90 +338,65 @@ export function autoDetectPhotoCorners(
  * Coordinates are normalized to [0, 1] range to ensure matrix condition number
  * is stable, preventing numerical overflow and blank white output.
  */
-function getNormalizedPerspectiveTransform(
-  srcCorners: QuadCorners,
-  srcW: number,
-  srcH: number
-): number[] {
-  // Normalize source points to [0, 1]
-  const sPts = [
-    { x: srcCorners.tl.x / srcW, y: srcCorners.tl.y / srcH },
-    { x: srcCorners.tr.x / srcW, y: srcCorners.tr.y / srcH },
-    { x: srcCorners.br.x / srcW, y: srcCorners.br.y / srcH },
-    { x: srcCorners.bl.x / srcW, y: srcCorners.bl.y / srcH },
-  ];
+/**
+ * Closed-Form Analytic Projective Homography for Perspective Warp.
+ * Maps arbitrary quadrilateral corners [tl, tr, br, bl] to a clean, upright
+ * rectangular canvas with guaranteed numerical stability and NO blank canvas.
+ */
+function getClosedFormPerspectiveTransform(
+  corners: QuadCorners
+): { a: number; b: number; c: number; d: number; e: number; f: number; g: number; h: number } {
+  const x0 = corners.tl.x, y0 = corners.tl.y;
+  const x1 = corners.tr.x, y1 = corners.tr.y;
+  const x2 = corners.br.x, y2 = corners.br.y;
+  const x3 = corners.bl.x, y3 = corners.bl.y;
 
-  // Normalized destination points [0, 1]
-  const dPts = [
-    { x: 0, y: 0 },
-    { x: 1, y: 0 },
-    { x: 1, y: 1 },
-    { x: 0, y: 1 },
-  ];
+  const dx1 = x1 - x2;
+  const dx2 = x3 - x2;
+  const sx = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2;
+  const dy2 = y3 - y2;
+  const sy = y0 - y1 + y2 - y3;
 
-  // Inverse mapping: Dest (0..1) -> Source (0..1)
-  const A: number[][] = [];
-  const B: number[] = [];
+  const det = dx1 * dy2 - dx2 * dy1;
 
-  for (let i = 0; i < 4; i++) {
-    const d = dPts[i];
-    const s = sPts[i];
-    A.push([d.x, d.y, 1, 0, 0, 0, -d.x * s.x, -d.y * s.x]);
-    B.push(s.x);
-    A.push([0, 0, 0, d.x, d.y, 1, -d.x * s.y, -d.y * s.y]);
-    B.push(s.y);
+  if (Math.abs(det) < 1e-8) {
+    // Parallelogram / Affine fallback
+    return {
+      a: x1 - x0,
+      b: x3 - x0,
+      c: x0,
+      d: y1 - y0,
+      e: y3 - y0,
+      f: y0,
+      g: 0,
+      h: 0
+    };
   }
 
-  // Gaussian elimination with partial pivoting
-  const n = 8;
-  for (let i = 0; i < n; i++) {
-    let maxRow = i;
-    for (let k = i + 1; k < n; k++) {
-      if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) {
-        maxRow = k;
-      }
-    }
-    const tempA = A[i];
-    A[i] = A[maxRow];
-    A[maxRow] = tempA;
+  const g = (sx * dy2 - sy * dx2) / det;
+  const h = (dx1 * sy - dy1 * sx) / det;
 
-    const tempB = B[i];
-    B[i] = B[maxRow];
-    B[maxRow] = tempB;
-
-    if (Math.abs(A[i][i]) < 1e-12) continue;
-
-    for (let k = i + 1; k < n; k++) {
-      const factor = A[k][i] / A[i][i];
-      for (let j = i; j < n; j++) {
-        A[k][j] -= factor * A[i][j];
-      }
-      B[k] -= factor * B[i];
-    }
-  }
-
-  const h = new Array(9).fill(0);
-  h[8] = 1;
-
-  for (let i = n - 1; i >= 0; i--) {
-    let sum = B[i];
-    for (let j = i + 1; j < n; j++) {
-      sum -= A[i][j] * h[j];
-    }
-    h[i] = sum / (A[i][i] || 1);
-  }
-
-  return h;
+  return {
+    a: x1 - x0 + g * x1,
+    b: x3 - x0 + h * x3,
+    c: x0,
+    d: y1 - y0 + g * y1,
+    e: y3 - y0 + h * y3,
+    f: y0,
+    g,
+    h
+  };
 }
 
 /**
  * Warp angled/skewed physical photo defined by 4 corners into perfectly flat,
  * upright, perspective-corrected rectangular canvas.
  *
- * Guarantees NO BLANK WHITE CANVAS:
- * 1. Normalized homography avoids ill-conditioning.
- * 2. Uses edge-clamping on source pixels so borders blend smoothly.
- * 3. Awaits clean image buffer transfer.
+ * Guarantees NO BLANK CANVAS and strictly enforces 3.5×4.5 cm aspect ratio by default:
+ * 1. Closed-form analytic homography eliminates matrix conditioning artifacts.
+ * 2. Bilinear 4-tap interpolation with clamped coordinate bounds.
+ * 3. Default target dimension is 700×900 px (exact 3.5 : 4.5 ratio).
  */
 export function warpPerspective(
   sourceCanvas: HTMLCanvasElement,
@@ -449,15 +404,10 @@ export function warpPerspective(
   targetWidth?: number,
   targetHeight?: number
 ): HTMLCanvasElement {
-  let finalW = targetWidth || 0;
-  let finalH = targetHeight || 0;
-
-  if (finalW <= 0 || finalH <= 0) {
-    const natural = getQuadNaturalDimensions(corners);
-    const aspect = natural.aspect;
-    finalH = 900;
-    finalW = Math.max(100, Math.round(finalH * aspect));
-  }
+  // Enforce standard 3.5 × 4.5 cm aspect ratio by default (700x900 HD)
+  const targetRatio = 3.5 / 4.5;
+  const finalH = targetHeight && targetHeight > 0 ? targetHeight : 900;
+  const finalW = targetWidth && targetWidth > 0 ? targetWidth : Math.round(finalH * targetRatio);
 
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = finalW;
@@ -475,28 +425,28 @@ export function warpPerspective(
   const outData = outCtx.createImageData(finalW, finalH);
   const outPixels = outData.data;
 
-  // Normalized homography mapping [0, 1] dest -> [0, 1] source
-  const H = getNormalizedPerspectiveTransform(corners, srcW, srcH);
+  // Closed-form mapping from unit square [0,1]^2 to source image quadrilateral
+  const { a, b, c, d, e, f, g, h } = getClosedFormPerspectiveTransform(corners);
 
-  // Backward pixel mapping with bilinear interpolation & boundary clamping
+  const denomW = Math.max(1, finalW - 1);
+  const denomH = Math.max(1, finalH - 1);
+
+  // Backward pixel mapping with bilinear interpolation
   for (let dy = 0; dy < finalH; dy++) {
-    const normDy = dy / finalH;
+    const v = dy / denomH;
 
     for (let dx = 0; dx < finalW; dx++) {
-      const normDx = dx / finalW;
+      const u = dx / denomW;
 
-      const z = H[6] * normDx + H[7] * normDy + H[8];
-      const invZ = 1.0 / (Math.abs(z) > 1e-9 ? z : 1e-9);
-      const normSx = (H[0] * normDx + H[1] * normDy + H[2]) * invZ;
-      const normSy = (H[3] * normDx + H[4] * normDy + H[5]) * invZ;
+      const w = g * u + h * v + 1.0;
+      const invW = 1.0 / (Math.abs(w) > 1e-9 ? w : 1e-9);
 
-      // Scale back to natural image coordinates
-      const sx = normSx * srcW;
-      const sy = normSy * srcH;
+      const sx = (a * u + b * v + c) * invW;
+      const sy = (d * u + e * v + f) * invW;
 
       const outIndex = (dy * finalW + dx) * 4;
 
-      // Clamp coordinates to natural image bounds (never yields blank white!)
+      // Clamp coordinates to source image boundaries (never blank canvas!)
       const clx = Math.max(0, Math.min(srcW - 1.001, sx));
       const cly = Math.max(0, Math.min(srcH - 1.001, sy));
 
@@ -515,11 +465,11 @@ export function warpPerspective(
       const i01 = (y1 * srcW + x0) * 4;
       const i11 = (y1 * srcW + x1) * 4;
 
-      for (let c = 0; c < 3; c++) {
+      for (let ch = 0; ch < 3; ch++) {
         const val =
-          (srcPixels[i00 + c] * wx0 + srcPixels[i10 + c] * wx1) * wy0 +
-          (srcPixels[i01 + c] * wx0 + srcPixels[i11 + c] * wx1) * wy1;
-        outPixels[outIndex + c] = Math.round(val);
+          (srcPixels[i00 + ch] * wx0 + srcPixels[i10 + ch] * wx1) * wy0 +
+          (srcPixels[i01 + ch] * wx0 + srcPixels[i11 + ch] * wx1) * wy1;
+        outPixels[outIndex + ch] = Math.round(val);
       }
       outPixels[outIndex + 3] = 255;
     }
@@ -907,7 +857,11 @@ export async function aiDetectPhotoCorners(
   try {
     const payload = await createOptimizedVisionPayload(imageDataUrl, width, height, sourceCanvas);
 
-    const endpoints = ['/api/tools/extract-passport', '/api/photo/detect-corners'];
+    const endpoints = [
+      '/api/tools/detect-photo-corners',
+      '/api/tools/extract-passport',
+      '/api/photo/detect-corners'
+    ];
 
     for (const endpoint of endpoints) {
       try {

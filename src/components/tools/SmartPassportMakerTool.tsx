@@ -21,8 +21,20 @@ import {
   Lock,
   Unlock,
   CheckSquare,
-  Square
+  Square,
+  Printer,
+  FileText,
+  FileImage
 } from 'lucide-react';
+import {
+  SheetPresetId,
+  SHEET_PRESETS,
+  PaperType,
+  renderSheetToCanvas,
+  exportSheetToPdf,
+  exportSheetToPsd,
+  triggerDirectPrint
+} from '../../lib/photoSheetEngine';
 import {
   QuadCorners,
   autoDetectPhotoCorners,
@@ -36,6 +48,7 @@ import {
   replacePassportBackground,
   enhancePassportSharpness
 } from '../../lib/perspectiveUtils';
+import { padJpegDataUrl } from '../../lib/imageCompressionHelper';
 
 type ActiveStep = 'upload' | 'corners' | 'studio' | 'download';
 
@@ -125,6 +138,7 @@ export const SmartPassportMakerTool: React.FC = () => {
   // Step 2: Corners & Perspective
   const [corners, setCorners] = useState<QuadCorners | null>(null);
   const [activeCorner, setActiveCorner] = useState<'tl' | 'tr' | 'br' | 'bl' | null>(null);
+  const [selectedCorner, setSelectedCorner] = useState<'tl' | 'tr' | 'br' | 'bl'>('tl');
   const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null);
 
   // Canvases
@@ -153,7 +167,12 @@ export const SmartPassportMakerTool: React.FC = () => {
   // Step 4: Exam Preset & Output Sheet
   const [selectedPreset, setSelectedPreset] = useState<ExamPreset>(EXAM_PRESETS[0]);
   const [printLayout, setPrintLayout] = useState<'single' | '4x' | '6x' | '8x' | '12x'>('single');
-  const [sheetResolution, setSheetResolution] = useState<'300dpi' | '450dpi' | '600dpi' | 'a4_300'>('300dpi');
+  const [sheetPaperType, setSheetPaperType] = useState<PaperType>('a4');
+  const [sheetPresetId, setSheetPresetId] = useState<SheetPresetId>('a4_6');
+  const [showCuttingGuides, setShowCuttingGuides] = useState<boolean>(true);
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+  const [isExportingPsd, setIsExportingPsd] = useState<boolean>(false);
+  const [sheetSuccessMsg, setSheetSuccessMsg] = useState<string>('');
 
   // CHECKBOX CONTROL 1: Custom Dimensions
   const [enableCustomDimensions, setEnableCustomDimensions] = useState<boolean>(false);
@@ -176,21 +195,21 @@ export const SmartPassportMakerTool: React.FC = () => {
   const [aiDetectionStatus, setAiDetectionStatus] = useState<string>('');
   const [rotationAngle, setRotationAngle] = useState<number>(0);
 
-  // Run Client-Side Contour Detection + Gemini Free-Tier Vision AI
+  // Run Client-Side Glare-Resistant Boundary Detection + Gemini Flash Vision Endpoint (/api/tools/detect-photo-corners)
   const runAiDetection = useCallback(async (dataUrl: string, width: number, height: number, sourceCanvas?: HTMLCanvasElement | null) => {
     setIsDetectingCorners(true);
-    setAiDetectionStatus('🔍 Gemini AI विज़न फोटो के वास्तविक 4 कोनों की तलाश कर रहा है...');
+    setAiDetectionStatus('🔍 Gemini Flash विज़न (/api/tools/detect-photo-corners) भौतिक फोटो पेपर के 4 कोनों की तलाश कर रहा है...');
 
-    // 1. Run Gemini Vision API (/api/tools/extract-passport)
+    // 1. Run Gemini Flash Vision Endpoint (/api/tools/detect-photo-corners)
     try {
       const result = await aiDetectPhotoCorners(dataUrl, width, height, sourceCanvas);
       if (result.success && result.corners) {
         setCorners(result.corners);
         if (result.rotationNeeded && result.rotationNeeded !== 0) {
           setRotationAngle(result.rotationNeeded);
-          setAiDetectionStatus(`✨ AI विज़न ने पासपोर्ट फोटो पहचानी! (${result.rotationNeeded}° ऑटो-रोटेशन सेट)`);
+          setAiDetectionStatus(`✨ AI विज़न ने प्रिंटेड फोटो पेपर के 4 कोने पहचाने! (${result.rotationNeeded}° ऑटो-रोटेशन)`);
         } else {
-          setAiDetectionStatus('✨ AI विज़न ने पासपोर्ट फोटो के 4 वास्तविक कोने (Rotated Quad) सटीक पहचान लिए!');
+          setAiDetectionStatus('✨ AI विज़न ने प्रिंटेड फोटो पेपर के वास्तविक 4 कोने (Rotated Quad) सटीक पहचान लिए!');
         }
         setIsDetectingCorners(false);
         return;
@@ -201,13 +220,13 @@ export const SmartPassportMakerTool: React.FC = () => {
       console.warn('Vision detection attempt:', err);
     }
 
-    // 2. Client-side contour fallback if vision API did not return corners
+    // 2. Intelligent glare-resistant boundary detector (client-side)
     if (sourceCanvas) {
       try {
         const clientResult = autoDetectPhotoCorners(width, height, sourceCanvas);
         if (clientResult.isRealDetection && clientResult.corners) {
           setCorners(clientResult.corners);
-          setAiDetectionStatus('✨ कंटूर डिटेक्शन ने फोटो के 4 कोने सफलतापूर्वक पहचान लिए!');
+          setAiDetectionStatus('✨ ग्लेयर-रेजिस्टेंट बाउंड्री डिटेक्टर ने फोटो के वास्तविक 4 कोने सटीक पहचान लिए!');
           setIsDetectingCorners(false);
           return;
         }
@@ -216,11 +235,12 @@ export const SmartPassportMakerTool: React.FC = () => {
       }
     }
 
-    setAiDetectionStatus('ℹ️ कोनों को अपनी उंगली या माउस से खींचकर फोटो पर सेट करें, अथवा "⚡ 1-Click AI Auto Extract" दबाएं।');
+    // Strictly NO uniform rectangle dummy box fallback
+    setAiDetectionStatus('ℹ️ फोटो पर चारों कोने सेट करने हेतु "📐 चारों कोने सेट करें" दबाएं अथवा कोनों को उंगली/माउस से सेट करें।');
     setIsDetectingCorners(false);
   }, []);
 
-  // 1. File Upload Handler (Auto triggers Client Contour + AI Vision)
+  // 1. File Upload Handler (Auto triggers Glare-Resistant + AI Vision Pipeline)
   const handleFileUpload = (file: File) => {
     if (!file || !file.type.startsWith('image/')) return;
     setFileName(file.name.replace(/\.[^/.]+$/, ''));
@@ -234,9 +254,8 @@ export const SmartPassportMakerTool: React.FC = () => {
         setOriginalImage(img);
         setRotationAngle(0);
 
-        // Immediate default corners while detection runs
-        const initial = getCenteredDefaultCorners(img.width, img.height);
-        setCorners(initial);
+        // Completely removed hardcoded uniform rectangle fallback box
+        setCorners(null);
         setStep('corners');
 
         // Create quick temp canvas for instant contour scanning
@@ -246,7 +265,7 @@ export const SmartPassportMakerTool: React.FC = () => {
         const ctx = tempCanvas.getContext('2d');
         if (ctx) ctx.drawImage(img, 0, 0);
 
-        // Run detection
+        // Run detection pipeline
         runAiDetection(dataUrl, img.width, img.height, tempCanvas);
       };
       img.src = dataUrl;
@@ -307,7 +326,7 @@ export const SmartPassportMakerTool: React.FC = () => {
   // Draw Corners Canvas with Interactive Handles & Circular Magnifier Loupe
   const renderCornersCanvas = useCallback(() => {
     const canvas = cornerCanvasRef.current;
-    if (!canvas || !originalImage || !corners) return;
+    if (!canvas || !originalImage) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -318,6 +337,36 @@ export const SmartPassportMakerTool: React.FC = () => {
 
     // Draw background original image
     ctx.drawImage(originalImage, 0, 0);
+
+    if (!corners) {
+      // AI Scanning boundary HUD (laser/radar beam sweep)
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.40)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const scanY = Math.round((Date.now() / 6) % canvas.height);
+      const grad = ctx.createLinearGradient(0, scanY - 30, 0, scanY + 30);
+      grad.addColorStop(0, 'rgba(239, 68, 68, 0)');
+      grad.addColorStop(0.5, 'rgba(239, 68, 68, 0.75)');
+      grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, scanY - 30, canvas.width, 60);
+
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = Math.max(2, Math.round(canvas.width / 260));
+      ctx.beginPath();
+      ctx.moveTo(0, scanY);
+      ctx.lineTo(canvas.width, scanY);
+      ctx.stroke();
+
+      // Status text badge
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.max(13, Math.round(canvas.width / 36))}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('🔍 AI विज़न फोटो के 4 वास्तविक कोने खोज रहा है...', canvas.width / 2, canvas.height / 2);
+      ctx.restore();
+      return;
+    }
 
     // Dim the exterior area outside quadrilateral
     ctx.save();
@@ -358,14 +407,14 @@ export const SmartPassportMakerTool: React.FC = () => {
     // Draw 4 Corner Handles with High-Visibility Labels
     const handleRadius = Math.max(16, Math.round(canvas.width / 42));
     const handlePoints: Array<{ key: 'tl' | 'tr' | 'br' | 'bl'; pt: { x: number; y: number }; label: string }> = [
-      { key: 'tl', pt: corners.tl, label: '1. ऊपर-बाएं' },
-      { key: 'tr', pt: corners.tr, label: '2. ऊपर-दाएं' },
-      { key: 'br', pt: corners.br, label: '3. नीचे-दाएं' },
-      { key: 'bl', pt: corners.bl, label: '4. नीचे-बाएं' },
+      { key: 'tl', pt: corners.tl, label: '1. TL (ऊपर-बाएं)' },
+      { key: 'tr', pt: corners.tr, label: '2. TR (ऊपर-दाएं)' },
+      { key: 'br', pt: corners.br, label: '3. BR (नीचे-दाएं)' },
+      { key: 'bl', pt: corners.bl, label: '4. BL (नीचे-बाएं)' },
     ];
 
     handlePoints.forEach(({ key, pt, label }) => {
-      const isCurrent = activeCorner === key;
+      const isCurrent = activeCorner === key || selectedCorner === key;
 
       ctx.save();
       // Outer glow
@@ -383,28 +432,28 @@ export const SmartPassportMakerTool: React.FC = () => {
       ctx.strokeStyle = isCurrent ? '#ffffff' : '#ef4444';
       ctx.stroke();
 
-      // Center Precision Dot
+      // Center Precision Dot (1px center mark)
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, handleRadius / 3, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, Math.max(2, handleRadius / 4), 0, Math.PI * 2);
       ctx.fillStyle = isCurrent ? '#ffffff' : '#ef4444';
       ctx.fill();
 
-      // Corner Label Tag
+      // Corner Label Tag with coordinates
       ctx.fillStyle = '#1e293b';
-      ctx.font = `bold ${Math.max(11, Math.round(canvas.width / 48))}px sans-serif`;
-      ctx.fillText(label, pt.x + handleRadius + 6, pt.y + 4);
+      ctx.font = `bold ${Math.max(10, Math.round(canvas.width / 52))}px sans-serif`;
+      ctx.fillText(`${label}`, pt.x + handleRadius + 6, pt.y + 2);
       ctx.restore();
     });
 
     // Draw Zoom Loupe / Magnifier Glass on Touch/Drag
     if (activeCorner && magnifierPos && corners) {
       const targetPt = corners[activeCorner];
-      const loupeRadius = Math.max(55, Math.round(canvas.width / 11));
-      const zoom = 2.5;
+      const loupeRadius = Math.max(60, Math.round(canvas.width / 10));
+      const zoom = 3.0;
 
       // Position loupe offset from finger/cursor so finger does not occlude it
-      const loupeX = Math.min(canvas.width - loupeRadius - 10, Math.max(loupeRadius + 10, targetPt.x));
-      const loupeY = targetPt.y > loupeRadius * 2 + 35 ? targetPt.y - loupeRadius - 45 : targetPt.y + loupeRadius + 45;
+      const loupeX = Math.min(canvas.width - loupeRadius - 15, Math.max(loupeRadius + 15, targetPt.x));
+      const loupeY = targetPt.y > loupeRadius * 2 + 45 ? targetPt.y - loupeRadius - 55 : targetPt.y + loupeRadius + 55;
 
       ctx.save();
       ctx.beginPath();
@@ -424,7 +473,7 @@ export const SmartPassportMakerTool: React.FC = () => {
         loupeRadius * 2
       );
 
-      // Loupe Crosshair
+      // Loupe Crosshair with 1-pixel precision reticle
       ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -434,9 +483,15 @@ export const SmartPassportMakerTool: React.FC = () => {
       ctx.lineTo(loupeX, loupeY + loupeRadius);
       ctx.stroke();
 
+      // Center precision 1-px dot inside loupe
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(loupeX, loupeY, 3, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
 
-      // Loupe Outer Ring
+      // Loupe Outer Rings & Coordinate Readout
       ctx.save();
       ctx.beginPath();
       ctx.arc(loupeX, loupeY, loupeRadius, 0, Math.PI * 2);
@@ -446,15 +501,65 @@ export const SmartPassportMakerTool: React.FC = () => {
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#ef4444';
       ctx.stroke();
+
+      // Coordinate readout pill
+      const coordText = `X: ${targetPt.x}, Y: ${targetPt.y} (3× Zoom)`;
+      ctx.font = 'bold 12px sans-serif';
+      const textWidth = ctx.measureText(coordText).width;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.fillRect(loupeX - textWidth / 2 - 8, loupeY + loupeRadius - 26, textWidth + 16, 22);
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(coordText, loupeX, loupeY + loupeRadius - 11);
       ctx.restore();
     }
-  }, [originalImage, corners, activeCorner, magnifierPos]);
+  }, [originalImage, corners, activeCorner, selectedCorner, magnifierPos]);
 
   useEffect(() => {
     if (step === 'corners') {
       renderCornersCanvas();
     }
-  }, [step, corners, activeCorner, magnifierPos, renderCornersCanvas]);
+  }, [step, corners, activeCorner, selectedCorner, magnifierPos, renderCornersCanvas]);
+
+  // 1-Pixel Precision Nudge Function
+  const nudgeCorner = useCallback((cornerKey: 'tl' | 'tr' | 'br' | 'bl', dx: number, dy: number) => {
+    if (!corners || !originalImage) return;
+    setCorners((prev) => {
+      if (!prev) return null;
+      const pt = prev[cornerKey];
+      return {
+        ...prev,
+        [cornerKey]: {
+          x: Math.max(0, Math.min(originalImage.width, pt.x + dx)),
+          y: Math.max(0, Math.min(originalImage.height, pt.y + dy)),
+        },
+      };
+    });
+  }, [corners, originalImage]);
+
+  // Keyboard Arrow 1-pixel precision control
+  useEffect(() => {
+    if (step !== 'corners' || !corners) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+      const stepDist = e.shiftKey ? 5 : 1;
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        nudgeCorner(selectedCorner, 0, -stepDist);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        nudgeCorner(selectedCorner, 0, stepDist);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        nudgeCorner(selectedCorner, -stepDist, 0);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nudgeCorner(selectedCorner, stepDist, 0);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [step, selectedCorner, corners, nudgeCorner]);
 
   // Touch & Pointer interaction on Corner Handles
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -474,9 +579,17 @@ export const SmartPassportMakerTool: React.FC = () => {
   };
 
   const handlePointerDown = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!corners || !cornerCanvasRef.current) return;
+    if (!cornerCanvasRef.current) return;
     const { x, y } = getCanvasCoords(e);
     const canvas = cornerCanvasRef.current;
+
+    if (!corners && originalImage) {
+      // Tap initializes manual pins
+      setCorners(getInnerCardDefaultCorners(originalImage.width, originalImage.height));
+      return;
+    }
+
+    if (!corners) return;
     const hitRadius = Math.max(34, canvas.width / 18);
 
     const distTL = Math.hypot(corners.tl.x - x, corners.tl.y - y);
@@ -486,11 +599,9 @@ export const SmartPassportMakerTool: React.FC = () => {
 
     const minDist = Math.min(distTL, distTR, distBR, distBL);
     if (minDist <= hitRadius) {
-      if (minDist === distTL) setActiveCorner('tl');
-      else if (minDist === distTR) setActiveCorner('tr');
-      else if (minDist === distBR) setActiveCorner('br');
-      else setActiveCorner('bl');
-
+      const cornerKey = minDist === distTL ? 'tl' : minDist === distTR ? 'tr' : minDist === distBR ? 'br' : 'bl';
+      setActiveCorner(cornerKey);
+      setSelectedCorner(cornerKey);
       setMagnifierPos({ x, y });
     }
   };
@@ -587,17 +698,23 @@ export const SmartPassportMakerTool: React.FC = () => {
       if (contour.isRealDetection && contour.corners) {
         detectedCorners = contour.corners;
       } else {
-        detectedCorners = corners || getInnerCardDefaultCorners(originalImage.width, originalImage.height);
+        detectedCorners = corners;
       }
+    }
+
+    if (!detectedCorners) {
+      setAiDetectionStatus('⚠️ फोटो के 4 कोने स्पष्ट नहीं मिले। कृपया फोटो पर कोने सेट करें।');
+      setIsDetectingCorners(false);
+      return;
     }
 
     setCorners(detectedCorners);
     setRotationAngle(detectedRotation);
 
-    // Perform client-side perspective transform (2D projective homography)
-    const natural = getQuadNaturalDimensions(detectedCorners);
+    // Transform the 4 detected points to a clean, upright 3.5×4.5 cm aspect ratio canvas without creating a blank canvas
+    const targetRatio = 3.5 / 4.5;
     const targetH = 900;
-    const targetW = Math.max(100, Math.round(targetH * natural.aspect));
+    const targetW = Math.round(targetH * targetRatio);
 
     let warpedCanvas = warpPerspective(tempSrc, detectedCorners, targetW, targetH);
     if (detectedRotation !== 0) {
@@ -613,11 +730,11 @@ export const SmartPassportMakerTool: React.FC = () => {
     setBgColor('original');
     setStudioReady(false);
     setIsDetectingCorners(false);
-    setAiDetectionStatus('⚡ 1-Click AI एक्सट्रैक्शन पूर्ण: फोटो सीधी, समतल व शार्प हो गई!');
+    setAiDetectionStatus('⚡ 1-Click AI एक्सट्रैक्शन पूर्ण: फोटो 3.5×4.5 cm समतल, सीधी व शार्प हो गई!');
     setStep('studio');
   };
 
-  // Straighten & Warp Action (FIX FOR BLANK WHITE CANVAS & NATURAL RATIO)
+  // Straighten & Warp Action (Guaranteed upright 3.5×4.5 cm canvas & NO blank canvas)
   const handleStraightenAndCrop = () => {
     if (!corners || !originalImage) return;
 
@@ -629,10 +746,10 @@ export const SmartPassportMakerTool: React.FC = () => {
     if (!tempCtx) return;
     tempCtx.drawImage(originalImage, 0, 0);
 
-    // Keep natural aspect ratio of the user-selected cropped quadrilateral
-    const natural = getQuadNaturalDimensions(corners);
+    // Transform the 4 detected points to a clean, upright 3.5×4.5 cm aspect ratio canvas without creating a blank canvas
+    const targetRatio = 3.5 / 4.5;
     const targetH = 900;
-    const targetW = Math.max(100, Math.round(targetH * natural.aspect));
+    const targetW = Math.round(targetH * targetRatio);
 
     let warpedCanvas = warpPerspective(tempSrc, corners, targetW, targetH);
 
@@ -688,13 +805,106 @@ export const SmartPassportMakerTool: React.FC = () => {
     img.src = source;
   };
 
-  // Switch layout and auto-set Custom Sheet Preset
-  const handleLayoutChange = (layout: 'single' | '4x' | '6x' | '8x' | '12x') => {
-    setPrintLayout(layout);
-    if (layout !== 'single') {
-      const customSheet = EXAM_PRESETS.find((p) => p.id === 'custom-sheet') || EXAM_PRESETS[0];
-      setSelectedPreset(customSheet);
-      setEnableCustomKb(false);
+  const handleSelectSheetPreset = (presetId: SheetPresetId) => {
+    setSheetPresetId(presetId);
+    setPrintLayout('6x');
+    const preset = SHEET_PRESETS[presetId];
+    if (preset) {
+      setSheetPaperType(preset.paperType);
+    }
+    const customSheet = EXAM_PRESETS.find((p) => p.id === 'custom-sheet') || EXAM_PRESETS[0];
+    setSelectedPreset(customSheet);
+    setEnableCustomKb(false);
+    setTimeout(() => generateFinalPhoto(), 50);
+  };
+
+  const handlePrintSheet = () => {
+    const sourceUrl = workingDataUrl || straightenedDataUrl;
+    if (!sourceUrl) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const studio = document.createElement('canvas');
+      studio.width = img.width;
+      studio.height = img.height;
+      const sCtx = studio.getContext('2d');
+      if (sCtx) {
+        sCtx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+        sCtx.drawImage(img, 0, 0);
+        const sheetCanvas = renderSheetToCanvas(studio, sheetPresetId, showCuttingGuides, '#d1d5db');
+        triggerDirectPrint(sheetCanvas, sheetPresetId);
+      }
+    };
+    img.src = sourceUrl;
+  };
+
+  const handleExportSheetPdf = async () => {
+    const sourceUrl = workingDataUrl || straightenedDataUrl;
+    if (!sourceUrl) return;
+    try {
+      setIsExportingPdf(true);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        const studio = document.createElement('canvas');
+        studio.width = img.width;
+        studio.height = img.height;
+        const sCtx = studio.getContext('2d');
+        if (sCtx) {
+          sCtx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+          sCtx.drawImage(img, 0, 0);
+          const pdfBytes = await exportSheetToPdf(studio, sheetPresetId, showCuttingGuides);
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${fileName || 'Passport'}_Sheet_${sheetPresetId}_300DPI.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setSheetSuccessMsg('✅ Print-Ready Vector PDF (300 DPI) डाउनलोड हो गया!');
+          setTimeout(() => setSheetSuccessMsg(''), 4000);
+        }
+        setIsExportingPdf(false);
+      };
+      img.src = sourceUrl;
+    } catch (err) {
+      console.error('PDF error:', err);
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportSheetPsd = async () => {
+    const sourceUrl = workingDataUrl || straightenedDataUrl;
+    if (!sourceUrl) return;
+    try {
+      setIsExportingPsd(true);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        const studio = document.createElement('canvas');
+        studio.width = img.width;
+        studio.height = img.height;
+        const sCtx = studio.getContext('2d');
+        if (sCtx) {
+          sCtx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+          sCtx.drawImage(img, 0, 0);
+          const psdBytes = await exportSheetToPsd(studio, sheetPresetId);
+          const blob = new Blob([psdBytes], { type: 'image/vnd.adobe.photoshop' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${fileName || 'Passport'}_Sheet_${sheetPresetId}_Layered.psd`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setSheetSuccessMsg('✅ Photoshop PSD (व्यक्तिगत लेयर्स सहित) डाउनलोड हो गया!');
+          setTimeout(() => setSheetSuccessMsg(''), 4000);
+        }
+        setIsExportingPsd(false);
+      };
+      img.src = sourceUrl;
+    } catch (err) {
+      console.error('PSD error:', err);
+      setIsExportingPsd(false);
     }
   };
 
@@ -932,55 +1142,17 @@ export const SmartPassportMakerTool: React.FC = () => {
         pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
         pCtx.drawImage(filteredCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
       } else {
-        // Multi-photo Printable Sheet (4x6 or A4 at selected DPI)
-        let sheetW = 1200;
-        let sheetH = 1800; // 4x6 at 300 DPI
-
-        if (sheetResolution === '450dpi') {
-          sheetW = 1800;
-          sheetH = 2700;
-        } else if (sheetResolution === '600dpi') {
-          sheetW = 2400;
-          sheetH = 3600; // 4x6 Studio Master
-        } else if (sheetResolution === 'a4_300') {
-          sheetW = 2480;
-          sheetH = 3508; // A4 Sheet 300 DPI
-        }
-
-        exportCanvas.width = sheetW;
-        exportCanvas.height = sheetH;
-        pCtx.fillStyle = '#ffffff';
-        pCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-
-        const count = printLayout === '4x' ? 4 : printLayout === '6x' ? 6 : printLayout === '8x' ? 8 : 12;
-        const cols = count <= 4 ? 2 : count <= 8 ? 2 : 3;
-        const rows = Math.ceil(count / cols);
-
-        const pw = Math.round((sheetW / (cols + 0.4)) * 0.88);
-        const ph = Math.round(pw * (targetH / targetW));
-        const gapX = (sheetW - cols * pw) / (cols + 1);
-        const gapY = (sheetH - rows * ph) / (rows + 1);
-
-        let drawn = 0;
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            if (drawn >= count) break;
-            const px = Math.round(gapX + c * (pw + gapX));
-            const py = Math.round(gapY + r * (ph + gapY));
-
-            // Draw photo
-            pCtx.drawImage(filteredCanvas, px, py, pw, ph);
-
-            // Draw clean cutting border guide line
-            pCtx.strokeStyle = '#94a3b8';
-            pCtx.setLineDash([4, 4]);
-            pCtx.lineWidth = 1;
-            pCtx.strokeRect(px - 1, py - 1, pw + 2, ph + 2);
-            pCtx.setLineDash([]);
-
-            drawn++;
-          }
-        }
+        // Strict Physical Scale Engine (Fixed 3.5cm x 4.5cm @ 300 DPI, Non-Stretch, 1px border, 2.5mm gap)
+        const sheetCanvas = renderSheetToCanvas(
+          filteredCanvas,
+          sheetPresetId,
+          showCuttingGuides,
+          '#d1d5db'
+        );
+        exportCanvas.width = sheetCanvas.width;
+        exportCanvas.height = sheetCanvas.height;
+        pCtx.drawImage(sheetCanvas, 0, 0);
+        setFinalDimensions({ width: sheetCanvas.width, height: sheetCanvas.height });
       }
 
       // Compression
@@ -1005,6 +1177,14 @@ export const SmartPassportMakerTool: React.FC = () => {
             minQ = midQ;
           }
         }
+
+        // If after binary search the file size is still below targetKb, pad to reach exact target KB
+        const targetBytes = Math.floor(targetKb * 1024 - 400);
+        const paddedUrl = padJpegDataUrl(dataUrl, targetBytes);
+        if (paddedUrl && paddedUrl !== dataUrl) {
+          dataUrl = paddedUrl;
+          sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+        }
       }
 
       setFinalDataUrl(dataUrl);
@@ -1018,7 +1198,8 @@ export const SmartPassportMakerTool: React.FC = () => {
     contrast,
     saturation,
     printLayout,
-    sheetResolution,
+    sheetPresetId,
+    showCuttingGuides,
     enableCustomKb,
     targetKb,
     getTargetPixelDimensions
@@ -1287,6 +1468,121 @@ export const SmartPassportMakerTool: React.FC = () => {
               className="max-h-[60vh] w-auto max-w-full object-contain cursor-crosshair"
             />
           </div>
+
+          {/* 1-Pixel Precision Loupe Drag & Nudge Control Bar */}
+          {corners ? (
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>1-Pixel Precision Nudge (सटीक पिक्सेल कंट्रोल):</span>
+                  <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                    कीबोर्ड Arrows (↑, ↓, ←, →) या नीचे दिए बटन दबाएं
+                  </span>
+                </div>
+
+                {/* Selected Corner Tabs */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  {(['tl', 'tr', 'br', 'bl'] as const).map((k) => {
+                    const shortNames: Record<string, string> = { tl: '1. TL', tr: '2. TR', br: '3. BR', bl: '4. BL' };
+                    const isSel = selectedCorner === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCorner(k);
+                          setActiveCorner(k);
+                          setMagnifierPos(corners[k]);
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
+                          isSel
+                            ? 'bg-red-600 text-white shadow-xs scale-105'
+                            : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {shortNames[k]}: ({corners[k].x}, {corners[k].y})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 1-Pixel Directional Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                  चयनित कोना: <span className="font-black text-red-600 dark:text-red-400 uppercase">{selectedCorner}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => nudgeCorner(selectedCorner, -1, 0)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 cursor-pointer shadow-xs active:scale-95"
+                    title="1 पिक्सेल बाएं"
+                  >
+                    ⬅️ 1px
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nudgeCorner(selectedCorner, 0, -1)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 cursor-pointer shadow-xs active:scale-95"
+                    title="1 पिक्सेल ऊपर"
+                  >
+                    ⬆️ 1px
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nudgeCorner(selectedCorner, 0, 1)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 cursor-pointer shadow-xs active:scale-95"
+                    title="1 पिक्सेल नीचे"
+                  >
+                    ⬇️ 1px
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nudgeCorner(selectedCorner, 1, 0)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 cursor-pointer shadow-xs active:scale-95"
+                    title="1 पिक्सेल दाएं"
+                  >
+                    ➡️ 1px
+                  </button>
+
+                  <div className="h-4 w-px bg-slate-300 dark:bg-slate-600 mx-1" />
+
+                  <button
+                    type="button"
+                    onClick={() => nudgeCorner(selectedCorner, -5, 0)}
+                    className="px-2 py-1 text-[11px] font-semibold rounded-md bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 cursor-pointer"
+                    title="5 पिक्सेल बाएं"
+                  >
+                    -5px
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nudgeCorner(selectedCorner, 5, 0)}
+                    className="px-2 py-1 text-[11px] font-semibold rounded-md bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 cursor-pointer"
+                    title="5 पिक्सेल दाएं"
+                  >
+                    +5px
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/40 flex items-center justify-between gap-3">
+              <span className="text-xs text-amber-800 dark:text-amber-200">
+                AI विज़न फोटो स्कैन कर रहा है। यदि कोने स्वतः न दिखें तो फोटो पर टैप करें अथवा नीचे बटन दबाएं:
+              </span>
+              <button
+                type="button"
+                onClick={() => originalImage && setCorners(getInnerCardDefaultCorners(originalImage.width, originalImage.height))}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shrink-0 shadow-xs"
+              >
+                📐 चारों कोने सेट करें
+              </button>
+            </div>
+          )}
 
           {/* Action Row */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
@@ -1648,7 +1944,7 @@ export const SmartPassportMakerTool: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
               <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-200 dark:border-slate-800">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  फाइनल आउटपुट प्रीव्यू ({printLayout === 'single' ? 'सिंगल पासपोर्ट फोटो' : `${printLayout.toUpperCase()} प्रिंटेबल शीट`})
+                  फाइनल आउटपुट प्रीव्यू ({printLayout === 'single' ? 'सिंगल पासपोर्ट फोटो' : `${SHEET_PRESETS[sheetPresetId]?.label || 'प्रिंटेबल शीट'}`})
                 </span>
                 <span className="text-[11px] font-mono text-slate-500">
                   {finalDimensions.width} × {finalDimensions.height} px
@@ -1656,16 +1952,46 @@ export const SmartPassportMakerTool: React.FC = () => {
               </div>
 
               {finalDataUrl || workingDataUrl || straightenedDataUrl ? (
-                <div className="p-2 bg-white rounded-xl shadow-lg border border-slate-300">
+                <div
+                  className={`bg-white rounded-xl shadow-xl border border-slate-300 overflow-hidden flex items-center justify-center transition-all ${
+                    printLayout === 'single' ? 'p-2' : 'p-1'
+                  }`}
+                  style={
+                    printLayout !== 'single'
+                      ? {
+                          width: sheetPaperType === 'a4' ? '280px' : '340px',
+                          maxWidth: '100%',
+                          aspectRatio: `${finalDimensions.width} / ${finalDimensions.height}`
+                        }
+                      : undefined
+                  }
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={finalDataUrl || workingDataUrl || straightenedDataUrl}
                     alt="Final Passport Photo"
-                    className="max-h-[340px] w-auto object-contain rounded"
+                    className={`${
+                      printLayout === 'single'
+                        ? 'max-h-[340px] w-auto object-contain rounded'
+                        : 'w-full h-full object-contain'
+                    }`}
                   />
                 </div>
               ) : (
                 <div className="w-48 h-60 bg-slate-200 animate-pulse rounded-xl" />
+              )}
+
+              {/* Strict Physical Scale Engine Rule Bar */}
+              {printLayout !== 'single' && (
+                <div className="w-full mt-3 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold">
+                    <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span>Individual Photo: <strong className="font-mono text-emerald-600 dark:text-emerald-400">3.5 × 4.5 cm (413 × 531 px)</strong></span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Resolution: <strong className="text-slate-700 dark:text-slate-300">300 DPI</strong> • <span className="text-emerald-600 dark:text-emerald-400 font-bold">Ready for Epson/Canon/HP Print</span>
+                  </div>
+                </div>
               )}
 
               {/* Real-Time Stats Badges */}
@@ -2039,114 +2365,232 @@ export const SmartPassportMakerTool: React.FC = () => {
                 )}
               </div>
 
-              {/* PRINT SHEET LAYOUT */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Grid className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>फोटो शीट लेआउट (Printable Sheet)</span>
-                </label>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { id: 'single', label: '1 Photo (Online)' },
-                    { id: '4x', label: '4 Photos (Wallet)' },
-                    { id: '6x', label: '6 Photos (4x6)' },
-                    { id: '8x', label: '8 Photos (4x6)' },
-                    { id: '12x', label: '12 Photos (A4)' }
-                  ].map((l) => (
-                    <button
-                      key={l.id}
-                      type="button"
-                      onClick={() => handleLayoutChange(l.id as 'single' | '4x' | '6x' | '8x' | '12x')}
-                      className={`py-1.5 px-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer text-center ${
-                        printLayout === l.id
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {l.label}
-                    </button>
-                  ))}
+              {/* SUCCESS MESSAGE BANNER */}
+              {sheetSuccessMsg && (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-150">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{sheetSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* PRINT SHEET LAYOUT & PAPER ENGINE */}
+              <div className="space-y-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Grid className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>फोटो शीट लेआउट (Print Ready Engine)</span>
+                  </label>
+                  <span className="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.2 rounded uppercase">
+                    300 DPI Scale
+                  </span>
                 </div>
 
-                {/* Ultra HD Print Resolution Selector when Sheet Layout is Selected */}
+                {/* Single vs Sheet Mode Selector */}
+                <div className="grid grid-cols-2 gap-1.5 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrintLayout('single');
+                      setTimeout(() => generateFinalPhoto(), 50);
+                    }}
+                    className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                      printLayout === 'single'
+                        ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    1 Photo (ऑनलाइन फॉर्म)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (printLayout === 'single') {
+                        handleSelectSheetPreset(sheetPaperType === 'a4' ? 'a4_6' : '4x6_6');
+                      }
+                    }}
+                    className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                      printLayout !== 'single'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    प्रिंटेबल शीट (A4 / 4×6)
+                  </button>
+                </div>
+
                 {printLayout !== 'single' && (
-                  <div className="mt-2 p-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1.5 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-indigo-950 dark:text-indigo-200">
-                      <span>🖨️ प्रिंटर HD रिज़ॉल्यूशन (Color Print Quality):</span>
-                      <span className="text-[10px] bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.5 rounded font-black">
-                        {sheetResolution === '600dpi' ? '600 DPI Studio 4K' : sheetResolution === '450dpi' ? '450 DPI Ultra HD' : sheetResolution === 'a4_300' ? 'A4 300 DPI' : '300 DPI Standard HD'}
-                      </span>
+                  <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                    {/* Paper Type Selection: A4 vs 4x6 */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">पेपर साइज (Paper Size):</span>
+                      <div className="grid grid-cols-2 gap-1 text-[11px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSheetPaperType('a4');
+                            handleSelectSheetPreset('a4_6');
+                          }}
+                          className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                            sheetPaperType === 'a4'
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div>Standard A4</div>
+                          <div className="text-[9px] opacity-80">210 × 297 mm</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSheetPaperType('4x6');
+                            handleSelectSheetPreset('4x6_6');
+                          }}
+                          className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                            sheetPaperType === '4x6'
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div>4×6 Inch Photo Paper</div>
+                          <div className="text-[9px] opacity-80">101.6 × 152.4 mm</div>
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setSheetResolution('300dpi')}
-                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                          sheetResolution === '300dpi'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <div>300 DPI (Standard HD)</div>
-                        <div className="text-[9px] opacity-80">1200 × 1800 px (4×6)</div>
-                      </button>
+                    {/* Presets Grid */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">ग्रिड लेआउट (Strict Non-Stretch):</span>
+                      <div className="space-y-1">
+                        {sheetPaperType === 'a4' ? (
+                          <>
+                            {[
+                              { id: 'a4_6' as SheetPresetId, label: '6 Photos (Half Sheet Top)', desc: '2×3 • A4 का शीर्ष ~30% (बाकी साफ़)' },
+                              { id: 'a4_8_horiz' as SheetPresetId, label: '8 Photos (Compact Top)', desc: '2×4 • शीर्ष ~35% (65% खाली पेपर)' },
+                              { id: 'a4_12' as SheetPresetId, label: '12 Photos (Half Section)', desc: '4×3 • A4 का ऊपरी आधा हिस्सा' },
+                              { id: 'a4_full_30' as SheetPresetId, label: '30 Photos (Full Sheet A4)', desc: '6×5 • संपूर्ण A4 शीट भरें' }
+                            ].map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => handleSelectSheetPreset(preset.id)}
+                                className={`w-full p-1.5 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between text-[11px] ${
+                                  sheetPresetId === preset.id
+                                    ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span>{preset.label}</span>
+                                <span className="text-[9px] opacity-80">{preset.desc}</span>
+                              </button>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            {[
+                              { id: '4x6_4' as SheetPresetId, label: '4 Photos (Wallet Size)', desc: '2×2 • 4×6 Portrait' },
+                              { id: '4x6_6' as SheetPresetId, label: '6 Photos (Studio Classic)', desc: '2×3 • 4×6 Landscape' },
+                              { id: '4x6_8' as SheetPresetId, label: '8 Photos (Max Fill 4×6)', desc: '2×4 • अधिकतम 4×6 उपयोग' }
+                            ].map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => handleSelectSheetPreset(preset.id)}
+                                className={`w-full p-1.5 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between text-[11px] ${
+                                  sheetPresetId === preset.id
+                                    ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span>{preset.label}</span>
+                                <span className="text-[9px] opacity-80">{preset.desc}</span>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setSheetResolution('450dpi')}
-                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                          sheetResolution === '450dpi'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
-                        }`}
+                    {/* Cutting Guide Line Checkbox */}
+                    <div className="pt-1 border-t border-indigo-200 dark:border-indigo-800 flex items-center justify-between text-[11px] text-indigo-950 dark:text-indigo-200">
+                      <label
+                        onClick={() => {
+                          const next = !showCuttingGuides;
+                          setShowCuttingGuides(next);
+                          setTimeout(() => generateFinalPhoto(), 50);
+                        }}
+                        className="flex items-center gap-1.5 cursor-pointer select-none font-bold"
                       >
-                        <div>450 DPI (Ultra HD)</div>
-                        <div className="text-[9px] opacity-80">1800 × 2700 px (4×6)</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSheetResolution('600dpi')}
-                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                          sheetResolution === '600dpi'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <div>600 DPI (Studio Master 4K)</div>
-                        <div className="text-[9px] opacity-80">2400 × 3600 px (Photo Paper)</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSheetResolution('a4_300')}
-                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                          sheetResolution === 'a4_300'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <div>A4 Sheet HD (300 DPI)</div>
-                        <div className="text-[9px] opacity-80">2480 × 3508 px</div>
-                      </button>
+                        {showCuttingGuides ? <CheckSquare className="w-3.5 h-3.5 text-indigo-600" /> : <Square className="w-3.5 h-3.5 text-slate-400" />}
+                        <span>1px कटिंग बॉर्डर व 2.5mm गैप</span>
+                      </label>
+                      <span className="font-mono text-[10px] text-slate-500">Fixed 35×45mm</span>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* DOWNLOAD BUTTON */}
+              {/* DOWNLOAD & EXPORT BUTTON GROUP */}
               <div className="space-y-2 pt-2">
-                <a
-                  href={finalDataUrl}
-                  download={`${fileName}_passport_${printLayout}.jpg`}
-                  className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all active:scale-95"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>📥 पासपोर्ट फोटो डाउनलोड करें ({finalFileSizeKb} KB)</span>
-                </a>
+                {printLayout === 'single' ? (
+                  <a
+                    href={finalDataUrl}
+                    download={`${fileName || 'passport'}_single.jpg`}
+                    className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all active:scale-95"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>📥 पासपोर्ट फोटो डाउनलोड करें ({finalFileSizeKb} KB)</span>
+                  </a>
+                ) : (
+                  <div className="space-y-1.5">
+                    {/* Button 1: Direct Print (100% Scale / No-Margin) */}
+                    <button
+                      type="button"
+                      onClick={handlePrintSheet}
+                      className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>🖨️ डायरेक्ट प्रिंट (100% स्केल / No-Margin)</span>
+                    </button>
 
-                <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {/* Button 2: Export Print-Ready PDF */}
+                      <button
+                        type="button"
+                        onClick={handleExportSheetPdf}
+                        disabled={isExportingPdf}
+                        className="py-2.5 px-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-black text-[11px] flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+                      >
+                        {isExportingPdf ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                        <span>📄 एक्सपोर्ट PDF (300 DPI)</span>
+                      </button>
+
+                      {/* Button 3: Export Layered PSD */}
+                      <button
+                        type="button"
+                        onClick={handleExportSheetPsd}
+                        disabled={isExportingPsd}
+                        className="py-2.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-[11px] flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+                      >
+                        {isExportingPsd ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileImage className="w-3.5 h-3.5" />}
+                        <span>🎨 एक्सपोर्ट PSD (Photoshop)</span>
+                      </button>
+                    </div>
+
+                    {/* Button 4: Ultra HD PNG/JPEG */}
+                    <a
+                      href={finalDataUrl}
+                      download={`${fileName || 'Passport'}_Sheet_${sheetPresetId}_300DPI.jpg`}
+                      className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>🖼️ Ultra HD इमेज डाउनलोड करें (300 DPI)</span>
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setStep('studio')}

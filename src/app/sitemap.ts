@@ -29,7 +29,7 @@ function parseSafeDate(val: unknown, fallback: Date): Date {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://npjobportal.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.in';
   const now = new Date();
 
   // Static Key Pages
@@ -52,6 +52,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.85,
     },
+    // Category Pages
     {
       url: `${baseUrl}/category/latest-jobs`,
       lastModified: now,
@@ -77,16 +78,204 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${baseUrl}/category/answer-keys`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/category/syllabus`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/category/admission`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
       url: `${baseUrl}/category/police`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.85,
     },
     {
+      url: `${baseUrl}/category/teaching`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/category/railway`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/category/ssc`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/category/upsc`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/category/banking`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    // Individual Government Tools Deep Links
+    {
+      url: `${baseUrl}/tools?tool=photo-resizer`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.92,
+    },
+    {
+      url: `${baseUrl}/tools?tool=smart-passport-maker`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.92,
+    },
+    {
+      url: `${baseUrl}/tools?tool=printable-photo-sheet`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.92,
+    },
+    {
+      url: `${baseUrl}/tools?tool=name-date-photo`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/tools?tool=signature-resizer`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/tools?tool=image-increaser`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-compress`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.92,
+    },
+    {
+      url: `${baseUrl}/tools?tool=convert-to-pdf`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-merge`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.88,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-split-unlock`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.88,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-rearrange`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-remove-pages`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-to-images`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=word-to-pdf`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=pdf-to-word`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=ocr-word`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=image-joiner`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=format-converter`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=document-enhancer`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/tools?tool=age-calculator`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    // Institutional & Legal Pages
+    {
       url: `${baseUrl}/about-us`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/contact-us`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/privacy-policy`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/terms-conditions`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
     },
     {
       url: `${baseUrl}/disclaimer`,

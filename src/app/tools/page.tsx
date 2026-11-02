@@ -27,7 +27,8 @@ import {
   Trash2,
   Sun,
   Moon,
-  Menu
+  Menu,
+  Printer
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Header } from '../../components/Header';
@@ -60,6 +61,11 @@ function ToolLoadingSkeleton() {
 // Dynamic Imports for Sub-Second Lazy Loading
 const SmartPassportMakerTool = dynamic(
   () => import('../../components/tools/SmartPassportMakerTool').then((m) => m.SmartPassportMakerTool),
+  { loading: () => <ToolLoadingSkeleton />, ssr: false }
+);
+
+const PrintablePhotoSheetTool = dynamic(
+  () => import('../../components/tools/PrintablePhotoSheetTool').then((m) => m.PrintablePhotoSheetTool),
   { loading: () => <ToolLoadingSkeleton />, ssr: false }
 );
 
@@ -156,6 +162,7 @@ const AgeCalculatorTool = dynamic(
 export type ToolId =
   | 'photo-resizer'
   | 'smart-passport-maker'
+  | 'printable-photo-sheet'
   | 'name-date-photo'
   | 'image-joiner'
   | 'signature-resizer'
@@ -224,6 +231,21 @@ const TOOLS_CONFIG: ToolItem[] = [
     description: 'टेबल पर रखी टेढ़ी-मेढ़ी पासपोर्ट फोटो को मोबाइल बैक कैमरा से खींचकर अपलोड करें। 4 कॉर्नर चुनकर सीधा करें और AI से उंगली/परछाई मिटाकर 3.5×4.5cm SSC/MPESB फोटो तैयार करें।',
     orderNumber: 2,
     keywords: ['passport size photo maker', 'straighten angled passport photo', 'ai object remover passport photo', 'mobile camera passport photo', 'स्मार्ट पासपोर्ट फोटो']
+  },
+  {
+    id: 'printable-photo-sheet',
+    name: 'Printable Photo Sheet Generator (Epson/Canon Photo Paper & A4)',
+    shortName: 'Printable Photo Sheet',
+    hindiName: 'प्रिंटेबल फोटो शीट जनरेटर (A4 व 4×6 ग्लॉसी कार्ड)',
+    category: 'image',
+    categoryLabel: '📷 Image Tools',
+    badge: '300 DPI Exact Scale • PDF / PSD',
+    icon: Printer,
+    iconColor: 'text-indigo-400',
+    iconBg: 'bg-indigo-500/10 border-indigo-500/30',
+    description: 'सख्त 3.5×4.5 cm (413×531px @ 300 DPI) नॉन-स्ट्रेच फिजिकल स्केल। A4 पेपर (6, 8, 12, 30 फोटो) या 4×6 ग्लॉसी कार्ड (4, 6, 8 फोटो)। 1px बॉर्डर, 2.5mm गैप। डायरेक्ट प्रिंट, Vector PDF, layered PSD व Ultra HD इमेज एक्सपोर्ट।',
+    orderNumber: 3,
+    keywords: ['printable photo sheet generator', 'passport photo sheet a4', '4x6 photo print', '35mm x 45mm 300 dpi', 'epson photo sheet', 'canon photo paper print']
   },
   {
     id: 'name-date-photo',
@@ -665,34 +687,97 @@ export default function ToolsPage() {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
       theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
     }`}>
-      {/* Schema.org WebApplication Metadata for Search Engines */}
+      {/* Schema.org WebApplication, ItemList & FAQ Metadata for Search Engines */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "WebApplication",
-            "name": "NP Job Portal Document & Image Tools Suite",
-            "url": "https://npjobportal.com/tools",
-            "applicationCategory": "UtilitiesApplication",
-            "operatingSystem": "All",
-            "author": {
-              "@type": "Person",
-              "name": "Nitish Khobragade",
-              "jobTitle": "Founder & Career Counselor",
-              "telephone": "+918982324497"
-            },
-            "publisher": {
-              "@type": "Organization",
-              "name": "NP Job Portal — A Unit of NTechBay",
-              "url": "https://npjobportal.com"
-            },
-            "offers": {
-              "@type": "Offer",
-              "price": "0",
-              "priceCurrency": "INR"
-            },
-            "description": "100% Free Client-Side Document & Image Tools Suite: Image compressor in KB, Passport photo maker with DOP, Signature resizer 10-20KB, PDF compressor under 200KB, Universal convert to PDF, PDF to Images 300 DPI, Re-arrange PDF pages, Remove PDF pages, and Age Calculator."
+            "@graph": [
+              {
+                "@type": "WebApplication",
+                "@id": "https://npjobportal.in/tools#webapp",
+                "name": "NP Job Portal Government Examination Document & Image Tools Suite",
+                "alternateName": [
+                  "NP Job Portal Tools",
+                  "NP JOB PORTAL Photo & PDF Tools",
+                  "npjobportal.in tools"
+                ],
+                "url": "https://npjobportal.in/tools",
+                "applicationCategory": "UtilitiesApplication",
+                "operatingSystem": "All (Web, Android, iOS, Windows, Mac)",
+                "author": {
+                  "@type": "Person",
+                  "name": "Nitish Khobragade",
+                  "alternateName": "Nitish Kumar Khobragade",
+                  "jobTitle": "Founder & Career Counselor",
+                  "telephone": "+918982324497",
+                  "url": "https://nitishkhobragade.github.io/portfolio.nitish/"
+                },
+                "publisher": {
+                  "@type": "Organization",
+                  "name": "NP Job Portal — A Unit of NTechBay",
+                  "url": "https://npjobportal.in",
+                  "logo": "https://nitishkhobragade.github.io/portfolio.nitish/img/logo.png"
+                },
+                "offers": {
+                  "@type": "Offer",
+                  "price": "0",
+                  "priceCurrency": "INR"
+                },
+                "description": "100% Free Client-Side Document & Image Tools Suite: Image compressor in KB (SSC 20-50KB, MPESB, UPSC), Passport photo maker 35mm x 45mm 300 DPI, Printable A4 / 4x6 photo sheet generator, Signature resizer 10-20KB, PDF compressor under 200KB, PDF merge, split, Word to PDF, and Age Calculator."
+              },
+              {
+                "@type": "ItemList",
+                "@id": "https://npjobportal.in/tools#tool-list",
+                "name": "Government Exam Online Form Filling Tools",
+                "itemListElement": TOOLS_CONFIG.map((t, idx) => ({
+                  "@type": "ListItem",
+                  "position": idx + 1,
+                  "name": t.name,
+                  "url": `https://npjobportal.in/tools?tool=${t.id}`,
+                  "description": t.description
+                }))
+              },
+              {
+                "@type": "FAQPage",
+                "@id": "https://npjobportal.in/tools#faq",
+                "mainEntity": [
+                  {
+                    "@type": "Question",
+                    "name": "How to resize and compress photo to 20 KB - 50 KB on NP Job Portal?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Upload your photo in 'Image Size Reducer / Photo Resizer' tool on NP Job Portal (npjobportal.in), select your exam preset (e.g. SSC, MPESB, UPSC) or enter your custom Target KB (e.g. 50 KB, 25 KB). The tool automatically resizes and adjusts or increases the file size to precisely match the required limit without losing quality."
+                    }
+                  },
+                  {
+                    "@type": "Question",
+                    "name": "Can I increase image size in KB if my photo is below 20 KB?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Yes! NP Job Portal's Image Size Increaser and Photo Resizer tool automatically increases/pads the file size up to your desired KB (e.g. 20 KB, 25 KB, 50 KB) without blurring the image, ensuring your photo passes strict government portal validation."
+                    }
+                  },
+                  {
+                    "@type": "Question",
+                    "name": "How to create a 300 DPI passport photo print sheet on A4 or 4x6 paper?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Use the 'Printable Photo Sheet Generator' tool on NP Job Portal. Choose your paper size (Standard A4 or 4x6 Glossy Photo Paper) and photo count (6, 8, 12, or Full Sheet). Photos maintain exact physical 35mm x 45mm dimensions at 300 DPI with 1px light gray cutting borders for easy trimming."
+                    }
+                  },
+                  {
+                    "@type": "Question",
+                    "name": "Is my data safe when using NP Job Portal tools?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "100% Safe. All image processing, PDF compression, and document conversions run completely inside your local browser. Your photos, signatures, and documents are never uploaded or stored on any server."
+                    }
+                  }
+                ]
+              }
+            ]
           })
         }}
       />
@@ -1303,6 +1388,11 @@ export default function ToolsPage() {
             <ToolErrorBoundary toolName={currentTool.name}>
               {activeTool === 'photo-resizer' && <PhotoResizerTool />}
               {activeTool === 'smart-passport-maker' && <SmartPassportMakerTool />}
+              {activeTool === 'printable-photo-sheet' && (
+                <PrintablePhotoSheetTool
+                  onNavigateToPassportMaker={() => openTool('smart-passport-maker')}
+                />
+              )}
               {activeTool === 'name-date-photo' && <NameDateOnPhotoTool />}
               {activeTool === 'image-joiner' && <ImageJoinerTool />}
               {activeTool === 'signature-resizer' && <SignatureTool />}

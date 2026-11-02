@@ -210,12 +210,13 @@ export const PhotoResizerTool: React.FC = () => {
       }
       ctx.restore();
 
-      // Compress strictly under target KB
+      // Compress strictly under target KB with Bidirectional Target Enforcer (reduces or pads to reach exact KB)
       const effectiveTargetKb = typeof targetKb === 'number' && targetKb > 0 ? targetKb : 50;
       const bestBlob = await compressCanvasStrictlyUnderTarget(canvas, {
         targetKb: effectiveTargetKb,
         mimeType: 'image/jpeg',
-        safetyMarginBytes: 512,
+        safetyMarginBytes: 400,
+        padToTarget: true,
       });
 
       if (!bestBlob || bestBlob.size === 0) throw new Error('इमेज कंप्रेस नहीं हो सकी।');
@@ -278,7 +279,7 @@ export const PhotoResizerTool: React.FC = () => {
           पासपोर्ट फोटो रिसाइज़र व कंप्रेसर (Photo Resizer &amp; Target KB)
         </h2>
         <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-          20KB - 50KB • SSC / व्यापम / UPSC
+          20KB - 50KB • घटाएं या बढ़ाएं (Increase / Reduce)
         </span>
       </div>
 
@@ -363,8 +364,8 @@ export const PhotoResizerTool: React.FC = () => {
                 className="w-full px-3 py-1.5 text-xs font-bold bg-neutral-50 border border-neutral-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-red-500 focus:outline-hidden"
               />
               {/* Quick KB Chips */}
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {[20, 30, 40, 50, 70, 100, 200].map((kb) => (
+              <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                {[20, 25, 30, 40, 50, 70, 100, 200].map((kb) => (
                   <button
                     key={kb}
                     type="button"
@@ -379,6 +380,9 @@ export const PhotoResizerTool: React.FC = () => {
                   </button>
                 ))}
               </div>
+              <p className="text-[10px] text-neutral-500 font-medium mt-1">
+                ⚡ <strong>द्वि-दिशात्मक साइज़ गारंटी (Bidirectional Size Enforcer):</strong> यदि फोटो या सिग्नेचर (उदा. 140×60) छोटे हैं, तो भी साइज़ को 20 KB, 25 KB या 50 KB तक सुरक्षित रूप से बढ़ा दिया जाएगा ताकि सरकारी परीक्षा पोर्टल रिजेक्ट न करे।
+              </p>
             </div>
 
             {/* Dimension Checkbox & Controls */}
