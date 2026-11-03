@@ -279,7 +279,7 @@ export async function compressCanvasStrictlyUnderTarget(
       try {
         const buffer = await finalBlob.arrayBuffer();
         const paddedBytes = padJpegBytes(buffer, safeTargetBytes);
-        finalBlob = new Blob([paddedBytes.buffer], { type: 'image/jpeg' });
+        finalBlob = new Blob([paddedBytes], { type: 'image/jpeg' });
       } catch (err) {
         console.warn('JPEG padding fallback to unpadded blob:', err);
       }

@@ -93,7 +93,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
   }, [results, searchQuery]);
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-2 sm:px-4 my-6 overflow-hidden">
+    <section id="three-column-section" className="w-full max-w-7xl mx-auto px-2 sm:px-4 my-6 overflow-hidden scroll-mt-20">
       {/* Section Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-neutral-200">
         <div>
@@ -151,7 +151,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start w-full max-w-full overflow-hidden">
         
         {/* ================= COLUMN 1: LATEST JOBS ================= */}
-        <div className="bg-white rounded-xl border-2 border-red-200/90 shadow-sm overflow-hidden flex flex-col">
+        <div id="latest-jobs-col" className="bg-white rounded-xl border-2 border-red-200/90 shadow-sm overflow-hidden flex flex-col scroll-mt-24 transition-all">
           {/* Column Header */}
           <div className="bg-linear-to-r from-red-700 via-rose-700 to-red-800 text-white px-4 py-3 flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
@@ -305,7 +305,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
         </div>
 
         {/* ================= COLUMN 2: ADMIT CARD ================= */}
-        <div className="bg-white rounded-xl border-2 border-blue-200/90 shadow-sm overflow-hidden flex flex-col">
+        <div id="admit-card-col" className="bg-white rounded-xl border-2 border-blue-200/90 shadow-sm overflow-hidden flex flex-col scroll-mt-24 transition-all">
           {/* Column Header */}
           <div className="bg-linear-to-r from-blue-700 via-indigo-700 to-blue-800 text-white px-4 py-3 flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
@@ -428,7 +428,7 @@ export const ThreeColumnLayout: React.FC<ThreeColumnLayoutProps> = ({
         </div>
 
         {/* ================= COLUMN 3: RESULTS / ANSWER KEYS ================= */}
-        <div className="bg-white rounded-xl border-2 border-emerald-200/90 shadow-sm overflow-hidden flex flex-col">
+        <div id="results-col" className="bg-white rounded-xl border-2 border-emerald-200/90 shadow-sm overflow-hidden flex flex-col scroll-mt-24 transition-all">
           {/* Column Header */}
           <div className="bg-linear-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white px-4 py-3 flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">

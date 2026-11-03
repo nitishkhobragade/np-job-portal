@@ -118,11 +118,36 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
   const activeTab = getActiveTab();
 
-  const handleHomeClick = () => {
+  const handleHomeClick = (e: React.MouseEvent) => {
+    setMobileMenuOpen(false);
     if (setSelectedCategory) {
       setSelectedCategory('All Updates');
     }
+    if (pathname === '/') {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleNavTabClick = (categoryName: string, targetColId?: string) => (e: React.MouseEvent) => {
     setMobileMenuOpen(false);
+    if (pathname === '/' && setSelectedCategory) {
+      // ON HOMEPAGE: Execute instant in-page category switch & smooth scroll in 0ms without slow route unmount!
+      e.preventDefault();
+      setSelectedCategory(categoryName);
+      if (targetColId) {
+        const el = document.getElementById(targetColId) || document.getElementById('three-column-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else {
+      if (setSelectedCategory) {
+        setSelectedCategory(categoryName);
+      }
+    }
   };
 
   const categories = [
@@ -141,6 +166,16 @@ const HeaderInner: React.FC<HeaderProps> = ({
   const handleCategoryPillClick = (cat: string) => {
     if (setSelectedCategory) {
       setSelectedCategory(cat);
+    }
+    const targetMap: Record<string, string> = {
+      'Latest Jobs': 'latest-jobs-col',
+      'Admit Card': 'admit-card-col',
+      'Results': 'results-col',
+    };
+    const targetId = targetMap[cat] || 'three-column-section';
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     setMobileMenuOpen(false);
   };
@@ -268,6 +303,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
             <Link
               href="/"
               onClick={handleHomeClick}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase flex items-center gap-1 cursor-pointer ${
                 activeTab === 'home'
                   ? 'bg-red-700 text-white shadow-sm'
@@ -279,9 +315,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/latest-jobs"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Latest Jobs');
-              }}
+              onClick={handleNavTabClick('Latest Jobs', 'latest-jobs-col')}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'latest-jobs'
                   ? 'bg-red-700 text-white shadow-sm'
@@ -293,9 +328,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/admit-card"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Admit Card');
-              }}
+              onClick={handleNavTabClick('Admit Card', 'admit-card-col')}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'admit-card'
                   ? 'bg-red-700 text-white shadow-sm'
@@ -307,9 +341,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/results"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Results');
-              }}
+              onClick={handleNavTabClick('Results', 'results-col')}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'results'
                   ? 'bg-red-700 text-white shadow-sm'
@@ -321,9 +354,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/mp-special"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('MP Special');
-              }}
+              onClick={handleNavTabClick('MP Special', 'three-column-section')}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase font-black flex items-center gap-1 cursor-pointer ${
                 activeTab === 'mp-special'
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
@@ -335,9 +367,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/tech-jobs"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Tech Jobs');
-              }}
+              onClick={handleNavTabClick('Tech Jobs', 'three-column-section')}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase font-bold flex items-center gap-1 cursor-pointer ${
                 activeTab === 'tech-jobs'
                   ? 'bg-blue-600 text-white shadow-sm'
@@ -350,9 +381,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/ssc-upsc"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('SSC/UPSC');
-              }}
+              onClick={handleNavTabClick('SSC/UPSC', 'three-column-section')}
+              prefetch={true}
               className={`px-3 py-1.5 transition-colors uppercase cursor-pointer ${
                 activeTab === 'central-ssc'
                   ? 'bg-red-700 text-white shadow-sm'
@@ -506,6 +536,7 @@ const HeaderInner: React.FC<HeaderProps> = ({
             <Link
               href="/"
               onClick={handleHomeClick}
+              prefetch={true}
               className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer ${
                 activeTab === 'home' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
@@ -516,10 +547,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/latest-jobs"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Latest Jobs');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleNavTabClick('Latest Jobs', 'latest-jobs-col')}
+              prefetch={true}
               className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer ${
                 activeTab === 'latest-jobs' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
@@ -530,10 +559,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/mp-special"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('MP Special');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleNavTabClick('MP Special', 'three-column-section')}
+              prefetch={true}
               className={`text-left px-2.5 py-1.5 rounded-lg border font-black flex items-center justify-between cursor-pointer ${
                 activeTab === 'mp-special'
                   ? 'bg-amber-500 text-slate-950 border-amber-400'
@@ -546,10 +573,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/tech-jobs"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Tech Jobs');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleNavTabClick('Tech Jobs', 'three-column-section')}
+              prefetch={true}
               className={`text-left px-2.5 py-1.5 rounded-lg border font-bold flex items-center justify-between cursor-pointer ${
                 activeTab === 'tech-jobs'
                   ? 'bg-blue-600 text-white border-blue-500'
@@ -562,10 +587,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/ssc-upsc"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('SSC/UPSC');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleNavTabClick('SSC/UPSC', 'three-column-section')}
+              prefetch={true}
               className={`text-left px-2.5 py-1.5 rounded-lg cursor-pointer ${
                 activeTab === 'central-ssc' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
@@ -575,10 +598,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/admit-card"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Admit Card');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleNavTabClick('Admit Card', 'admit-card-col')}
+              prefetch={true}
               className={`px-2.5 py-1.5 rounded-lg cursor-pointer ${
                 activeTab === 'admit-card' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}
@@ -588,10 +609,8 @@ const HeaderInner: React.FC<HeaderProps> = ({
 
             <Link
               href="/category/results"
-              onClick={() => {
-                if (setSelectedCategory) setSelectedCategory('Results');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleNavTabClick('Results', 'results-col')}
+              prefetch={true}
               className={`px-2.5 py-1.5 rounded-lg cursor-pointer ${
                 activeTab === 'results' ? 'bg-red-700 text-white' : 'hover:bg-slate-800 text-slate-200'
               }`}

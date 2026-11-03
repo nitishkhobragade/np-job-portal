@@ -135,6 +135,9 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1
     }
+  },
+  alternates: {
+    canonical: "https://npjobportal.in"
   }
 };
 
@@ -271,17 +274,6 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-x-hidden w-full max-w-full`}
     >
       <head>
-        {/* Favicons & Google Search Branding Icons */}
-        <link rel="icon" type="image/png" href="https://nitishkhobragade.github.io/portfolio.nitish/img/logo.png" />
-        <link rel="apple-touch-icon" href="https://nitishkhobragade.github.io/portfolio.nitish/img/logo.png" />
-        <link rel="shortcut icon" href="https://nitishkhobragade.github.io/portfolio.nitish/img/logo.png" />
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon.png" />
-        <link rel="icon" type="image/png" sizes="416x416" href="/logo.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="canonical" href="https://npjobportal.in" />
-
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

@@ -45,7 +45,18 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
   onSelectAdmit,
   onSelectResult
 }) => {
-  const [activeCategory, setActiveCategory] = useState<CategorySlug>(initialCategory);
+  const [userCategoryOverride, setUserCategoryOverride] = useState<CategorySlug | null>(null);
+  const [prevInitialCategory, setPrevInitialCategory] = useState(initialCategory);
+
+  if (prevInitialCategory !== initialCategory) {
+    setPrevInitialCategory(initialCategory);
+    setUserCategoryOverride(null);
+  }
+
+  const activeCategory = userCategoryOverride ?? initialCategory;
+  const setActiveCategory = (cat: CategorySlug) => {
+    setUserCategoryOverride(cat);
+  };
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -157,8 +168,13 @@ export const CompactCategoryView: React.FC<CompactCategoryViewProps> = ({
             return (
               <button
                 key={tab.slug}
-                onClick={() => setActiveCategory(tab.slug)}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                onClick={() => {
+                  setActiveCategory(tab.slug);
+                  if (typeof window !== 'undefined') {
+                    window.history.replaceState(null, '', `/category/${tab.slug}`);
+                  }
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   isActive
                     ? 'bg-red-700 text-white shadow-xs'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'

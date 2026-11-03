@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, useMemo, use } from 'react';
 import Link from 'next/link';
 import { Header } from '../../../components/Header';
 import { CompactCategoryView, CategorySlug } from '../../../components/CompactCategoryView';
@@ -95,13 +95,29 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   const currentCategorySlug = slugToCategory(rawSlug);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedHeaderCategory, setSelectedHeaderCategory] = useState(
-    currentCategorySlug === 'tech-jobs'
-      ? 'Tech Jobs'
-      : currentCategorySlug === 'mp-special'
-      ? 'MP Special'
-      : 'All Updates'
-  );
+  const [userSelectedCategory, setUserSelectedCategory] = useState<string | null>(null);
+  const [prevSlug, setPrevSlug] = useState(currentCategorySlug);
+
+  if (prevSlug !== currentCategorySlug) {
+    setPrevSlug(currentCategorySlug);
+    setUserSelectedCategory(null);
+  }
+
+  const defaultCategoryTitle = useMemo(() => {
+    const slugMap: Record<string, string> = {
+      'latest-jobs': 'Latest Jobs',
+      'admit-card': 'Admit Card',
+      'results': 'Results',
+      'mp-special': 'MP Special',
+      'tech-jobs': 'Tech Jobs',
+      'ssc-upsc': 'SSC/UPSC',
+      'police': 'Police',
+      'railway': 'Railway',
+    };
+    return slugMap[currentCategorySlug] || 'All Updates';
+  }, [currentCategorySlug]);
+
+  const selectedHeaderCategory = userSelectedCategory ?? defaultCategoryTitle;
 
   const initialPosts = getStoredPosts();
   const [liveJobs, setLiveJobs] = useState<JobItem[]>(() =>
@@ -162,7 +178,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         selectedCategory={selectedHeaderCategory}
-        setSelectedCategory={setSelectedHeaderCategory}
+        setSelectedCategory={setUserSelectedCategory}
       />
 
       {/* 2. Breadcrumb bar */}
