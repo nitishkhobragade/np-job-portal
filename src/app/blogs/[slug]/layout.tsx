@@ -8,7 +8,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.in';
+  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.vercel.app';
+  const baseUrl = rawUrl.replace(/\/+$/, '');
 
   let title: string | undefined;
   let summary: string | undefined;

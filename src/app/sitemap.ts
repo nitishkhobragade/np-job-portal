@@ -29,7 +29,8 @@ function parseSafeDate(val: unknown, fallback: Date): Date {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.in';
+  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.vercel.app';
+  const baseUrl = rawUrl.replace(/\/+$/, '');
   const now = new Date();
 
   // Static Key Pages

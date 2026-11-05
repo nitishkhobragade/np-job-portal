@@ -38,12 +38,12 @@ export const metadata: Metadata = {
     'nitish khobragade'
   ],
   alternates: {
-    canonical: 'https://npjobportal.in/tools',
+    canonical: `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.vercel.app').replace(/\/+$/, '')}/tools`,
   },
   openGraph: {
     title: 'Free Govt Form Tools Suite – Photo Resizer, Image Compressor & PDF Tools | NP Job Portal',
     description: '100% Private Client-Side Online Form Tools: Passport Photo Maker, Image Compressor (20-50KB), Signature Resizer (10-20KB), 300 DPI Photo Sheet Generator, PDF Compress under 200KB.',
-    url: 'https://npjobportal.in/tools',
+    url: `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.vercel.app').replace(/\/+$/, '')}/tools`,
     siteName: 'NP Job Portal',
     type: 'website',
     locale: 'hi_IN',

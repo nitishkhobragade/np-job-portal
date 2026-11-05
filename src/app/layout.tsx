@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://npjobportal.in"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://npjobportal.vercel.app"),
   title: {
     default: "NP Job Portal - Latest MP & Central Govt Jobs, Admit Card, Results | Nitish Khobragade (NTechBay)",
     template: "%s | NP Job Portal (NTechBay)"
@@ -153,7 +153,7 @@ export const metadata: Metadata = {
     }
   },
   alternates: {
-    canonical: "https://npjobportal.in"
+    canonical: (process.env.NEXT_PUBLIC_SITE_URL || "https://npjobportal.vercel.app").replace(/\/+$/, '')
   },
   verification: {
     google: "googlee1dd6021669e73ba"

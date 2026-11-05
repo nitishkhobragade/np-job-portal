@@ -9,7 +9,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.in';
+  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.vercel.app';
+  const baseUrl = rawUrl.replace(/\/+$/, '');
 
   // 1. Check static detailed jobs dataset
   const staticJob = getJobDetailBySlug(slug) || DETAILED_JOBS_LIST.find((j) => j.slug === slug);
