@@ -1,6 +1,8 @@
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://npjobportal.in').replace(/\/+$/, '');
+
   return {
     rules: [
       {
@@ -19,7 +21,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/admin/', '/api/'],
       },
     ],
-    sitemap: 'https://npjobportal.in/sitemap.xml',
-    host: 'https://npjobportal.in',
+    sitemap: `${baseUrl}/sitemap.xml`,
+    host: baseUrl,
   };
 }

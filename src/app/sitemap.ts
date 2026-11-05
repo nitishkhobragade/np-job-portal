@@ -66,6 +66,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${baseUrl}/category/tech-jobs`,
+      lastModified: now,
+      changeFrequency: 'hourly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/category/ssc-upsc`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.88,
+    },
+    {
       url: `${baseUrl}/category/admit-card`,
       lastModified: now,
       changeFrequency: 'hourly',
@@ -335,5 +347,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Graceful fallback
   }
 
-  return [...staticRoutes, ...staticJobRoutes, ...dynamicJobRoutes, ...dynamicBlogRoutes];
+  // Deduplicate URLs to ensure 100% compliant sitemap
+  const urlMap = new Map<string, MetadataRoute.Sitemap[number]>();
+  for (const item of [...staticRoutes, ...staticJobRoutes, ...dynamicJobRoutes, ...dynamicBlogRoutes]) {
+    urlMap.set(item.url, item);
+  }
+
+  return Array.from(urlMap.values());
 }
