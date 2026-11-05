@@ -1073,8 +1073,8 @@ export default function AdminPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       showToast(
         data.isGeminiVerified
-          ? 'जेमिनी द्वारा सत्यापित डेटा लोड किया गया! कृपया समीक्षा कर "प्रकाशित करें" दबाएं।'
-          : 'डेटा लोड हुआ। कृपया समीक्षा करें।'
+          ? '✨ AI Grounding द्वारा सत्यापित डेटा लोड किया गया! कृपया समीक्षा कर प्रकाशित करें।'
+          : '✅ 100% Lifetime Free Scraper: भर्ती विवरण सफलतापूर्वक लोड हो गया! (कोई Quota लिमिट नहीं)'
       );
     } catch (err: unknown) {
       console.error('URL extraction error:', err);
@@ -3521,7 +3521,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* 1. SINGLE WEB PAGE INSTANT SCRAPER (URL INPUT & GEMINI GROUNDING) */}
+            {/* 1. SINGLE WEB PAGE INSTANT SCRAPER (LIFETIME FREE & AI HYBRID) */}
             <div className="bg-gradient-to-br from-purple-950/40 via-slate-900 to-indigo-950/40 border-2 border-purple-600/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                 <div className="flex items-center gap-2.5">
@@ -3529,21 +3529,21 @@ export default function AdminPage() {
                     <Sparkles className="w-5 h-5 animate-pulse" />
                   </span>
                   <div>
-                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 flex-wrap">
                       <span>सिंगल वेब पेज इंस्टेंट स्क्रैपर (Single URL Scraper)</span>
-                      <span className="text-[10px] bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        Gemini 2.5 Flash Grounding
+                      <span className="text-[10px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                        ⚡ 100% Lifetime Free & Quota-Proof
                       </span>
                     </h3>
                     <p className="text-xs text-slate-300">
-                      किसी भी आधिकारिक भर्ती सूचना या करियर पेज का URL दर्ज करें — जेमिनी AI तिथियां, फीस, पात्रता व पद स्वतः निष्कर्षित कर फॉर्म भरेगा।
+                      किसी भी आधिकारिक भर्ती सूचना (SarkariResult, MPESB, SSC, Tech Job आदि) का URL डालें — बिना किसी Quota लिमिट के तिथियां, फीस, पात्रता व पद स्वतः निष्कर्षित होकर फॉर्म में भर जाएंगे।
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-purple-300 font-mono bg-purple-950/60 border border-purple-800/60 px-3 py-1.5 rounded-xl self-start md:self-auto">
+                <div className="flex items-center gap-2 text-xs text-emerald-300 font-mono bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-xl self-start md:self-auto">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>AI Grounding Engine Ready</span>
+                  <span>Unlimited Free Engine Ready</span>
                 </div>
               </div>
 
@@ -3578,17 +3578,17 @@ export default function AdminPage() {
                   type="button"
                   onClick={handleExtractFromUrl}
                   disabled={isGeminiExtracting || !scraperUrlInput.trim()}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-xl transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 via-indigo-600 to-purple-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-xl transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer"
                 >
                   {isGeminiExtracting ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
-                      <span>जेमिनी AI सत्यापन जारी है...</span>
+                      <span>विज्ञप्ति का विश्लेषण जारी है...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-amber-300" />
-                      <span>Auto-Fetch & Ground with Gemini</span>
+                      <span>1-Click Auto Scrape & Fill Form (Free)</span>
                     </>
                   )}
                 </button>

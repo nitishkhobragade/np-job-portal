@@ -5,6 +5,7 @@ import { db } from '../../../../lib/firebase';
 import { PostRecord } from '../../../../types';
 import { formatDateToDDMMYYYY } from '../../../../lib/postRouting';
 import { runSafeBatchAutoScraper } from '../../../../lib/sarkariScraper';
+import { parseRecruitmentHtml } from '../../../../lib/nativeJobScraper';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
 
     let pdfBase64 = '';
     let fetchedText = '';
+    let fetchedHtml = '';
 
     // Fetch official webpage or PDF with realistic user agent & 12s timeout
     const fetchController = new AbortController();
@@ -114,8 +116,8 @@ export async function POST(req: NextRequest) {
           pdfBase64 = Buffer.from(arrayBuf).toString('base64');
         }
       } else {
-        const rawHtml = await resp.text();
-        fetchedText = extractCleanTextFromHtml(rawHtml);
+        fetchedHtml = await resp.text();
+        fetchedText = extractCleanTextFromHtml(fetchedHtml);
       }
     } catch (fetchErr: unknown) {
       clearTimeout(timeout);
@@ -129,6 +131,7 @@ export async function POST(req: NextRequest) {
       category: 'latest-jobs',
       sourceUrl: cleanUrl,
       rawContext: fetchedText,
+      rawHtml: fetchedHtml,
       pdfBase64,
       ai
     });
@@ -164,6 +167,7 @@ interface ExtractionParams {
   category?: string;
   sourceUrl: string;
   rawContext?: string;
+  rawHtml?: string;
   pdfBase64?: string;
   ai: GoogleGenAI | null;
 }
@@ -174,6 +178,7 @@ async function extractAndCreateDraft({
   category,
   sourceUrl,
   rawContext,
+  rawHtml,
   pdfBase64,
   ai
 }: ExtractionParams): Promise<PostRecord | null> {
@@ -236,6 +241,46 @@ async function extractAndCreateDraft({
     syllabusUrl: sourceUrl,
     officialWebsiteUrl: sourceUrl
   };
+
+  // 100% Lifetime Free Native Extraction Baseline
+  if (rawHtml) {
+    try {
+      const native = parseRecruitmentHtml(rawHtml, sourceUrl);
+      if (native) {
+        extracted = {
+          ...extracted,
+          title: native.title || extracted.title,
+          shortTitle: native.shortTitle || extracted.shortTitle,
+          dept: native.dept || extracted.dept,
+          totalPosts: native.totalPosts ? String(native.totalPosts) : extracted.totalPosts,
+          category: native.category || extracted.category,
+          state: native.isTechJob ? 'All India' : 'MP',
+          startDate: native.startDate || extracted.startDate,
+          lastDate: native.lastDate || extracted.lastDate,
+          lastDateFee: native.lastDateFee || native.lastDate || extracted.lastDateFee,
+          examDate: native.examDate || extracted.examDate,
+          admitCardDate: native.admitCardDate || extracted.admitCardDate,
+          feeGeneral: native.feeGeneral || extracted.feeGeneral,
+          feeReserved: native.feeReserved || extracted.feeReserved,
+          feeOBC: native.feeGeneral || extracted.feeOBC,
+          feeSCST: native.feeReserved || extracted.feeSCST,
+          feePortal: native.feePortal || extracted.feePortal,
+          paymentMode: native.paymentMode || extracted.paymentMode,
+          minAge: native.minAge || extracted.minAge,
+          maxAge: native.maxAge || extracted.maxAge,
+          ageRelaxation: native.ageRelaxation || extracted.ageRelaxation,
+          qualificationSummary: native.qualification || native.eligibility || extracted.qualificationSummary,
+          description: native.description || extracted.description,
+          roleOverview: native.roleOverview || extracted.roleOverview,
+          applyUrl: native.applyUrl || extracted.applyUrl,
+          notificationPdfUrl: native.notificationPdfUrl || extracted.notificationPdfUrl,
+          officialWebsiteUrl: native.officialSite || extracted.officialWebsiteUrl
+        };
+      }
+    } catch (parseErr) {
+      console.warn('Native parser non-fatal error in draft creation:', parseErr);
+    }
+  }
 
   if (ai) {
     try {

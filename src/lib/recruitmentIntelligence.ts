@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { PostRecord } from '../types';
+import { parseRecruitmentHtml } from './nativeJobScraper';
 
 export interface AuditDiagnosticItem {
   status: 'verified' | 'warning' | 'critical';
@@ -475,48 +476,57 @@ Return pure valid JSON matching this schema:
   "verificationTag": "Live Internet Grounded"
 }`;
 
-  const response = await generateContentWithModelFallback(ai, {
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            text: `${extractionPrompt}\n\nTarget URL: ${urlOrText.url || 'N/A'}\n\nInput Content:\n${(urlOrText.rawText || '').slice(0, 10000)}`
-          }
-        ]
+  try {
+    const response = await generateContentWithModelFallback(ai, {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `${extractionPrompt}\n\nTarget URL: ${urlOrText.url || 'N/A'}\n\nInput Content:\n${(urlOrText.rawText || '').slice(0, 10000)}`
+            }
+          ]
+        }
+      ],
+      config: {
+        tools: [{ googleSearch: {} }]
       }
-    ],
-    config: {
-      tools: [{ googleSearch: {} }]
+    });
+
+    const responseText = response.text || '';
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Gemini did not return valid JSON for multi-category extraction');
     }
-  });
 
-  const responseText = response.text || '';
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Gemini did not return valid JSON for multi-category extraction');
-  }
+    const parsed = JSON.parse(jsonMatch[0]);
 
-  const parsed = JSON.parse(jsonMatch[0]);
-
-  // Extract grounding sources
-  const groundingMetadata = (response.candidates?.[0] as { groundingMetadata?: { groundingChunks?: Array<{ web?: { title?: string; uri?: string } }> } })?.groundingMetadata;
-  const groundingSources: Array<{ title: string; url: string }> = [];
-  if (groundingMetadata?.groundingChunks) {
-    for (const chunk of groundingMetadata.groundingChunks) {
-      if (chunk.web?.uri) {
-        groundingSources.push({
-          title: chunk.web.title || 'Official Source',
-          url: chunk.web.uri
-        });
+    // Extract grounding sources
+    const groundingMetadata = (response.candidates?.[0] as { groundingMetadata?: { groundingChunks?: Array<{ web?: { title?: string; uri?: string } }> } })?.groundingMetadata;
+    const groundingSources: Array<{ title: string; url: string }> = [];
+    if (groundingMetadata?.groundingChunks) {
+      for (const chunk of groundingMetadata.groundingChunks) {
+        if (chunk.web?.uri) {
+          groundingSources.push({
+            title: chunk.web.title || 'Official Source',
+            url: chunk.web.uri
+          });
+        }
       }
     }
-  }
 
-  return {
-    ...parsed,
-    status: 'draft',
-    isPublished: false,
-    groundingSources
-  };
+    return {
+      ...parsed,
+      status: 'draft',
+      isPublished: false,
+      groundingSources
+    };
+  } catch (err: unknown) {
+    console.warn('Gemini extraction unavailable (429/quota/offline), using 100% Free Native Scraper:', err);
+    const native = parseRecruitmentHtml(urlOrText.rawText || '', urlOrText.url || '');
+    return {
+      ...native,
+      verificationTag: '100% Lifetime Free Native Scraper'
+    };
+  }
 }
