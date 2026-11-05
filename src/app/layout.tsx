@@ -138,6 +138,9 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "https://npjobportal.in"
+  },
+  verification: {
+    google: "googlee1dd6021669e73ba"
   }
 };
 
